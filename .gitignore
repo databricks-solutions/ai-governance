@@ -3,3 +3,13 @@
 __pycache__
 .idea/
 .env
+
+# Python / uv
+.venv/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+
+# Databricks Asset Bundles
+.databricks/
+bundle.tf.json

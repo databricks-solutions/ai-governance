@@ -1,0 +1,129 @@
+{
+  "datasets": [
+    {
+      "name": "tokens_by_day",
+      "displayName": "Tokens by day",
+      "queryLines": [
+        "SELECT date(request_time) AS day,\n",
+        "       sum(input_token_count) AS input_tokens,\n",
+        "       sum(output_token_count) AS output_tokens\n",
+        "FROM system.serving.endpoint_usage\n",
+        "WHERE request_time >= current_date() - INTERVAL 30 DAYS\n",
+        "GROUP BY date(request_time)\n",
+        "ORDER BY day"
+      ]
+    },
+    {
+      "name": "tokens_by_user",
+      "displayName": "Top users by tokens",
+      "queryLines": [
+        "SELECT requester AS user,\n",
+        "       sum(input_token_count + output_token_count) AS total_tokens\n",
+        "FROM system.serving.endpoint_usage\n",
+        "WHERE request_time >= current_date() - INTERVAL 30 DAYS\n",
+        "GROUP BY requester\n",
+        "ORDER BY total_tokens DESC\n",
+        "LIMIT 10"
+      ]
+    },
+    {
+      "name": "cost_by_day",
+      "displayName": "Model Serving cost by day",
+      "queryLines": [
+        "SELECT u.usage_date,\n",
+        "       round(sum(u.usage_quantity * p.pricing.default), 2) AS cost_usd\n",
+        "FROM system.billing.usage u\n",
+        "JOIN system.billing.list_prices p\n",
+        "  ON u.sku_name = p.sku_name AND u.usage_unit = p.usage_unit\n",
+        " AND u.usage_end_time BETWEEN p.price_start_time AND coalesce(p.price_end_time, current_timestamp())\n",
+        "WHERE u.billing_origin_product = 'MODEL_SERVING'\n",
+        "  AND u.usage_date >= current_date() - INTERVAL 30 DAYS\n",
+        "GROUP BY u.usage_date\n",
+        "ORDER BY u.usage_date"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "overview",
+      "displayName": "Unity AI Gateway — FinOps",
+      "layout": [
+        {
+          "widget": {
+            "name": "tokens_by_day_chart",
+            "queries": [
+              {
+                "name": "main",
+                "query": {
+                  "datasetName": "tokens_by_day",
+                  "fields": [
+                    {"name": "day", "expression": "`day`"},
+                    {"name": "input_tokens", "expression": "`input_tokens`"},
+                    {"name": "output_tokens", "expression": "`output_tokens`"}
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {"fieldName": "day", "scale": {"type": "temporal"}, "displayName": "Day"},
+                "y": {"fieldName": "input_tokens", "scale": {"type": "quantitative"}, "displayName": "Tokens"}
+              }
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "cost_by_day_chart",
+            "queries": [
+              {
+                "name": "main",
+                "query": {
+                  "datasetName": "cost_by_day",
+                  "fields": [
+                    {"name": "usage_date", "expression": "`usage_date`"},
+                    {"name": "cost_usd", "expression": "`cost_usd`"}
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {"fieldName": "usage_date", "scale": {"type": "temporal"}, "displayName": "Day"},
+                "y": {"fieldName": "cost_usd", "scale": {"type": "quantitative"}, "displayName": "Cost (USD)"}
+              }
+            }
+          },
+          "position": {"x": 3, "y": 0, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "tokens_by_user_table",
+            "queries": [
+              {
+                "name": "main",
+                "query": {
+                  "datasetName": "tokens_by_user",
+                  "fields": [
+                    {"name": "user", "expression": "`user`"},
+                    {"name": "total_tokens", "expression": "`total_tokens`"}
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {"version": 1, "widgetType": "table", "encodings": {}}
+          },
+          "position": {"x": 0, "y": 6, "width": 6, "height": 6}
+        }
+      ]
+    }
+  ]
+}

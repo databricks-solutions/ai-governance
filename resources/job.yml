@@ -1,0 +1,50 @@
+# Optional job that runs the five core model-governance labs end to end against the
+# deployed gateway endpoint. Useful for a guided POC walkthrough or CI smoke test.
+resources:
+  jobs:
+    run_core_labs:
+      name: "[AI Governance] Run core Unity AI Gateway labs"
+      tasks:
+        - task_key: rate_limiting
+          notebook_task:
+            notebook_path: ../labs/models/01-rate-limiting/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+        - task_key: ai_guardrails
+          depends_on:
+            - task_key: rate_limiting
+          notebook_task:
+            notebook_path: ../labs/models/02-ai-guardrails/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+        - task_key: fallbacks
+          depends_on:
+            - task_key: ai_guardrails
+          notebook_task:
+            notebook_path: ../labs/models/04-fallbacks/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+        - task_key: traffic_routing
+          depends_on:
+            - task_key: fallbacks
+          notebook_task:
+            notebook_path: ../labs/models/05-traffic-routing/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+        - task_key: usage_tracking_finops
+          depends_on:
+            - task_key: traffic_routing
+          notebook_task:
+            notebook_path: ../labs/models/03-usage-tracking-finops/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
