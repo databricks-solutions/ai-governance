@@ -27,29 +27,27 @@
 
 # COMMAND ----------
 
-from databricks.sdk.service.serving import ServedEntityInput, TrafficConfig, Route
+# Both entities wrap Databricks Foundation Models as external models (see Lab 04).
+# `external_entity` / `primary_target` / `update_config` come from `shared/setup`.
+CHAMPION_TARGET = primary_target()  # keep whatever the endpoint currently fronts
+CHALLENGER_TARGET = "databricks-gpt-oss-120b"
+print(f"Champion wraps:   {CHAMPION_TARGET}")
+print(f"Challenger wraps: {CHALLENGER_TARGET}")
 
-CHALLENGER_MODEL = "databricks-meta-llama-3-1-8b-instruct"
+ENTITIES = [
+    external_entity("champion", CHAMPION_TARGET),
+    external_entity("challenger", CHALLENGER_TARGET),
+]
 
-current = w.serving_endpoints.get(ENDPOINT_NAME)
-primary_model = current.config.served_entities[0].entity_name
-print(f"Champion (primary): {primary_model}")
-print(f"Challenger:         {CHALLENGER_MODEL}")
-
-w.serving_endpoints.update_config(
-    name=ENDPOINT_NAME,
-    served_entities=[
-        ServedEntityInput(name="champion", entity_name=primary_model, entity_version="1", scale_to_zero_enabled=True),
-        ServedEntityInput(name="challenger", entity_name=CHALLENGER_MODEL, entity_version="1", scale_to_zero_enabled=True),
-    ],
-    traffic_config=TrafficConfig(
-        routes=[
-            Route(served_model_name="champion", traffic_percentage=50),
-            Route(served_model_name="challenger", traffic_percentage=50),
+update_config(
+    served_entities=ENTITIES,
+    traffic_config={
+        "routes": [
+            {"served_model_name": "champion", "traffic_percentage": 50},
+            {"served_model_name": "challenger", "traffic_percentage": 50},
         ]
-    ),
+    },
 )
-w.serving_endpoints.wait_get_serving_endpoint_not_updating(name=ENDPOINT_NAME)
 print("50/50 split is live.")
 
 # COMMAND ----------
@@ -81,16 +79,16 @@ print("Routing roughly matches the 50/50 traffic config (variance is expected ov
 # COMMAND ----------
 
 def set_split(champion_pct: int, challenger_pct: int):
-    w.serving_endpoints.update_config(
-        name=ENDPOINT_NAME,
-        traffic_config=TrafficConfig(
-            routes=[
-                Route(served_model_name="champion", traffic_percentage=champion_pct),
-                Route(served_model_name="challenger", traffic_percentage=challenger_pct),
+    # The config API replaces the whole config, so re-send the entities each time.
+    update_config(
+        served_entities=ENTITIES,
+        traffic_config={
+            "routes": [
+                {"served_model_name": "champion", "traffic_percentage": champion_pct},
+                {"served_model_name": "challenger", "traffic_percentage": challenger_pct},
             ]
-        ),
+        },
     )
-    w.serving_endpoints.wait_get_serving_endpoint_not_updating(name=ENDPOINT_NAME)
     print(f"Split updated: champion={champion_pct}% challenger={challenger_pct}%")
 
 

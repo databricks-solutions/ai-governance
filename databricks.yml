@@ -24,8 +24,13 @@ variables:
 
 targets:
   dev:
-    mode: development
+    # No `mode: development` so resource names stay literal (e.g. `ai-governance-gateway`),
+    # matching the variables and the names the labs/docs reference. Development mode would
+    # prepend a per-user prefix that breaks the job parameters and inference-table target.
     default: true
-    # Set your workspace host here or via the DATABRICKS_HOST env / a CLI profile.
-    # workspace:
-    #   host: https://<your-workspace>.cloud.databricks.com
+    # The host must be set explicitly here (not just via a CLI profile): the
+    # external-model served entity reads `${workspace.host}` as its target URL, and that
+    # substitution only resolves when the target's workspace.host is defined. Change this
+    # to your own workspace before deploying.
+    workspace:
+      host: https://adb-984752964297111.11.azuredatabricks.net

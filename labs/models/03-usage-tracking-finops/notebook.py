@@ -50,24 +50,27 @@ print("Sent 5 requests through the gateway endpoint.")
 # MAGIC %md
 # MAGIC ## 3. Token usage from system tables
 # MAGIC `system.serving.endpoint_usage` records per-request token counts and the requesting
-# MAGIC identity. Filter to our endpoint.
+# MAGIC identity, keyed by `served_entity_id`. Join `system.serving.served_entities` to map
+# MAGIC that id to an `endpoint_name` and filter to our endpoint. (Serving usage rows can lag
+# MAGIC live traffic by a while, so this may be empty right after a run — re-run later.)
 
 # COMMAND ----------
 
 usage = spark.sql(
     f"""
     SELECT
-      requester                                AS user,
-      date(request_time)                       AS day,
-      count(*)                                 AS requests,
-      sum(input_token_count)                   AS input_tokens,
-      sum(output_token_count)                  AS output_tokens,
-      sum(input_token_count + output_token_count) AS total_tokens
-    FROM system.serving.endpoint_usage
-    WHERE served_entity_name IS NOT NULL
-      AND endpoint_name = '{ENDPOINT_NAME}'
-      AND request_time >= current_date() - INTERVAL 7 DAYS
-    GROUP BY requester, date(request_time)
+      u.requester                                  AS user,
+      date(u.request_time)                         AS day,
+      count(*)                                     AS requests,
+      sum(u.input_token_count)                     AS input_tokens,
+      sum(u.output_token_count)                    AS output_tokens,
+      sum(u.input_token_count + u.output_token_count) AS total_tokens
+    FROM system.serving.endpoint_usage u
+    JOIN system.serving.served_entities se
+      ON u.served_entity_id = se.served_entity_id
+    WHERE se.endpoint_name = '{ENDPOINT_NAME}'
+      AND u.request_time >= current_date() - INTERVAL 7 DAYS
+    GROUP BY u.requester, date(u.request_time)
     ORDER BY day DESC, total_tokens DESC
     """
 )

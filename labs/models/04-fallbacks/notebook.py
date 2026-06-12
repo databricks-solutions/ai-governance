@@ -21,48 +21,34 @@
 
 # MAGIC %md
 # MAGIC ## 1. Add a fallback served entity
-# MAGIC The endpoint ships with a single served entity (`primary`). We read its current config,
-# MAGIC keep the existing primary, and append a second model as the fallback. The Gateway treats
-# MAGIC served entities in order, so the primary stays first and the fallback second.
+# MAGIC The endpoint fronts a Databricks Foundation Model via an external-model served entity.
+# MAGIC We keep that `primary` and append a second model (also wrapped as an external model)
+# MAGIC as the fallback. The Gateway treats served entities in order, so `primary` stays first
+# MAGIC and `fallback` second. `external_entity` / `primary_target` / `update_config` come from
+# MAGIC `shared/setup`.
 
 # COMMAND ----------
 
-from databricks.sdk.service.serving import ServedEntityInput, TrafficConfig, Route
+FALLBACK_TARGET = "databricks-gpt-oss-120b"
 
-FALLBACK_MODEL = "databricks-meta-llama-3-1-8b-instruct"
+# Preserve whatever the current primary wraps, then add the fallback.
+primary = primary_target()
+print(f"Primary wraps:  {primary}")
+print(f"Fallback wraps: {FALLBACK_TARGET}")
 
-# Discover the existing primary entity rather than assuming its model name.
-current = w.serving_endpoints.get(ENDPOINT_NAME)
-primary = current.config.served_entities[0]
-primary_model = primary.entity_name
-print(f"Existing primary served entity: {primary.name} -> {primary_model}")
-
-w.serving_endpoints.update_config(
-    name=ENDPOINT_NAME,
+update_config(
     served_entities=[
-        ServedEntityInput(
-            name="primary",
-            entity_name=primary_model,
-            entity_version="1",
-            scale_to_zero_enabled=True,
-        ),
-        ServedEntityInput(
-            name="fallback",
-            entity_name=FALLBACK_MODEL,
-            entity_version="1",
-            scale_to_zero_enabled=True,
-        ),
+        external_entity("primary", primary),
+        external_entity("fallback", FALLBACK_TARGET),
     ],
-    traffic_config=TrafficConfig(
-        routes=[
-            Route(served_model_name="primary", traffic_percentage=100),
-            Route(served_model_name="fallback", traffic_percentage=0),
+    traffic_config={
+        "routes": [
+            {"served_model_name": "primary", "traffic_percentage": 100},
+            {"served_model_name": "fallback", "traffic_percentage": 0},
         ]
-    ),
+    },
 )
-print("Endpoint now has a primary + fallback served entity. Waiting for it to be ready...")
-w.serving_endpoints.wait_get_serving_endpoint_not_updating(name=ENDPOINT_NAME)
-print("Ready.")
+print("Endpoint now has a primary + fallback served entity, and is ready.")
 
 # COMMAND ----------
 
