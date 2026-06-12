@@ -55,19 +55,86 @@ def get_ai_gateway(endpoint_name: str = None) -> dict:
     return resp.json().get("ai_gateway", {})
 
 
-def put_ai_gateway(config: dict, endpoint_name: str = None) -> dict:
-    """Update (PUT) the AI Gateway configuration for an endpoint.
+_GATEWAY_KEYS = [
+    "usage_tracking_config",
+    "inference_table_config",
+    "rate_limits",
+    "guardrails",
+    "fallback_config",
+]
 
-    `config` keys: usage_tracking_config, inference_table_config, rate_limits,
-    guardrails, fallback_config. Only the keys you pass are changed.
+
+def put_ai_gateway(config: dict, endpoint_name: str = None) -> dict:
+    """Update the AI Gateway configuration for an endpoint, merging into what's already set.
+
+    The `/ai-gateway` PUT replaces the *entire* gateway config, so this helper does a
+    read-modify-write: it reads the current config and overlays the keys you pass. This
+    keeps unrelated controls (e.g. usage tracking, payload logging) intact across labs.
+
+    Pass a key with value `None` to remove that control (e.g. `{"guardrails": None}`).
+    Recognized keys: usage_tracking_config, inference_table_config, rate_limits,
+    guardrails, fallback_config.
     """
     name = endpoint_name or ENDPOINT_NAME
+    current = get_ai_gateway(name)
+    merged = {k: current[k] for k in _GATEWAY_KEYS if k in current}
+    for k, v in config.items():
+        if v is None:
+            merged.pop(k, None)
+        else:
+            merged[k] = v
     resp = requests.put(
         f"{HOST}/api/2.0/serving-endpoints/{name}/ai-gateway",
         headers=_HEADERS,
-        data=json.dumps(config),
+        data=json.dumps(merged),
     )
     resp.raise_for_status()
+    return resp.json()
+
+
+def external_entity(name: str, target_endpoint: str, task: str = "llm/v1/chat") -> dict:
+    """Build an external-model served entity that wraps another Databricks serving
+    endpoint (provider `databricks-model-serving`). Reuses the shared auth secret.
+
+    The base gateway endpoint fronts a Databricks Foundation Model this way (the
+    `databricks-*` models are pre-provisioned system endpoints, not re-servable models),
+    so labs that add served entities must do the same.
+    """
+    return {
+        "name": name,
+        "external_model": {
+            "name": target_endpoint,
+            "provider": "databricks-model-serving",
+            "task": task,
+            "databricks_model_serving_config": {
+                "databricks_workspace_url": HOST,
+                "databricks_api_token": "{{secrets/ai_governance/api_token}}",
+            },
+        },
+    }
+
+
+def primary_target(endpoint_name: str = None) -> str:
+    """Return the target endpoint that the current `primary` served entity wraps."""
+    name = endpoint_name or ENDPOINT_NAME
+    ep = w.serving_endpoints.get(name)
+    return ep.config.served_entities[0].external_model.name
+
+
+def update_config(served_entities: list, traffic_config: dict = None, endpoint_name: str = None) -> dict:
+    """Update an endpoint's served entities (and optionally traffic config), then wait
+    for it to finish reconciling."""
+    name = endpoint_name or ENDPOINT_NAME
+    body = {"served_entities": served_entities}
+    if traffic_config:
+        body["traffic_config"] = traffic_config
+    resp = requests.put(
+        f"{HOST}/api/2.0/serving-endpoints/{name}/config",
+        headers=_HEADERS,
+        data=json.dumps(body),
+    )
+    resp.raise_for_status()
+    w.serving_endpoints.wait_get_serving_endpoint_not_updating(name=name)
     return resp.json()
 
 
@@ -94,4 +161,7 @@ def show_json(obj) -> None:
     print(json.dumps(obj, indent=2, default=str))
 
 
-print("Loaded helpers: get_ai_gateway, put_ai_gateway, invoke, show_json")
+print(
+    "Loaded helpers: get_ai_gateway, put_ai_gateway, external_entity, primary_target, "
+    "update_config, invoke, show_json"
+)

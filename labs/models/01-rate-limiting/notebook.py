@@ -35,18 +35,19 @@ show_json(get_ai_gateway())
 # MAGIC ## 2. Apply rate limits
 # MAGIC We set a small limit so it is easy to trip during the lab:
 # MAGIC
-# MAGIC - **Endpoint**: 5 requests / minute across all callers.
-# MAGIC - **Per user**: 2 requests / minute.
+# MAGIC - **Endpoint**: 2 requests / minute across all callers.
+# MAGIC - **Per user**: 1 request / minute.
 # MAGIC
 # MAGIC `key` selects the scope (`endpoint` or `user`); `renewal_period` is always `minute`.
+# MAGIC We use very low limits so a couple of requests trip them quickly.
 
 # COMMAND ----------
 
 put_ai_gateway(
     {
         "rate_limits": [
-            {"calls": 5, "renewal_period": "minute", "key": "endpoint"},
-            {"calls": 2, "renewal_period": "minute", "key": "user"},
+            {"calls": 2, "renewal_period": "minute", "key": "endpoint"},
+            {"calls": 1, "renewal_period": "minute", "key": "user"},
         ]
     }
 )
@@ -56,19 +57,26 @@ show_json(get_ai_gateway().get("rate_limits"))
 
 # MAGIC %md
 # MAGIC ## 3. Trip the limit
-# MAGIC Fire requests in a tight loop. Once the per-user limit (2/min) is exceeded the
-# MAGIC Gateway rejects further calls with HTTP `429` before they reach the model.
+# MAGIC Rate-limit enforcement is eventually consistent: it can take a short time to take
+# MAGIC effect after a config change. We poll — firing a small burst every few seconds — until
+# MAGIC the Gateway starts rejecting excess calls with HTTP `429` (before they reach the model).
 
 # COMMAND ----------
 
-results = []
-for i in range(6):
-    r = invoke(f"In one word, say hello (attempt {i}).", max_tokens=5)
-    results.append(r["status_code"])
-    print(f"attempt {i}: HTTP {r['status_code']}")
+import time
 
-print("\nStatus codes:", results)
-assert 429 in results, "Expected at least one 429 once the per-user limit is exceeded."
+deadline = time.time() + 120  # allow up to 2 minutes for the limit to propagate
+saw_429 = False
+attempt = 0
+while time.time() < deadline and not saw_429:
+    attempt += 1
+    codes = [invoke("In one word, say hello.", max_tokens=5)["status_code"] for _ in range(4)]
+    print(f"burst {attempt}: {codes}")
+    saw_429 = 429 in codes
+    if not saw_429:
+        time.sleep(10)
+
+assert saw_429, "Expected a 429 once the per-user limit is exceeded (enforcement did not engage within 2 minutes)."
 print("Rate limiting confirmed: requests past the limit were rejected with 429.")
 
 # COMMAND ----------

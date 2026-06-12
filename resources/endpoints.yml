@@ -2,6 +2,15 @@
 # features to. It is created with usage tracking + payload (inference table) logging on
 # from the start; the labs then layer on rate limits, guardrails, fallbacks, and traffic
 # routing so each control is demonstrated explicitly.
+#
+# The Databricks Foundation Models (e.g. databricks-meta-llama-3-3-70b-instruct) are
+# pre-provisioned *system* endpoints, not re-servable models. To put our own governed
+# endpoint in front of one, we wrap it as an external model with provider
+# `databricks-model-serving`. The auth token is read from a Databricks secret
+# (create it out of band so the value never lives in bundle state):
+#
+#   databricks secrets create-scope ai_governance
+#   databricks secrets put-secret ai_governance api_token --string-value <PAT>
 resources:
   model_serving_endpoints:
     ai_governance_gateway:
@@ -9,14 +18,13 @@ resources:
       config:
         served_entities:
           - name: primary
-            entity_name: ${var.base_model}
-            entity_version: "1"
-            # Pay-per-token Foundation Model: no provisioned capacity needed for the POC.
-            scale_to_zero_enabled: true
-        traffic_config:
-          routes:
-            - served_model_name: primary
-              traffic_percentage: 100
+            external_model:
+              name: ${var.base_model}
+              provider: databricks-model-serving
+              task: llm/v1/chat
+              databricks_model_serving_config:
+                databricks_workspace_url: ${workspace.host}
+                databricks_api_token: "{{secrets/ai_governance/api_token}}"
       ai_gateway:
         usage_tracking_config:
           enabled: true

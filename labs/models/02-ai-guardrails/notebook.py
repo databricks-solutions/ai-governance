@@ -95,4 +95,17 @@ show_json(r["body"])
 # MAGIC - Pair guardrails with **payload logging** (see Lab 03 / inference tables) to audit what
 # MAGIC   was blocked and why.
 # MAGIC
-# MAGIC **Teardown:** `put_ai_gateway({"guardrails": {}})` removes all guardrails.
+# MAGIC **Teardown:** `put_ai_gateway({"guardrails": None})` removes all guardrails.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Cleanup
+# MAGIC Reset guardrails so the endpoint returns to a clean state for other labs (topic
+# MAGIC moderation in particular would otherwise block their generic test prompts). Comment
+# MAGIC this out if you want the guardrails to persist.
+
+# COMMAND ----------
+
+put_ai_gateway({"guardrails": None})
+print("Guardrails reset. Current guardrails:", get_ai_gateway().get("guardrails"))
