@@ -1,0 +1,27 @@
+# Base chat serving endpoint that the model-governance labs attach Unity AI Gateway
+# features to. It is created with usage tracking + payload (inference table) logging on
+# from the start; the labs then layer on rate limits, guardrails, fallbacks, and traffic
+# routing so each control is demonstrated explicitly.
+resources:
+  model_serving_endpoints:
+    ai_governance_gateway:
+      name: ${var.gateway_endpoint}
+      config:
+        served_entities:
+          - name: primary
+            entity_name: ${var.base_model}
+            entity_version: "1"
+            # Pay-per-token Foundation Model: no provisioned capacity needed for the POC.
+            scale_to_zero_enabled: true
+        traffic_config:
+          routes:
+            - served_model_name: primary
+              traffic_percentage: 100
+      ai_gateway:
+        usage_tracking_config:
+          enabled: true
+        inference_table_config:
+          enabled: true
+          catalog_name: ${var.catalog}
+          schema_name: ${var.schema}
+          table_name_prefix: gateway
