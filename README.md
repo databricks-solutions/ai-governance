@@ -41,43 +41,38 @@ See [`docs/architecture.md`](docs/architecture.md) for detail.
 ## Labs
 
 ### 🧠 Unity AI Gateway for Models
-| # | Lab | Status | What it shows |
-|---|-----|--------|---------------|
-| 01 | [Rate limiting](labs/models/01-rate-limiting) | ✅ | Per-endpoint & per-user token/request limits; observe `429` |
-| 02 | [AI guardrails](labs/models/02-ai-guardrails) | ✅ | PII masking, safety, topic moderation, keyword filtering |
-| 03 | [Usage tracking & FinOps](labs/models/03-usage-tracking-finops) | ✅ | Tokens & cost via system tables + budget alert + AI/BI dashboard |
-| 04 | [Fallbacks](labs/models/04-fallbacks) | ✅ | Automatic failover across served entities |
-| 05 | [Traffic routing](labs/models/05-traffic-routing) | ✅ | Load balancing + A/B/canary across backends |
-| 06 | [External models](labs/models/06-external-models) | 🟡 | Govern third-party providers behind the Gateway |
-| 07 | [Semantic caching](labs/models/07-semantic-caching) | 🟡 | Vector Search cache to cut cost & latency |
+| # | Lab | What it shows |
+|---|-----|---------------|
+| 01 | [Rate limiting](labs/models/01-rate-limiting) | Per-endpoint & per-user token/request limits; observe `429` |
+| 02 | [AI guardrails](labs/models/02-ai-guardrails) | PII masking, safety, topic moderation, keyword filtering |
+| 03 | [Usage tracking & FinOps](labs/models/03-usage-tracking-finops) | Tokens & cost via system tables + budget alert + AI/BI dashboard |
+| 04 | [Fallbacks](labs/models/04-fallbacks) | Automatic failover across served entities |
+| 05 | [Traffic routing](labs/models/05-traffic-routing) | Load balancing + A/B/canary across backends |
 
 ### 🔧 Unity AI Gateway for Tools
-| Lab | Status | What it shows |
-|-----|--------|---------------|
-| [Managed MCP servers](labs/tools/01-managed-mcp) | ✅ | UC functions, Genie, Vector Search as governed MCP tools |
-| [MCP client authorization](labs/tools/02-mcp-authorization) | 🟡 | UC connections + managed OAuth for external tools |
-| [Function calling](labs/tools/03-function-calling) | ✅ | Unity Catalog functions as governed tools |
-| [Custom MCP on Apps](labs/tools/04-custom-mcp-app) | 🟡 | Host your own MCP server on Databricks Apps |
+| Lab | What it shows |
+|-----|---------------|
+| [Managed MCP servers](labs/tools/01-managed-mcp) | UC functions, Genie, Vector Search as governed MCP tools |
+| [Function calling](labs/tools/03-function-calling) | Unity Catalog functions as governed tools |
 
 ### 🤖 Unity AI Gateway for Agents
-| Lab | Status | What it shows |
-|-----|--------|---------------|
-| [Agent Framework](labs/agents/01-agent-framework) | ✅ | Mosaic AI agent on governed endpoints, logged + registered to UC |
-| [Agent evaluation](labs/agents/02-agent-evaluation) | ✅ | Evaluate & monitor governed agents with MLflow judges |
-| [OpenAI Agents SDK](labs/agents/03-openai-agents-sdk) | ✅ | Existing agent stack on the OpenAI-compatible endpoint |
-| [Multi-agent](labs/agents/04-multi-agent) | 🟡 | Agent-to-agent delegation through governed tools |
-
-### 🔨 Developer tools
-| Lab | Status |
-|-----|--------|
-| [Tracing](labs/dev-tools/tracing) · [Streaming](labs/dev-tools/streaming) · [Rate limit tester](labs/dev-tools/rate-limit-tester) · [Mock server](labs/dev-tools/mock-server) | 🟡 |
+| Lab | What it shows |
+|-----|---------------|
+| [Agent Framework](labs/agents/01-agent-framework) | Mosaic AI agent on governed endpoints, logged + registered to UC |
+| [Agent evaluation](labs/agents/02-agent-evaluation) | Evaluate & monitor governed agents with MLflow judges |
+| [OpenAI Agents SDK](labs/agents/03-openai-agents-sdk) | Existing agent stack on the OpenAI-compatible endpoint |
 
 ### 🏁 Capstone
-| Lab | Status | What it shows |
-|-----|--------|---------------|
-| [Zero to production](labs/zero-to-production) | ✅ | One endpoint, end to end: observability → guardrails → limits → fallback → governed tools → validate → checklist |
+| Lab | What it shows |
+|-----|---------------|
+| [Zero to production](labs/zero-to-production) | One endpoint, end to end: observability → guardrails → limits → fallback → governed tools → validate → checklist |
 
-✅ = built · 🟡 = planned (objective + outline provided)
+Every lab above is built, deployable, and verified end-to-end in a workspace.
+
+### Roadmap
+Planned additions: external-model providers, semantic caching (Vector Search), MCP client
+authorization, custom MCP on Databricks Apps, multi-agent orchestration, and developer
+utilities (tracing, streaming, rate-limit tester, mock server).
 
 ## Getting started
 
@@ -96,16 +91,16 @@ scripts/deploy.sh run
 ```
 
 Full prerequisites and walkthrough: [`docs/getting-started.md`](docs/getting-started.md).
-Governance design principles: [`docs/well-architected.md`](docs/well-architected.md).
+Architecture and where governance data lands: [`docs/architecture.md`](docs/architecture.md).
 
 ## Repository layout
 
 ```
 databricks.yml          Asset Bundle root (endpoint + schema + job)
 resources/              Bundle resource definitions
-shared/setup.py         %run helper used by the core labs
-labs/                   models / tools / agents / dev-tools
-docs/                   getting started, architecture, governance principles
+shared/setup.py         %run helper used by the labs
+labs/                   models / tools / agents / zero-to-production
+docs/                   getting started, architecture
 scripts/deploy.sh       CLI wrapper (validate / deploy / run / destroy)
 ```
 

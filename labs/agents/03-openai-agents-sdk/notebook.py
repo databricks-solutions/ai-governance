@@ -29,7 +29,7 @@
 # MAGIC ## 1. Point the Agents SDK at the governed endpoint
 # MAGIC `base_url` is the workspace serving root; the "model" is our endpoint name. `HOST` and
 # MAGIC `TOKEN` come from `shared/setup`. We disable the SDK's built-in tracing (it would call
-# MAGIC api.openai.com); use MLflow tracing instead — see `dev-tools/tracing`.
+# MAGIC api.openai.com); use MLflow tracing instead (`mlflow.openai.autolog()`).
 
 # COMMAND ----------
 
