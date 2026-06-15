@@ -1,23 +1,12 @@
+# The labs run as Databricks notebooks and each `%pip install`s its own dependencies, so
+# there are no project runtime dependencies. This file only configures ruff for linting
+# the notebook sources locally (`uvx ruff check` or `ruff check`).
 [project]
 name = "ai-governance"
 version = "0.1.0"
 description = "Hands-on labs for running a proof of concept with Databricks Unity AI Gateway."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-    "databricks-sdk>=0.40.0",
-    "mlflow>=2.20.0",
-    "openai>=1.50.0",
-    "requests>=2.32.0",
-    "polars>=1.0.0",
-    "pandas>=2.0.0",
-]
-
-[dependency-groups]
-dev = [
-    "ruff>=0.6.0",
-    "databricks-connect>=15.0.0",
-]
 
 [tool.ruff]
 line-length = 100

@@ -59,4 +59,4 @@ Models labs are independent controls on one endpoint; later categories build on 
 - **Tools** labs govern MCP servers and Unity Catalog functions that agents call.
 - **Agents** labs assemble agents whose every model/tool call flows through governed
   endpoints, inheriting all the Models-layer controls.
-- **Developer tools** support the inner loop (tracing, streaming, load testing, mocking).
+- The **zero-to-production** capstone composes these into one production-ready endpoint.

@@ -111,5 +111,4 @@ print("result:", result.content[0].text if getattr(result, "content", None) else
 # MAGIC - One UC function is reusable as a **direct tool** (`tools/03-function-calling`) *and* an
 # MAGIC   **MCP tool** — same governance, two access paths.
 # MAGIC - For tools that need external credentials, govern them with Unity Catalog connections
-# MAGIC   and managed OAuth (`tools/02-mcp-authorization`); to host your own server, see
-# MAGIC   `tools/04-custom-mcp-app`.
+# MAGIC   and managed OAuth; to host your own server, deploy it as a Databricks App.
