@@ -54,9 +54,9 @@ See [`docs/architecture.md`](docs/architecture.md) for detail.
 ### 🔧 Unity AI Gateway for Tools
 | Lab | Status | What it shows |
 |-----|--------|---------------|
-| [Managed MCP servers](labs/tools/01-managed-mcp) | 🟡 | UC functions, Genie, Vector Search as governed MCP tools |
+| [Managed MCP servers](labs/tools/01-managed-mcp) | ✅ | UC functions, Genie, Vector Search as governed MCP tools |
 | [MCP client authorization](labs/tools/02-mcp-authorization) | 🟡 | UC connections + managed OAuth for external tools |
-| [Function calling](labs/tools/03-function-calling) | 🟡 | Unity Catalog functions as governed tools |
+| [Function calling](labs/tools/03-function-calling) | ✅ | Unity Catalog functions as governed tools |
 | [Custom MCP on Apps](labs/tools/04-custom-mcp-app) | 🟡 | Host your own MCP server on Databricks Apps |
 
 ### 🤖 Unity AI Gateway for Agents
@@ -64,13 +64,18 @@ See [`docs/architecture.md`](docs/architecture.md) for detail.
 |-----|--------|---------------|
 | [Agent Framework](labs/agents/01-agent-framework) | 🟡 | Mosaic AI agent on governed endpoints |
 | [Agent evaluation](labs/agents/02-agent-evaluation) | 🟡 | Evaluate & monitor governed agents |
-| [OpenAI Agents SDK](labs/agents/03-openai-agents-sdk) | 🟡 | Existing agent stack on the OpenAI-compatible endpoint |
+| [OpenAI Agents SDK](labs/agents/03-openai-agents-sdk) | ✅ | Existing agent stack on the OpenAI-compatible endpoint |
 | [Multi-agent](labs/agents/04-multi-agent) | 🟡 | Agent-to-agent delegation through governed tools |
 
 ### 🔨 Developer tools
 | Lab | Status |
 |-----|--------|
 | [Tracing](labs/dev-tools/tracing) · [Streaming](labs/dev-tools/streaming) · [Rate limit tester](labs/dev-tools/rate-limit-tester) · [Mock server](labs/dev-tools/mock-server) | 🟡 |
+
+### 🏁 Capstone
+| Lab | Status | What it shows |
+|-----|--------|---------------|
+| [Zero to production](labs/zero-to-production) | ✅ | One endpoint, end to end: observability → guardrails → limits → fallback → governed tools → validate → checklist |
 
 ✅ = built · 🟡 = planned (objective + outline provided)
 

@@ -48,3 +48,14 @@ resources:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}
               schema: ${var.schema}
+
+    run_zero_to_production:
+      name: "[AI Governance] Zero to production capstone"
+      tasks:
+        - task_key: zero_to_production
+          notebook_task:
+            notebook_path: ../labs/zero-to-production/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
