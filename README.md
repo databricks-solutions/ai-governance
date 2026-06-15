@@ -62,8 +62,8 @@ See [`docs/architecture.md`](docs/architecture.md) for detail.
 ### 🤖 Unity AI Gateway for Agents
 | Lab | Status | What it shows |
 |-----|--------|---------------|
-| [Agent Framework](labs/agents/01-agent-framework) | 🟡 | Mosaic AI agent on governed endpoints |
-| [Agent evaluation](labs/agents/02-agent-evaluation) | 🟡 | Evaluate & monitor governed agents |
+| [Agent Framework](labs/agents/01-agent-framework) | ✅ | Mosaic AI agent on governed endpoints, logged + registered to UC |
+| [Agent evaluation](labs/agents/02-agent-evaluation) | ✅ | Evaluate & monitor governed agents with MLflow judges |
 | [OpenAI Agents SDK](labs/agents/03-openai-agents-sdk) | ✅ | Existing agent stack on the OpenAI-compatible endpoint |
 | [Multi-agent](labs/agents/04-multi-agent) | 🟡 | Agent-to-agent delegation through governed tools |
 

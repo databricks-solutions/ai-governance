@@ -59,3 +59,23 @@ resources:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}
               schema: ${var.schema}
+
+    run_agent_labs:
+      name: "[AI Governance] Agent labs (framework + evaluation)"
+      tasks:
+        - task_key: agent_framework
+          notebook_task:
+            notebook_path: ../labs/agents/01-agent-framework/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+        - task_key: agent_evaluation
+          depends_on:
+            - task_key: agent_framework
+          notebook_task:
+            notebook_path: ../labs/agents/02-agent-evaluation/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
