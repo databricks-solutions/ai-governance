@@ -1,0 +1,36 @@
+# Databricks Asset Bundle for the Unity AI Gateway labs.
+# Deploy with:  databricks bundle deploy -t dev
+# Validate with: databricks bundle validate -t dev
+bundle:
+  name: ai-governance
+
+include:
+  - resources/*.yml
+
+# Variables let every lab share one governed endpoint, catalog, and schema.
+variables:
+  catalog:
+    description: Unity Catalog catalog used for governance artifacts (inference tables, usage views).
+    default: main
+  schema:
+    description: Schema (within the catalog) used for governance artifacts.
+    default: ai_governance
+  gateway_endpoint:
+    description: Name of the chat serving endpoint that the labs attach Gateway features to.
+    default: ai-governance-gateway
+  base_model:
+    description: Foundation Model served behind the gateway endpoint (pay-per-token).
+    default: databricks-meta-llama-3-3-70b-instruct
+
+targets:
+  dev:
+    # No `mode: development` so resource names stay literal (e.g. `ai-governance-gateway`),
+    # matching the variables and the names the labs/docs reference. Development mode would
+    # prepend a per-user prefix that breaks the job parameters and inference-table target.
+    default: true
+    # The host must be set explicitly here (not just via a CLI profile): the
+    # external-model served entity reads `${workspace.host}` as its target URL, and that
+    # substitution only resolves when the target's workspace.host is defined. Change this
+    # to your own workspace before deploying.
+    workspace:
+      host: https://adb-984752964297111.11.azuredatabricks.net
