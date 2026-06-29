@@ -11,7 +11,7 @@
 # MAGIC |------|---------|--------|---------------|
 # MAGIC | 1 | Governed endpoint | — | (bundle deploy) |
 # MAGIC | 2 | Usage tracking + payload logging | Operations | `models/03` |
-# MAGIC | 3 | Safety + PII guardrails | Security | `models/02` |
+# MAGIC | 3 | Safety + PII guardrails | Security | `guardrails/01` |
 # MAGIC | 4 | Rate limits | Cost / Reliability | `models/01` |
 # MAGIC | 5 | Fallback | Reliability | `models/04` |
 # MAGIC | 6 | Governed tools | Security | `tools/01`, `tools/03` |
@@ -65,7 +65,7 @@ show_json({k: gw.get(k) for k in ["usage_tracking_config", "inference_table_conf
 # MAGIC ## 3. Safety & privacy guardrails
 # MAGIC A production baseline: block unsafe content and mask PII in and out. (We keep topic
 # MAGIC moderation off here so the endpoint stays general-purpose; add `valid_topics` to scope
-# MAGIC it — see `models/02`.)
+# MAGIC it — see `guardrails/01`.)
 
 # COMMAND ----------
 
@@ -168,14 +168,14 @@ print("\n✅ Governed endpoint is serving.")
 # MAGIC %md
 # MAGIC ## 8. Observe cost & usage
 # MAGIC Usage flows to system tables (with lag) and full payloads to the inference table.
-# MAGIC `models/03-usage-tracking-finops` builds the rollups, budget alert, and AI/BI dashboard.
+# MAGIC `models/02-usage-tracking-finops` builds the rollups, budget alert, and AI/BI dashboard.
 
 # COMMAND ----------
 
 print("Usage:      system.serving.endpoint_usage  (join system.serving.served_entities)")
 print("Cost:       system.billing.usage + system.billing.list_prices")
 print(f"Payloads:   {CATALOG}.{SCHEMA}.gateway_payload")
-print("Dashboard:  labs/models/03-usage-tracking-finops/dashboard.lvdash.json")
+print("Dashboard:  labs/models/02-usage-tracking-finops/dashboard.lvdash.json")
 
 # COMMAND ----------
 

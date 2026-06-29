@@ -91,7 +91,7 @@ print("FINAL:", result.final_output)
 # MAGIC - **One line of config** (`base_url` → Databricks) brings an existing OpenAI Agents stack
 # MAGIC   under Gateway governance — no rewrite.
 # MAGIC - Because traffic flows through the endpoint, the agent is automatically rate-limited,
-# MAGIC   guardrailed, and logged (confirm in `models/03-usage-tracking-finops`).
+# MAGIC   guardrailed, and logged (confirm in `models/02-usage-tracking-finops`).
 # MAGIC - Swap the plain tool for a Unity Catalog function (`tools/03`) or a managed MCP tool
 # MAGIC   (`tools/01`) to govern the tools as well as the model.
 # MAGIC - For a Databricks-native agent you log, register, and deploy, see

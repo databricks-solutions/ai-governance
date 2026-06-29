@@ -41,13 +41,23 @@ See [`docs/architecture.md`](docs/architecture.md) for detail.
 ## Labs
 
 ### 🧠 Unity AI Gateway for Models
+General platform governance — setup, cost control, tagging, resilience.
+
 | # | Lab | What it shows |
 |---|-----|---------------|
 | 01 | [Rate limiting](labs/models/01-rate-limiting) | Per-endpoint & per-user token/request limits; observe `429` |
-| 02 | [AI guardrails](labs/models/02-ai-guardrails) | PII masking, safety, topic moderation, keyword filtering |
-| 03 | [Usage tracking & FinOps](labs/models/03-usage-tracking-finops) | Tokens & cost via system tables + budget alert + AI/BI dashboard |
-| 04 | [Fallbacks](labs/models/04-fallbacks) | Automatic failover across served entities |
-| 05 | [Traffic routing](labs/models/05-traffic-routing) | Load balancing + A/B/canary across backends |
+| 02 | [Usage tracking & FinOps](labs/models/02-usage-tracking-finops) | Tokens & cost via system tables + budget alert + AI/BI dashboard |
+| 03 | [Fallbacks](labs/models/03-fallbacks) | Automatic failover across served entities |
+| 04 | [Traffic routing](labs/models/04-traffic-routing) | Load balancing + A/B/canary across backends |
+
+### 🛡️ Guardrails
+Self-contained guardrail track — apply, deploy a custom safety model, benchmark. See [`labs/guardrails`](labs/guardrails).
+
+| # | Lab | What it shows |
+|---|-----|---------------|
+| 01 | [Apply guardrails](labs/guardrails/01-apply-guardrails) | PII masking, safety, topic moderation, keyword filtering at the gateway |
+| 02 | [Deploy `gpt-oss-safeguard-20b`](labs/guardrails/02-deploy-oss-safeguard) | Custom policy-driven safety model + head-to-head vs Claude Haiku |
+| 03 | Guardrail benchmark *(coming)* | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination |
 
 ### 🔧 Unity AI Gateway for Tools
 | Lab | What it shows |

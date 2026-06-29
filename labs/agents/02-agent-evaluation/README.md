@@ -21,4 +21,4 @@ Score responses from the governed endpoint with Mosaic AI Agent Evaluation (MLfl
 ## Notes
 - Judges call an LLM, so a run takes a couple of minutes.
 - For continuous monitoring, schedule this over a dataset sampled from the inference table
-  (`models/03-usage-tracking-finops`).
+  (`models/02-usage-tracking-finops`).

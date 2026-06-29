@@ -47,9 +47,9 @@ flowchart TB
 
 | Signal | Location | Used by |
 |--------|----------|---------|
-| Per-request token usage + identity | `system.serving.endpoint_usage` | Lab 03 (FinOps) |
-| DBU cost + pricing | `system.billing.usage`, `system.billing.list_prices` | Lab 03 (FinOps) |
-| Full request/response payloads | Unity Catalog inference table (`<catalog>.<schema>.gateway_*`) | Audit, eval, guardrail review |
+| Per-request token usage + identity | `system.serving.endpoint_usage` | Lab 02 (FinOps) |
+| DBU cost + pricing | `system.billing.usage`, `system.billing.list_prices` | Lab 02 (FinOps) |
+| Full request/response payloads | Unity Catalog inference table (`<catalog>.<schema>.gateway_*`) | Audit, eval, [guardrail review](../labs/guardrails) |
 | Access control | Unity Catalog permissions | Tools / Agents labs |
 
 ## How the labs compose

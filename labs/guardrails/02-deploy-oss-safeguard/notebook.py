@@ -1,8 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 06 — Deploy `gpt-oss-safeguard-20b` as a custom guardrail model (+ head-to-head vs Claude Haiku)
+# MAGIC # Lab 02 — Deploy `gpt-oss-safeguard-20b` as a custom guardrail model (+ head-to-head vs Claude Haiku)
 # MAGIC
-# MAGIC **Unity AI Gateway for Models**
+# MAGIC **Unity AI Gateway · Guardrails**
 # MAGIC
 # MAGIC `gpt-oss-safeguard-20b` (OpenAI, Apache-2.0, Oct 2025) is a **policy-at-inference** safety
 # MAGIC reasoning model: you put a **policy in the system prompt**, the **content in the user
@@ -182,7 +182,7 @@ def classify(endpoint: str, content: str) -> dict:
 
 # MAGIC %md
 # MAGIC ## 5. Head-to-head: gpt-oss-safeguard-20b vs Claude Haiku
-# MAGIC A few probes spanning attacks + hard negatives. (Lab 07 runs the full labeled benchmark.)
+# MAGIC A few probes spanning attacks + hard negatives. (Lab 03 runs the full labeled benchmark.)
 
 # COMMAND ----------
 
@@ -216,7 +216,7 @@ display(pd.DataFrame(rows))
 # MAGIC   so you version and tune policy without retraining — the same ergonomics as an LLM-judge, but
 # MAGIC   with a model fine-tuned for the task and **self-hosted** (data never leaves your tenancy).
 # MAGIC - Running it next to **Claude Haiku** on identical inputs gives you the real trade-off:
-# MAGIC   open + self-hosted + fixed-cost vs frontier + managed + per-token. **Lab 07** turns this into
+# MAGIC   open + self-hosted + fixed-cost vs frontier + managed + per-token. **Lab 03** turns this into
 # MAGIC   labeled precision / recall / **false-positive rate** across all five guardrail categories.
 # MAGIC - Swap `HF_MODEL_ID` to try **Granite Guardian 4.1-8B** (best GuardBench coverage incl.
 # MAGIC   hallucination) or **Qwen3Guard** (best adversarial / multilingual) — the deploy + query flow

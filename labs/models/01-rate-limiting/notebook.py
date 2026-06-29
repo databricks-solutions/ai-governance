@@ -104,6 +104,6 @@ show_json(get_ai_gateway().get("rate_limits"))
 # MAGIC ## Takeaways
 # MAGIC - Rate limits are enforced at the Gateway, *before* model compute is consumed.
 # MAGIC - Per-user limits stop a single caller from starving everyone else on a shared endpoint.
-# MAGIC - Combine with **usage tracking** (Lab 03) to set limits from real consumption data.
+# MAGIC - Combine with **usage tracking** (Lab 02) to set limits from real consumption data.
 # MAGIC
 # MAGIC **Teardown:** to remove limits entirely, `put_ai_gateway({"rate_limits": []})`.

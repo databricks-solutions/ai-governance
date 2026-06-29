@@ -1,6 +1,6 @@
-# Lab 02 — AI guardrails
+# Lab 01 — Apply guardrails
 
-**Category:** Unity AI Gateway for Models · **Status:** ✅ Built
+**Category:** Unity AI Gateway · Guardrails · **Status:** ✅ Built
 
 Inspect and act on prompts and completions to enforce safety and compliance policy at the endpoint.
 
@@ -18,4 +18,4 @@ Inspect and act on prompts and completions to enforce safety and compliance poli
 - Permission to update the endpoint's AI Gateway configuration.
 
 ## Run it
-Open `notebook.py` and run top-to-bottom, or via the `run_core_labs` job.
+Open `notebook.py` and run top-to-bottom, or via the `run_guardrail_labs` job.
