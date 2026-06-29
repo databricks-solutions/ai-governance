@@ -42,8 +42,8 @@ resources:
 
     run_guardrail_labs:
       name: "[AI Governance] Guardrail labs"
-      # Note: the deploy (gpt-oss-safeguard) and benchmark labs are GPU-heavy / interactive
-      # and are run manually, not as part of this smoke-test job.
+      # Note: the benchmark (Part 2) is interactive and makes model calls, so it is run manually,
+      # not as part of this smoke-test job.
       tasks:
         - task_key: apply_guardrails
           notebook_task:

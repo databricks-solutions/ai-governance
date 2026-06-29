@@ -1,4 +1,4 @@
-# Guardrail Lab · Part 3 — Benchmark
+# Guardrail Lab · Part 2 — Benchmark
 
 **Category:** Unity AI Gateway · Guardrails · **Status:** 🚧 Built (run on a workspace to populate numbers)
 
@@ -8,8 +8,8 @@ labeled data, and reports **precision / recall / false-positive rate** per categ
 
 ## What you'll do
 1. Build labeled datasets per category (bundled seed + hard negatives; optional JailbreakBench / Dolly).
-2. Run two **offline judges** with the policy in the system prompt — **`gpt-oss-safeguard-20b`** (Part 2)
-   vs **Claude Haiku** — and score each category.
+2. Run two **managed offline judges** with the policy in the system prompt — open **`databricks-gpt-oss-20b`**
+   vs frontier **`databricks-claude-haiku-4-5`** — and score each category. (No model to deploy.)
 3. Run the **online** Unity AI Gateway guardrails (safety + PII) over the same data and score.
 4. Reproduce the scoring as an **`mlflow.genai.evaluate`** run with a custom scorer.
 5. **Align** the jailbreak judge with **DSPy + GEPA** using an FPR-aware metric; compare baseline vs aligned.
@@ -21,14 +21,23 @@ switched off. Every category includes **hard negatives** (benign text that looks
 the FPR is real.
 
 ## Databricks features
-- Unity AI Gateway guardrails (online) + model-based judges (offline).
+- Unity AI Gateway guardrails (online) + managed model-based judges (offline).
 - **MLflow 3 GenAI evaluation** scorers + tracing.
 - **DSPy + GEPA** prompt/policy optimization.
 
 ## Prerequisites
-- **Part 2** deployed `gpt-oss-safeguard-20b` (otherwise that judge is skipped automatically).
-- Claude Haiku is a managed endpoint (`databricks-claude-haiku-4-5`).
+- Both judges are **managed Foundation Model API endpoints** — no GPU, no Hugging Face token, nothing to deploy.
 - The gateway endpoint exists; permission to update its AI Gateway config.
+
+> **Note on gotchas:** `gpt-oss` returns harmony-format content as a *list* (reasoning + output) and
+> reasoning consumes tokens — the lab's `extract_text()` handles this and uses `max_tokens=2000` /
+> `Reasoning: low`. The base `gpt-oss-20b` sometimes *refuses* an attack instead of classifying it; a
+> dedicated guard model (optional, below) avoids that.
+
+## Use a dedicated guard model (optional)
+For stronger jailbreak/safety detection, deploy a guard model yourself and add it to `JUDGES`:
+**`gpt-oss-safeguard-20b`** (policy-at-inference), **Granite Guardian 4.1-8B** (tops GuardBench, covers
+hallucination), or **Qwen3Guard** (best adversarial / multilingual). The query + scoring flow is identical.
 
 ## Extend it
 Swap in reputable public sets per category: **HarmBench / garak** (unsafe), **Lakera PINT /
