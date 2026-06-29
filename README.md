@@ -57,7 +57,7 @@ Self-contained guardrail track — apply, deploy a custom safety model, benchmar
 |---|-----|---------------|
 | 01 | [Apply guardrails](labs/guardrails/01-apply-guardrails) | PII masking, safety, topic moderation, keyword filtering at the gateway |
 | 02 | [Deploy `gpt-oss-safeguard-20b`](labs/guardrails/02-deploy-oss-safeguard) | Custom policy-driven safety model + head-to-head vs Claude Haiku |
-| 03 | Guardrail benchmark *(coming)* | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination |
+| 03 | [Guardrail benchmark](labs/guardrails/03-guardrail-benchmark) | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination; online vs two judges + DSPy/GEPA alignment |
 
 ### 🔧 Unity AI Gateway for Tools
 | Lab | What it shows |

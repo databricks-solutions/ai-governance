@@ -18,11 +18,11 @@ survives contact with production.
 
 ## The labs
 
-| # | Lab | What it proves |
-|---|-----|----------------|
-| 01 | [Apply guardrails](01-apply-guardrails) | Turn on the Unity AI Gateway built-ins (PII `MASK`/`BLOCK`, safety, topic moderation, keyword filtering) and watch the gateway enforce them on every client. |
-| 02 | [Deploy `gpt-oss-safeguard-20b`](02-deploy-oss-safeguard) | Deploy a recent, **policy-driven** open safety model as a custom endpoint and run it **head-to-head against Claude Haiku** on the same policy + content. |
-| 03 | Guardrail benchmark *(coming)* | The full labeled benchmark: **online** (endpoint guardrails) vs **offline** (LLM-judge) across all five categories, scored with MLflow, with **DSPy + GEPA** judge alignment. |
+| Part | Lab | What it proves |
+|------|-----|----------------|
+| 1 | [Apply guardrails](01-apply-guardrails) | Turn on the Unity AI Gateway built-ins (PII `MASK`/`BLOCK`, safety, topic moderation, keyword filtering) and watch the gateway enforce them on every client. |
+| 2 | [Deploy `gpt-oss-safeguard-20b`](02-deploy-oss-safeguard) | Deploy a recent, **policy-driven** open safety model as a custom endpoint and run it **head-to-head against Claude Haiku** on the same policy + content. |
+| 3 | [Guardrail benchmark](03-guardrail-benchmark) | The full labeled benchmark: **online** (endpoint guardrails) vs **offline** (two judges) across all five categories, scored with MLflow, with **DSPy + GEPA** judge alignment. |
 
 ## Two ways to enforce, both covered
 

@@ -1,4 +1,4 @@
-# Lab 02 — Deploy `gpt-oss-safeguard-20b` as a custom guardrail model
+# Guardrail Lab · Part 2 — Deploy `gpt-oss-safeguard-20b` as a custom guardrail model
 
 **Category:** Unity AI Gateway · Guardrails · **Status:** 🚧 Built (deploy step needs a GPU + HF token)
 
@@ -36,4 +36,4 @@ hallucination) or a **Qwen3Guard** size (best adversarial / multilingual). The d
 - `notebook.py` — the lab.
 
 > The full labeled benchmark (precision / recall / FPR across PII redaction, PII blocking, unsafe
-> content, jailbreak, hallucination) lives in **Lab 03 — guardrail benchmark**.
+> content, jailbreak, hallucination) lives in **Part 3 — guardrail benchmark**.

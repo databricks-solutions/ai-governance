@@ -1,4 +1,4 @@
-# Lab 01 — Apply guardrails
+# Guardrail Lab · Part 1 — Apply guardrails
 
 **Category:** Unity AI Gateway · Guardrails · **Status:** ✅ Built
 
