@@ -1,6 +1,6 @@
-# Lab 06 — Deploy `gpt-oss-safeguard-20b` as a custom guardrail model
+# Lab 02 — Deploy `gpt-oss-safeguard-20b` as a custom guardrail model
 
-**Category:** Unity AI Gateway for Models · **Status:** 🚧 Built (deploy step needs a GPU + HF token)
+**Category:** Unity AI Gateway · Guardrails · **Status:** 🚧 Built (deploy step needs a GPU + HF token)
 
 Deploy OpenAI's **`gpt-oss-safeguard-20b`** (Apache-2.0, policy-at-inference safety reasoning) as a
 **custom model serving endpoint**, then run it **head-to-head against Claude Haiku** on the same
@@ -36,4 +36,4 @@ hallucination) or a **Qwen3Guard** size (best adversarial / multilingual). The d
 - `notebook.py` — the lab.
 
 > The full labeled benchmark (precision / recall / FPR across PII redaction, PII blocking, unsafe
-> content, jailbreak, hallucination) lives in **Lab 07 — guardrail benchmark**.
+> content, jailbreak, hallucination) lives in **Lab 03 — guardrail benchmark**.

@@ -1,4 +1,4 @@
-# Lab 03 — Usage tracking & FinOps
+# Lab 02 — Usage tracking & FinOps
 
 **Category:** Unity AI Gateway for Models · **Status:** ✅ Built
 

@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 05 — Traffic routing
+# MAGIC # Lab 04 — Traffic routing
 # MAGIC
 # MAGIC **Unity AI Gateway for Models**
 # MAGIC
@@ -27,7 +27,7 @@
 
 # COMMAND ----------
 
-# Both entities wrap Databricks Foundation Models as external models (see Lab 04).
+# Both entities wrap Databricks Foundation Models as external models (see Lab 03).
 # `external_entity` / `primary_target` / `update_config` come from `shared/setup`.
 CHAMPION_TARGET = primary_target()  # keep whatever the endpoint currently fronts
 CHALLENGER_TARGET = "databricks-gpt-oss-120b"
@@ -101,8 +101,8 @@ set_split(90, 10)  # canary
 # MAGIC ## Takeaways
 # MAGIC - Traffic config splits load across served entities for **load balancing** and **A/B/canary** rollouts.
 # MAGIC - Callers hit one stable, governed endpoint URL regardless of the split.
-# MAGIC - Pair with **usage tracking** (Lab 03) to compare cost/latency per served entity, and
-# MAGIC   **fallbacks** (Lab 04) for resilience on top of the split.
+# MAGIC - Pair with **usage tracking** (Lab 02) to compare cost/latency per served entity, and
+# MAGIC   **fallbacks** (Lab 03) for resilience on top of the split.
 
 # COMMAND ----------
 

@@ -1,9 +1,9 @@
-# Optional job that runs the five core model-governance labs end to end against the
-# deployed gateway endpoint. Useful for a guided POC walkthrough or CI smoke test.
+# Optional jobs that run the labs end to end against the deployed gateway endpoint.
+# Useful for a guided POC walkthrough or CI smoke test.
 resources:
   jobs:
     run_core_labs:
-      name: "[AI Governance] Run core Unity AI Gateway labs"
+      name: "[AI Governance] Run core model-governance labs"
       tasks:
         - task_key: rate_limiting
           notebook_task:
@@ -12,20 +12,20 @@ resources:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}
               schema: ${var.schema}
-        - task_key: ai_guardrails
+        - task_key: usage_tracking_finops
           depends_on:
             - task_key: rate_limiting
           notebook_task:
-            notebook_path: ../labs/models/02-ai-guardrails/notebook.py
+            notebook_path: ../labs/models/02-usage-tracking-finops/notebook.py
             base_parameters:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}
               schema: ${var.schema}
         - task_key: fallbacks
           depends_on:
-            - task_key: ai_guardrails
+            - task_key: usage_tracking_finops
           notebook_task:
-            notebook_path: ../labs/models/04-fallbacks/notebook.py
+            notebook_path: ../labs/models/03-fallbacks/notebook.py
             base_parameters:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}
@@ -34,16 +34,20 @@ resources:
           depends_on:
             - task_key: fallbacks
           notebook_task:
-            notebook_path: ../labs/models/05-traffic-routing/notebook.py
+            notebook_path: ../labs/models/04-traffic-routing/notebook.py
             base_parameters:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}
               schema: ${var.schema}
-        - task_key: usage_tracking_finops
-          depends_on:
-            - task_key: traffic_routing
+
+    run_guardrail_labs:
+      name: "[AI Governance] Guardrail labs"
+      # Note: the deploy (gpt-oss-safeguard) and benchmark labs are GPU-heavy / interactive
+      # and are run manually, not as part of this smoke-test job.
+      tasks:
+        - task_key: apply_guardrails
           notebook_task:
-            notebook_path: ../labs/models/03-usage-tracking-finops/notebook.py
+            notebook_path: ../labs/guardrails/01-apply-guardrails/notebook.py
             base_parameters:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}

@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 04 — Fallbacks
+# MAGIC # Lab 03 — Fallbacks
 # MAGIC
 # MAGIC **Unity AI Gateway for Models**
 # MAGIC
@@ -81,7 +81,7 @@ print("All succeeded." if all(c == 200 for c in codes) else "Some non-200s — i
 # MAGIC ## Takeaways
 # MAGIC - Fallbacks are configured once at the Gateway and apply to every caller.
 # MAGIC - Order served entities primary → fallback; keep fallback traffic at 0% so it only
-# MAGIC   serves on failure (use **Lab 05** for intentional traffic splitting instead).
+# MAGIC   serves on failure (use **Lab 04** for intentional traffic splitting instead).
 # MAGIC - Combine with external-model served entities to fail over across providers.
 # MAGIC
 # MAGIC **Teardown:** `put_ai_gateway({"fallback_config": {"enabled": False}})`.

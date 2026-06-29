@@ -1,8 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 02 — AI guardrails
+# MAGIC # Lab 01 — Apply guardrails
 # MAGIC
-# MAGIC **Unity AI Gateway for Models**
+# MAGIC **Unity AI Gateway · Guardrails**
 # MAGIC
 # MAGIC Guardrails inspect prompts (input) and completions (output) and act on unsafe or
 # MAGIC non-compliant content. The Gateway supports:
@@ -92,7 +92,7 @@ show_json(r["body"])
 # MAGIC ## Takeaways
 # MAGIC - Guardrails run at the Gateway, so every client of the endpoint is protected uniformly.
 # MAGIC - `MASK` keeps requests flowing while redacting PII; `BLOCK` rejects them outright.
-# MAGIC - Pair guardrails with **payload logging** (see Lab 03 / inference tables) to audit what
+# MAGIC - Pair guardrails with **payload logging** (see the Models *Usage tracking* lab / inference tables) to audit what
 # MAGIC   was blocked and why.
 # MAGIC
 # MAGIC **Teardown:** `put_ai_gateway({"guardrails": None})` removes all guardrails.

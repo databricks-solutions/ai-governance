@@ -1,6 +1,6 @@
 # Getting started
 
-This guide takes you from zero to a governed endpoint with the five core labs running.
+This guide takes you from zero to a governed endpoint with the core labs running.
 
 ## Prerequisites
 
@@ -55,11 +55,16 @@ already enabled. Each lab then adds one more control.
 run top to bottom. The shared widgets (`endpoint_name`, `catalog`, `schema`) default to
 the bundle values; change them if you deployed with overrides.
 
-**As a job:** run all five core labs end to end:
+**As a job:** run the core model-governance labs end to end:
 
 ```bash
 scripts/deploy.sh run        # databricks bundle run run_core_labs -t dev
 ```
+
+**Guardrails** are a self-contained track in [`labs/guardrails`](../labs/guardrails) — apply the
+gateway built-ins, deploy a custom safety model (`gpt-oss-safeguard-20b`) head-to-head with Claude
+Haiku, and benchmark precision/recall/FPR across PII, unsafe content, jailbreak, and hallucination.
+Run Lab 01 via `databricks bundle run run_guardrail_labs -t dev`.
 
 Recommended order: 01 → 02 → 04 → 05 → 03 (run the FinOps lab last so usage/cost data exists).
 
@@ -74,7 +79,7 @@ built notebook.
 
 ## Troubleshooting
 
-- **System tables empty in Lab 03** — usage/billing rows can lag several minutes; re-run
+- **System tables empty in Lab 02** — usage/billing rows can lag several minutes; re-run
   the query cells later. Confirm system tables are enabled for your workspace.
 - **`429` outside Lab 01** — a previous run left tight rate limits; re-run Lab 01's final
   cell or `put_ai_gateway({"rate_limits": []})`.

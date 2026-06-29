@@ -1,4 +1,4 @@
-# Lab 04 — Fallbacks
+# Lab 03 — Fallbacks
 
 **Category:** Unity AI Gateway for Models · **Status:** ✅ Built
 
@@ -19,5 +19,5 @@ Make an endpoint resilient: when the primary model errors, the Gateway transpare
 
 ## Notes
 - Keep the fallback route at 0% traffic so it only serves on failure. For intentional
-  splitting across models, see **Lab 05 — Traffic routing**.
+  splitting across models, see **Lab 04 — Traffic routing**.
 - The lab waits for the endpoint to finish updating, which can take a few minutes.

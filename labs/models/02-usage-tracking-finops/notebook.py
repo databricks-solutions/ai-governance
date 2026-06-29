@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 03 — Usage tracking & FinOps
+# MAGIC # Lab 02 — Usage tracking & FinOps
 # MAGIC
 # MAGIC **Unity AI Gateway for Models**
 # MAGIC

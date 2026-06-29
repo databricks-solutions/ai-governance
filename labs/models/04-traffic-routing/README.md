@@ -1,4 +1,4 @@
-# Lab 05 — Traffic routing
+# Lab 04 — Traffic routing
 
 **Category:** Unity AI Gateway for Models · **Status:** ✅ Built
 
@@ -19,4 +19,4 @@ Split traffic across multiple served entities behind one endpoint for load balan
 
 ## Notes
 - Updates wait for the endpoint to finish reconciling (can take a few minutes).
-- For failure-only fallback rather than intentional splitting, see **Lab 04 — Fallbacks**.
+- For failure-only fallback rather than intentional splitting, see **Lab 03 — Fallbacks**.
