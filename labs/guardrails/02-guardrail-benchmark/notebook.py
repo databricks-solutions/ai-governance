@@ -36,8 +36,11 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --quiet --upgrade mlflow>=3.6.0 datasets dspy databricks_dspy
+# MAGIC %pip install --quiet --upgrade "mlflow>=3.6.0" "datasets==2.20.0" dspy databricks_dspy
 # MAGIC %restart_python
+# MAGIC
+# MAGIC # Note: datasets is pinned to 2.20.0 — newer 5.x needs a pyarrow that conflicts with the
+# MAGIC # serverless base image (`pyarrow has no attribute 'json_'`).
 
 # COMMAND ----------
 
@@ -48,13 +51,21 @@
 
 # COMMAND ----------
 
-import base64, json, re, time
+import os, base64, json, re, time
 import pandas as pd
 import mlflow
 from mlflow.deployments import get_deploy_client
 
-deploy_client  = get_deploy_client("databricks")
-MAX_PER_SOURCE = 50
+# Hugging Face writes to ~/.cache by default, which is read-only on serverless — redirect to /tmp.
+os.environ.setdefault("HF_HOME", "/tmp/hf")
+os.environ.setdefault("HF_DATASETS_CACHE", "/tmp/hf/datasets")
+
+deploy_client = get_deploy_client("databricks")
+
+# Examples per category per evaluation (widget) — raise for a fuller benchmark, lower for a quick pass.
+dbutils.widgets.text("n_examples", "40", "Examples per category per evaluation")
+N_EXAMPLES = int(dbutils.widgets.get("n_examples"))
+print("Examples per category:", N_EXAMPLES)
 
 # Two managed judges — nothing to deploy. To add a dedicated guard model you've deployed yourself
 # (e.g. gpt-oss-safeguard-20b, Granite Guardian 4.1, Qwen3Guard), just add it here, e.g.:
@@ -69,10 +80,10 @@ print("Judges:", JUDGES)
 
 # MAGIC %md
 # MAGIC ## 2. Labeled datasets — one per category
-# MAGIC Each row: `payload` (the user message), `category`, `expected` (1 = violation / should block,
-# MAGIC 0 = benign / should allow), `source`. Every category includes **hard negatives** — benign text
-# MAGIC that *looks* like a violation — because that's what drives false positives. Bundled seeds always
-# MAGIC run; public sets load opportunistically.
+# MAGIC **Public datasets are the default**, balanced (violations + benign) and sampled to `n_examples`
+# MAGIC per category. Each falls back to a small **bundled seed** if its dataset is unavailable. Sources:
+# MAGIC PII → `ai4privacy/pii-masking-200k` + Dolly (benign); unsafe → `lmsys/toxic-chat`; jailbreak →
+# MAGIC `jackhhao/jailbreak-classification`; hallucination → `notrichardren/HaluEval` (QA).
 
 # COMMAND ----------
 
@@ -113,39 +124,79 @@ SEED = {
     ],
 }
 
+from datasets import load_dataset
+from itertools import islice
+
+def _stream(path, name=None, split="train"):
+    return load_dataset(path, name, split=split, streaming=True)
+
+def _collect(it, label_fn, text_fn, want, max_scan=8000):
+    """Stream until we have `want` violations and `want` benign rows (or scan budget runs out)."""
+    pos, neg = [], []
+    for r in islice(it, max_scan):
+        lab = label_fn(r)
+        if lab is None:
+            continue
+        (pos if lab == 1 else neg).append(text_fn(r))
+        if len(pos) >= want and len(neg) >= want:
+            break
+    return pos[:want], neg[:want]
+
+def _frame(pos, neg, cat):
+    rows = [(t, 1) for t in pos] + [(t, 0) for t in neg]
+    return (pd.DataFrame(rows, columns=["payload", "expected"])
+              .sample(frac=1, random_state=7).reset_index(drop=True)
+              .assign(category=cat, source="public"))
+
+half = max(1, N_EXAMPLES // 2)
+
+def load_pii():
+    pos, _ = _collect(_stream("ai4privacy/pii-masking-200k"),
+                      lambda r: 1,  # every source_text in this dataset contains PII
+                      lambda r: r["source_text"], half)
+    _, neg = _collect(_stream("databricks/databricks-dolly-15k"),  # benign instructions (no PII)
+                      lambda r: 0, lambda r: r["instruction"], half)
+    return _frame(pos, neg, "pii")
+
+def load_unsafe():
+    pos, neg = _collect(_stream("lmsys/toxic-chat", "toxicchat0124"),
+                        lambda r: int(r["toxicity"]), lambda r: r["user_input"], half)
+    return _frame(pos, neg, "unsafe")
+
+def load_jailbreak():
+    pos, neg = _collect(_stream("jackhhao/jailbreak-classification"),
+                        lambda r: 1 if r["type"] == "jailbreak" else 0,
+                        lambda r: r["prompt"], half)
+    return _frame(pos, neg, "jailbreak")
+
+def load_hallucination():
+    pos, neg = [], []
+    for r in islice(_stream("notrichardren/HaluEval", "qa"), 8000):
+        ctx = r["knowledge"]
+        if len(pos) < half: pos.append(f"CONTEXT: {ctx}\nRESPONSE: {r['hallucinated_answer']}")
+        if len(neg) < half: neg.append(f"CONTEXT: {ctx}\nRESPONSE: {r['right_answer']}")
+        if len(pos) >= half and len(neg) >= half:
+            break
+    return _frame(pos, neg, "hallucination")
+
+LOADERS = {"pii": load_pii, "unsafe": load_unsafe, "jailbreak": load_jailbreak, "hallucination": load_hallucination}
+
 frames = []
-for cat, rows in SEED.items():
-    frames.append(pd.DataFrame(rows, columns=["payload", "expected"]).assign(category=cat, source="seed"))
-
-# Optional public augmentation (graceful fallback)
-def _try(loader, name, category):
+for cat, loader in LOADERS.items():
     try:
-        df = loader().head(MAX_PER_SOURCE)
-        df["category"], df["source"] = category, name
-        print(f"  + {name}: {len(df)}")
-        return df
+        df = loader()
+        if df.empty:
+            raise ValueError("no rows returned")
+        src = "public"
     except Exception as e:
-        print(f"  - {name}: skipped ({type(e).__name__})")
-        return None
-
-def load_jailbreakbench():
-    from datasets import load_dataset
-    ds = load_dataset("JailbreakBench/JBB-Behaviors", "behaviors")["harmful"]
-    return pd.DataFrame({"payload": ds["Goal"], "expected": 1})
-
-def load_dolly_benign():
-    from datasets import load_dataset
-    ds = load_dataset("databricks/databricks-dolly-15k", split="train").shuffle(seed=7).select(range(MAX_PER_SOURCE))
-    return pd.DataFrame({"payload": ds["instruction"], "expected": 0})
-
-for loader, name, cat in [(load_jailbreakbench, "jailbreakbench", "jailbreak"),
-                          (load_dolly_benign, "dolly_benign", "jailbreak")]:
-    df = _try(loader, name, cat)
-    if df is not None:
-        frames.append(df)
+        print(f"  {cat}: public set unavailable ({type(e).__name__}: {str(e)[:60]}) -> bundled seed")
+        df = pd.DataFrame(SEED[cat], columns=["payload", "expected"]).assign(category=cat, source="seed")
+    frames.append(df)
+    print(f"  {cat:14s} {len(df):3d} rows ({df['source'].iloc[0]})")
 
 data = pd.concat(frames, ignore_index=True)
-print("\nRows by category/expected:\n", data.groupby(["category", "expected"]).size())
+print("\nTotal rows:", len(data))
+print(data.groupby(["category", "expected"]).size())
 
 # COMMAND ----------
 

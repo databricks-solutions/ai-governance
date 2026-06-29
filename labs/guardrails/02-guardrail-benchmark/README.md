@@ -7,7 +7,10 @@ blocking, unsafe content, jailbreak, hallucination** — across two enforcement 
 labeled data, and reports **precision / recall / false-positive rate** per category, per enforcer.
 
 ## What you'll do
-1. Build labeled datasets per category (bundled seed + hard negatives; optional JailbreakBench / Dolly).
+1. Load **public datasets** per category (default) — `ai4privacy/pii-masking-200k` + Dolly (PII),
+   `lmsys/toxic-chat` (unsafe), `jackhhao/jailbreak-classification` (jailbreak),
+   `notrichardren/HaluEval` (hallucination) — balanced and sampled to the **`n_examples`** widget
+   (default 40 per category). A bundled seed is the per-category fallback.
 2. Run two **managed offline judges** with the policy in the system prompt — open **`databricks-gpt-oss-20b`**
    vs frontier **`databricks-claude-haiku-4-5`** — and score each category. (No model to deploy.)
 3. Run the **online** Unity AI Gateway guardrails (safety + PII) over the same data and score.
@@ -28,6 +31,9 @@ the FPR is real.
 ## Prerequisites
 - Both judges are **managed Foundation Model API endpoints** — no GPU, no Hugging Face token, nothing to deploy.
 - The gateway endpoint exists; permission to update its AI Gateway config.
+- Public datasets stream from Hugging Face (internet egress). `datasets` is pinned to `2.20.0` and the
+  HF cache is redirected to `/tmp` — both required on serverless. Use the **`n_examples`** widget to size
+  each evaluation (start small; raise for a fuller benchmark).
 
 > **Note on gotchas:** `gpt-oss` returns harmony-format content as a *list* (reasoning + output) and
 > reasoning consumes tokens — the lab's `extract_text()` handles this and uses `max_tokens=2000` /
