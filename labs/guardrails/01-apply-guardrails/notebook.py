@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 01 — Apply guardrails
+# MAGIC # Guardrail Lab · Part 1 — Apply guardrails
 # MAGIC
 # MAGIC **Unity AI Gateway · Guardrails**
 # MAGIC
