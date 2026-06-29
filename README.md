@@ -51,13 +51,12 @@ General platform governance — setup, cost control, tagging, resilience.
 | 04 | [Traffic routing](labs/models/04-traffic-routing) | Load balancing + A/B/canary across backends |
 
 ### 🛡️ Guardrails
-Self-contained guardrail track — apply, deploy a custom safety model, benchmark. See [`labs/guardrails`](labs/guardrails).
+Self-contained guardrail track — apply, then benchmark. See [`labs/guardrails`](labs/guardrails).
 
-| # | Lab | What it shows |
-|---|-----|---------------|
-| 01 | [Apply guardrails](labs/guardrails/01-apply-guardrails) | PII masking, safety, topic moderation, keyword filtering at the gateway |
-| 02 | [Deploy `gpt-oss-safeguard-20b`](labs/guardrails/02-deploy-oss-safeguard) | Custom policy-driven safety model + head-to-head vs Claude Haiku |
-| 03 | [Guardrail benchmark](labs/guardrails/03-guardrail-benchmark) | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination; online vs two judges + DSPy/GEPA alignment |
+| Part | Lab | What it shows |
+|------|-----|---------------|
+| 1 | [Apply guardrails](labs/guardrails/01-apply-guardrails) | PII masking, safety, topic moderation, keyword filtering at the gateway |
+| 2 | [Guardrail benchmark](labs/guardrails/02-guardrail-benchmark) | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination; online vs two managed judges + DSPy/GEPA alignment |
 
 ### 🔧 Unity AI Gateway for Tools
 | Lab | What it shows |

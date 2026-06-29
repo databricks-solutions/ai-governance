@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Guardrail Lab · Part 3 — Benchmark
+# MAGIC # Guardrail Lab · Part 2 — Benchmark
 # MAGIC
 # MAGIC **Unity AI Gateway · Guardrails**
 # MAGIC
@@ -12,8 +12,12 @@
 # MAGIC We measure two enforcement points on the *same* labeled data:
 # MAGIC
 # MAGIC - **Online** — the Unity AI Gateway guardrails running on the endpoint (safety, PII).
-# MAGIC - **Offline** — a model-based judge with the **policy in the system prompt**, using two judges
-# MAGIC   head-to-head: self-hosted **`gpt-oss-safeguard-20b`** (Part 2) vs managed **Claude Haiku**.
+# MAGIC - **Offline** — a model-based judge with the **policy in the system prompt**, using two **managed**
+# MAGIC   judges head-to-head: open **`databricks-gpt-oss-20b`** vs frontier **Claude Haiku**.
+# MAGIC
+# MAGIC Both judges are managed Foundation Model API endpoints — **nothing to deploy or self-host**. If you
+# MAGIC want a dedicated guard model (e.g. `gpt-oss-safeguard-20b`, Granite Guardian 4.1, Qwen3Guard), deploy
+# MAGIC it yourself and add it to `JUDGES` — the rest of the lab is unchanged.
 # MAGIC
 # MAGIC The headline metric is the **false-positive rate (FPR)** — how often a guardrail blocks *benign*
 # MAGIC traffic. Recall gets the press; FPR decides whether a guardrail survives production. We report
@@ -21,11 +25,10 @@
 # MAGIC
 # MAGIC > Grounding: the Databricks guardrails docs prescribe a Log-mode → inference-table → score loop;
 # MAGIC > internal PII work (LogSentinel) reports ~92% precision / 95% recall, and the prompt-injection
-# MAGIC > blog reports >90% attack-success reduction with custom guard models. This lab is that loop,
-# MAGIC > made reproducible.
+# MAGIC > blog reports >90% attack-success reduction with guard models. This lab is that loop, made reproducible.
 # MAGIC >
-# MAGIC > **Prerequisites:** Part 2 deployed `gpt-oss-safeguard-20b` (else that judge is skipped);
-# MAGIC > Claude Haiku is a managed endpoint. The gateway endpoint exists (repo root README).
+# MAGIC > **Prerequisites:** the gateway endpoint exists (repo root README). Both judges are managed — no GPU,
+# MAGIC > no Hugging Face token, nothing to deploy.
 
 # COMMAND ----------
 
@@ -50,22 +53,16 @@ import pandas as pd
 import mlflow
 from mlflow.deployments import get_deploy_client
 
-deploy_client     = get_deploy_client("databricks")
-SAFEGUARD_ENDPOINT = "gpt-oss-safeguard-20b"        # from Part 2 (custom deploy)
-HAIKU_ENDPOINT     = "databricks-claude-haiku-4-5"  # managed Claude
-MAX_PER_SOURCE     = 50
+deploy_client  = get_deploy_client("databricks")
+MAX_PER_SOURCE = 50
 
-def endpoint_ready(name: str) -> bool:
-    try:
-        return str(w.serving_endpoints.get(name).state.ready) == "READY"
-    except Exception:
-        return False
-
-JUDGES = {"haiku": HAIKU_ENDPOINT}
-if endpoint_ready(SAFEGUARD_ENDPOINT):
-    JUDGES["safeguard"] = SAFEGUARD_ENDPOINT
-else:
-    print(f"NOTE: '{SAFEGUARD_ENDPOINT}' not READY — deploy it in Part 2 to include it. Running with: {list(JUDGES)}")
+# Two managed judges — nothing to deploy. To add a dedicated guard model you've deployed yourself
+# (e.g. gpt-oss-safeguard-20b, Granite Guardian 4.1, Qwen3Guard), just add it here, e.g.:
+#   JUDGES["safeguard"] = "gpt-oss-safeguard-20b"
+JUDGES = {
+    "gpt-oss-20b": "databricks-gpt-oss-20b",      # open, managed
+    "haiku":       "databricks-claude-haiku-4-5",  # frontier, managed
+}
 print("Judges:", JUDGES)
 
 # COMMAND ----------
@@ -154,7 +151,7 @@ print("\nRows by category/expected:\n", data.groupby(["category", "expected"]).s
 
 # MAGIC %md
 # MAGIC ## 3. Policies (system prompts) + the judge call
-# MAGIC One policy per category. gpt-oss-safeguard and Claude Haiku get the **same** policy as the
+# MAGIC One policy per category. gpt-oss-20b and Claude Haiku get the **same** policy as the
 # MAGIC system prompt and the **same** content as the user message, and both return the same JSON —
 # MAGIC so we compare judges, not prompts.
 
@@ -311,7 +308,7 @@ from mlflow.genai.scorers import scorer
 def blocks_correctly(inputs, outputs, expectations):
     return outputs["violation"] == expectations["expected"]
 
-primary = "safeguard" if "safeguard" in JUDGES else "haiku"
+primary = "haiku" if "haiku" in JUDGES else list(JUDGES)[0]
 eval_rows = [{"inputs": {"endpoint": JUDGES[primary], "category": r.category, "payload": r.payload},
               "expectations": {"expected": int(r.expected)}}
              for r in data.itertuples()]
@@ -327,7 +324,7 @@ print("MLflow eval run:", mlflow_results.run_id)
 # MAGIC %md
 # MAGIC ## 8. Align the judge with DSPy + GEPA (jailbreak)
 # MAGIC Optimize the jailbreak judge from the labeled data with an **FPR-aware** feedback metric, so it
-# MAGIC stops over-blocking. Seeded with our current policy; uses `gpt-oss-safeguard` if deployed, else Haiku.
+# MAGIC stops over-blocking. Seeded with our current policy; runs on the primary managed judge (Haiku).
 
 # COMMAND ----------
 
@@ -401,7 +398,7 @@ display(matrix)
 # MAGIC - **Online vs offline are complementary**: the gateway guardrails are fast and cover PII/safety
 # MAGIC   uniformly for every client; the policy-driven judge is stronger on nuanced **jailbreak** and the
 # MAGIC   only option for **hallucination/groundedness**. Run both.
-# MAGIC - **`gpt-oss-safeguard` vs Haiku**: open + self-hosted + fixed-cost vs frontier + managed +
+# MAGIC - **`gpt-oss-20b` vs Haiku**: open vs frontier (both managed); add a dedicated guard model for
 # MAGIC   per-token — pick per category from the matrix above.
 # MAGIC - **DSPy + GEPA** lowered jailbreak FPR by optimizing the policy from labeled data.
 # MAGIC - **Reproduce / extend**: swap in HarmBench/garak (unsafe), Lakera PINT (jailbreak), RAGTruth

@@ -62,9 +62,9 @@ scripts/deploy.sh run        # databricks bundle run run_core_labs -t dev
 ```
 
 **Guardrails** are a self-contained track in [`labs/guardrails`](../labs/guardrails) — apply the
-gateway built-ins, deploy a custom safety model (`gpt-oss-safeguard-20b`) head-to-head with Claude
-Haiku, and benchmark precision/recall/FPR across PII, unsafe content, jailbreak, and hallucination.
-Run Lab 01 via `databricks bundle run run_guardrail_labs -t dev`.
+gateway built-ins, then benchmark precision/recall/FPR across PII, unsafe content, jailbreak, and
+hallucination using two **managed** judges (open `databricks-gpt-oss-20b` vs Claude Haiku — nothing to
+deploy). Run Part 1 via `databricks bundle run run_guardrail_labs -t dev`.
 
 Recommended order: 01 → 02 → 04 → 05 → 03 (run the FinOps lab last so usage/cost data exists).
 
