@@ -1,8 +1,6 @@
 # Lab 01 — Rate limiting
 
-**Category:** Unity AI Gateway for Models · **Status:** ✅ Built
-
-Cap traffic to a serving endpoint to protect shared capacity and control spend.
+**Cap traffic to a serving endpoint with the Unity AI Gateway to protect shared capacity and control spend.**
 
 ## What you'll do
 1. Inspect the endpoint's current Gateway configuration.
@@ -10,15 +8,11 @@ Cap traffic to a serving endpoint to protect shared capacity and control spend.
 3. Drive traffic past the limit and observe `429 Too Many Requests`.
 4. Relax the limit to production-appropriate values.
 
-## Databricks features
-- Unity AI Gateway **rate limits** (`rate_limits`, scoped by `endpoint` or `user`).
-- Model Serving invocation API.
+## How it works
+Rate limits cap how much traffic a serving endpoint will accept. The Gateway can limit by **requests** or **tokens**, and scope each limit to the whole **endpoint** or to an individual **user** (`key`); `renewal_period` is always `minute`. Limits are enforced at the Gateway, *before* model compute is consumed, so excess calls are rejected with HTTP `429`. Per-user limits stop a single caller from starving everyone else on a shared endpoint. Enforcement is eventually consistent, so a config change can take a short time to engage.
 
-## Prerequisites
-- The bundle deployed (`scripts/deploy.sh deploy`) so the `${var.gateway_endpoint}` endpoint exists.
-- Permission to update the endpoint's AI Gateway configuration.
+To remove limits entirely: `put_ai_gateway({"rate_limits": []})`.
 
 ## Run it
-Open `notebook.py` in your workspace and run top-to-bottom, or run it via the
-`run_core_labs` job. Set the `endpoint_name`, `catalog`, and `schema` widgets if you
-deployed with non-default values.
+Open `notebook.py` and run top-to-bottom, or run the `run_core_labs` job. Requires the bundle deployed:
+`databricks bundle deploy -t dev`.
