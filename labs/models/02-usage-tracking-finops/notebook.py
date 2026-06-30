@@ -2,19 +2,9 @@
 # MAGIC %md
 # MAGIC # Lab 02 — Usage tracking & FinOps
 # MAGIC
-# MAGIC **Unity AI Gateway for Models**
+# MAGIC Turn Gateway telemetry into tokens, cost, and a budget alert.
 # MAGIC
-# MAGIC The Gateway records every request to **system tables** and (when enabled) full
-# MAGIC request/response payloads to an **inference table** in Unity Catalog. This lab turns
-# MAGIC that telemetry into a FinOps view: tokens and cost per endpoint, per user, and per day,
-# MAGIC plus a simple budget check.
-# MAGIC
-# MAGIC You will:
-# MAGIC 1. Confirm usage tracking + payload logging are enabled.
-# MAGIC 2. Generate a little traffic.
-# MAGIC 3. Query `system.serving.*` for token usage and `system.billing.usage` for cost.
-# MAGIC 4. Build per-user / per-day rollups and a budget alert.
-# MAGIC 5. (Optional) Import the bundled AI/BI dashboard for ongoing monitoring.
+# MAGIC See README.md for details.
 
 # COMMAND ----------
 
@@ -22,10 +12,7 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 1. Confirm telemetry is on
-# MAGIC The deployed endpoint has both `usage_tracking_config` and `inference_table_config`
-# MAGIC enabled (see `resources/endpoints.yml`).
+# MAGIC %md ### Confirm telemetry is on
 
 # COMMAND ----------
 
@@ -34,10 +21,7 @@ show_json({k: gw.get(k) for k in ["usage_tracking_config", "inference_table_conf
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 2. Generate traffic
-# MAGIC A handful of calls so the system tables have something to show. Usage rows can take a
-# MAGIC few minutes to land.
+# MAGIC %md ### Generate traffic
 
 # COMMAND ----------
 
@@ -47,12 +31,7 @@ print("Sent 5 requests through the gateway endpoint.")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 3. Token usage from system tables
-# MAGIC `system.serving.endpoint_usage` records per-request token counts and the requesting
-# MAGIC identity, keyed by `served_entity_id`. Join `system.serving.served_entities` to map
-# MAGIC that id to an `endpoint_name` and filter to our endpoint. (Serving usage rows can lag
-# MAGIC live traffic by a while, so this may be empty right after a run — re-run later.)
+# MAGIC %md ### Token usage from system tables
 
 # COMMAND ----------
 
@@ -78,11 +57,7 @@ display(usage)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 4. Cost from billing system tables
-# MAGIC `system.billing.usage` carries DBU consumption for Model Serving; join to
-# MAGIC `system.billing.list_prices` for dollar estimates. Costs are attributed by endpoint
-# MAGIC via `usage_metadata.endpoint_name`.
+# MAGIC %md ### Cost from billing system tables
 
 # COMMAND ----------
 
@@ -112,11 +87,7 @@ display(cost)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 5. Budget alert
-# MAGIC A minimal FinOps guardrail: compare month-to-date cost against a budget and flag when
-# MAGIC it is exceeded. In production, schedule this as a job and route the alert to email/Slack,
-# MAGIC or tighten the endpoint's **rate limits** (Lab 01) automatically.
+# MAGIC %md ### Budget alert
 
 # COMMAND ----------
 
@@ -138,9 +109,7 @@ else:
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 6. Inference (payload) table
-# MAGIC Full request/response payloads land in Unity Catalog for audit and evaluation.
+# MAGIC %md ### Inference (payload) table
 
 # COMMAND ----------
 
@@ -149,12 +118,3 @@ try:
     display(spark.sql(f"SELECT * FROM {payload_table} ORDER BY timestamp_ms DESC LIMIT 20"))
 except Exception as e:  # noqa: BLE001
     print(f"Payload table {payload_table} not queryable yet (rows can lag a few minutes): {e}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Takeaways
-# MAGIC - **`system.serving.endpoint_usage`** → token-level usage by user and time.
-# MAGIC - **`system.billing.usage` + `list_prices`** → dollar cost by endpoint.
-# MAGIC - **Inference tables** → full payloads for audit, eval, and guardrail review.
-# MAGIC - Import `dashboard.lvdash.json` in this folder for an AI/BI monitoring dashboard.

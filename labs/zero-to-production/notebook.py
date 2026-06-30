@@ -2,22 +2,9 @@
 # MAGIC %md
 # MAGIC # Zero to production — a governed endpoint end to end
 # MAGIC
-# MAGIC This capstone walks a single endpoint from "it returns text" to "it's ready for
-# MAGIC production," applying each Unity AI Gateway control in the order you'd actually adopt
-# MAGIC them. It composes the individual Models/Tools labs into one narrative and leaves the
-# MAGIC endpoint in a sensible, production-appropriate state.
+# MAGIC Take one endpoint from "returns text" to "production-ready," applying each Gateway control in adoption order.
 # MAGIC
-# MAGIC | Step | Control | Pillar | Deep-dive lab |
-# MAGIC |------|---------|--------|---------------|
-# MAGIC | 1 | Governed endpoint | — | (bundle deploy) |
-# MAGIC | 2 | Usage tracking + payload logging | Operations | `models/03` |
-# MAGIC | 3 | Safety + PII guardrails | Security | `guardrails/01` |
-# MAGIC | 4 | Rate limits | Cost / Reliability | `models/01` |
-# MAGIC | 5 | Fallback | Reliability | `models/04` |
-# MAGIC | 6 | Governed tools | Security | `tools/01`, `tools/03` |
-# MAGIC | 7 | Validate | — | — |
-# MAGIC | 8 | Observe cost & usage | Cost | `models/03` |
-# MAGIC | 9 | Production checklist | — | — |
+# MAGIC See README.md for details.
 
 # COMMAND ----------
 
@@ -25,10 +12,7 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 1. The governed endpoint
-# MAGIC Deployed by the bundle. Everything below configures *this* endpoint, and every caller
-# MAGIC (apps, agents, notebooks) goes through it.
+# MAGIC %md ### The governed endpoint
 
 # COMMAND ----------
 
@@ -37,11 +21,7 @@ print("State:", w.serving_endpoints.get(ENDPOINT_NAME).state)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 2. Observability first
-# MAGIC Turn on usage tracking and payload logging before traffic arrives, so you can always
-# MAGIC answer "who called what, and what did it cost?". (The bundle enables these at create
-# MAGIC time; we assert it here.)
+# MAGIC %md ### Observability first
 
 # COMMAND ----------
 
@@ -61,11 +41,7 @@ show_json({k: gw.get(k) for k in ["usage_tracking_config", "inference_table_conf
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 3. Safety & privacy guardrails
-# MAGIC A production baseline: block unsafe content and mask PII in and out. (We keep topic
-# MAGIC moderation off here so the endpoint stays general-purpose; add `valid_topics` to scope
-# MAGIC it — see `guardrails/01`.)
+# MAGIC %md ### Safety & privacy guardrails
 
 # COMMAND ----------
 
@@ -81,10 +57,7 @@ show_json(get_ai_gateway().get("guardrails"))
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 4. Cost & capacity controls
-# MAGIC Production-appropriate rate limits (tune to expected concurrency and budget). These
-# MAGIC protect shared capacity and cap spend before the model is ever invoked.
+# MAGIC %md ### Cost & capacity controls
 
 # COMMAND ----------
 
@@ -100,10 +73,7 @@ show_json(get_ai_gateway().get("rate_limits"))
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 5. Resilience: a fallback
-# MAGIC Add a second model and enable fallbacks so a failure on the primary is retried
-# MAGIC automatically. Both are external-model entities (see `models/04`).
+# MAGIC %md ### Resilience: a fallback
 
 # COMMAND ----------
 
@@ -125,10 +95,7 @@ print("Fallback enabled:", get_ai_gateway().get("fallback_config"))
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 6. Governed tools
-# MAGIC Publish actions as Unity Catalog functions so agents act through permissioned, audited
-# MAGIC tools. Full round trips are in `tools/03-function-calling` and `tools/01-managed-mcp`.
+# MAGIC %md ### Governed tools
 
 # COMMAND ----------
 
@@ -147,9 +114,7 @@ print(f"Governed tool ready: {CATALOG}.{SCHEMA}.lookup_order_status "
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 7. Validate
-# MAGIC A smoke test confirms the fully governed endpoint still serves normal traffic.
+# MAGIC %md ### Validate
 
 # COMMAND ----------
 
@@ -165,10 +130,7 @@ print("\n✅ Governed endpoint is serving.")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 8. Observe cost & usage
-# MAGIC Usage flows to system tables (with lag) and full payloads to the inference table.
-# MAGIC `models/02-usage-tracking-finops` builds the rollups, budget alert, and AI/BI dashboard.
+# MAGIC %md ### Observe cost & usage
 
 # COMMAND ----------
 
@@ -179,8 +141,8 @@ print("Dashboard:  labs/models/02-usage-tracking-finops/dashboard.lvdash.json")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 9. Production checklist
+# MAGIC %md ### Production checklist
+# MAGIC
 # MAGIC The endpoint now has, in one place and applied to every caller:
 # MAGIC
 # MAGIC - ✅ **Observability** — usage tracking + payload logging on
@@ -189,10 +151,7 @@ print("Dashboard:  labs/models/02-usage-tracking-finops/dashboard.lvdash.json")
 # MAGIC - ✅ **Reliability** — automatic fallback to a second model
 # MAGIC - ✅ **Governed tools** — actions exposed as Unity Catalog functions
 # MAGIC
-# MAGIC Before go-live, also consider:
-# MAGIC - **Access control** — grant `CAN_QUERY` only to the principals/groups that need it; manage tool grants in Unity Catalog.
-# MAGIC - **Budgets & alerting** — schedule the FinOps queries as a job and route alerts (email/Slack).
-# MAGIC - **Evaluation & monitoring** — add Agent Evaluation / MLflow monitoring (`agents/02`).
-# MAGIC - **Topic scoping** — add `valid_topics` / `invalid_keywords` if the use case is narrow.
-# MAGIC - **Networking** — restrict access via your workspace's private connectivity controls.
-# MAGIC - **Change management** — manage all of the above as code in this bundle (`resources/`).
+# MAGIC Before go-live, also consider: access control (`CAN_QUERY` grants + UC tool grants),
+# MAGIC budgets & alerting, evaluation & monitoring (`agents/02`), topic scoping
+# MAGIC (`valid_topics` / `invalid_keywords`), networking, and change management (manage it all
+# MAGIC as code in this bundle, `resources/`).

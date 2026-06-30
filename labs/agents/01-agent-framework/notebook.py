@@ -2,20 +2,9 @@
 # MAGIC %md
 # MAGIC # Lab — Mosaic AI Agent Framework on a governed endpoint
 # MAGIC
-# MAGIC **Unity AI Gateway for Agents**
+# MAGIC Build, log, and register a `ChatAgent` whose model calls run through the governed endpoint.
 # MAGIC
-# MAGIC Here we build a first-class Databricks agent: a `ChatAgent` whose model calls run
-# MAGIC through the **governed endpoint**, logged with MLflow and registered to **Unity
-# MAGIC Catalog**. Because the agent uses the gateway, it inherits rate limits, guardrails,
-# MAGIC usage tracking, and payload logging; because it's a UC model, it's versioned and
-# MAGIC permissioned like any other governed asset. When deployed, its own serving endpoint is
-# MAGIC governed too.
-# MAGIC
-# MAGIC In this lab you will:
-# MAGIC 1. Define a `ChatAgent` (models-from-code).
-# MAGIC 2. Log it to MLflow with a serving-endpoint resource dependency.
-# MAGIC 3. Load it back and test it.
-# MAGIC 4. Register it to Unity Catalog (deploy step included as an optional next move).
+# MAGIC See README.md for details.
 
 # COMMAND ----------
 
@@ -28,11 +17,7 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 1. Define the agent (models-from-code)
-# MAGIC The agent uses the Databricks deployments client, which auto-authenticates both in this
-# MAGIC notebook and (via the declared resource) when deployed. We write it to a file so MLflow
-# MAGIC can log the code as the model definition.
+# MAGIC %md ### Define the agent (models-from-code)
 
 # COMMAND ----------
 
@@ -78,10 +63,7 @@ print("Wrote agent definition to", agent_path)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 2. Log the agent to MLflow
-# MAGIC We declare the governed endpoint as a **resource** so a future deployment is granted
-# MAGIC access to it automatically (no embedded credentials).
+# MAGIC %md ### Log the agent to MLflow
 
 # COMMAND ----------
 
@@ -105,10 +87,7 @@ print("Logged model:", logged.model_uri)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 3. Load it back and test
-# MAGIC Loading the logged model and calling `predict` exercises the real artifact — the model
-# MAGIC call goes through the governed endpoint.
+# MAGIC %md ### Load it back and test
 
 # COMMAND ----------
 
@@ -118,9 +97,7 @@ show_json(out)
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 4. Register to Unity Catalog
-# MAGIC The agent becomes a versioned, permissioned UC model.
+# MAGIC %md ### Register to Unity Catalog
 
 # COMMAND ----------
 
@@ -130,29 +107,9 @@ print(f"Registered {uc_name} version {registered.version}")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 5. Deploy (optional next step)
-# MAGIC Deploying creates a governed serving endpoint for the agent (with review app + feedback
-# MAGIC logging). It provisions dedicated capacity and takes several minutes, so it's left as an
-# MAGIC explicit step:
+# MAGIC %md ### Deploy (optional next step)
 # MAGIC
 # MAGIC ```python
 # MAGIC from databricks import agents
 # MAGIC agents.deploy(uc_name, registered.version)
 # MAGIC ```
-# MAGIC
-# MAGIC Once deployed, evaluate it with `agents/02-agent-evaluation` by pointing `predict_fn` at
-# MAGIC the agent's endpoint.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Takeaways
-# MAGIC - The agent calls the **governed endpoint**, so it inherits every Gateway control —
-# MAGIC   governance is centralized, not reimplemented per agent.
-# MAGIC - Declaring the endpoint as a **resource** gives the deployed agent automatic, scoped
-# MAGIC   access — no embedded tokens.
-# MAGIC - Registered in **Unity Catalog**, the agent is versioned and permissioned like any
-# MAGIC   other asset; its deployment endpoint is itself governable by the Gateway.
-# MAGIC - Add governed tools (`tools/03-function-calling`, `tools/01-managed-mcp`) and quality
-# MAGIC   gates (`agents/02-agent-evaluation`) to complete the loop.

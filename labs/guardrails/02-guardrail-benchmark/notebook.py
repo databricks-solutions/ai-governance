@@ -1,34 +1,9 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Guardrail Lab · Part 2 — Benchmark
-# MAGIC
-# MAGIC **Unity AI Gateway · Guardrails**
-# MAGIC
-# MAGIC A guardrail you haven't evaluated is a guess. This lab turns guardrails into a **number**,
-# MAGIC across the five categories that matter in production:
-# MAGIC
-# MAGIC **PII redaction · PII blocking · unsafe content · jailbreak / prompt-injection · hallucination**
-# MAGIC
-# MAGIC We measure two enforcement points on the *same* labeled data:
-# MAGIC
-# MAGIC - **Online** — the Unity AI Gateway guardrails running on the endpoint (safety, PII).
-# MAGIC - **Offline** — a model-based judge with the **policy in the system prompt**, using two **managed**
-# MAGIC   judges head-to-head: open **`databricks-gpt-oss-20b`** vs frontier **Claude Haiku**.
-# MAGIC
-# MAGIC Both judges are managed Foundation Model API endpoints — **nothing to deploy or self-host**. If you
-# MAGIC want a dedicated guard model (e.g. `gpt-oss-safeguard-20b`, Granite Guardian 4.1, Qwen3Guard), deploy
-# MAGIC it yourself and add it to `JUDGES` — the rest of the lab is unchanged.
-# MAGIC
-# MAGIC The headline metric is the **false-positive rate (FPR)** — how often a guardrail blocks *benign*
-# MAGIC traffic. Recall gets the press; FPR decides whether a guardrail survives production. We report
-# MAGIC precision / recall / FPR **per category, per enforcer**, then **align** the judge with DSPy + GEPA.
-# MAGIC
-# MAGIC > Grounding: the Databricks guardrails docs prescribe a Log-mode → inference-table → score loop;
-# MAGIC > internal PII work (LogSentinel) reports ~92% precision / 95% recall, and the prompt-injection
-# MAGIC > blog reports >90% attack-success reduction with guard models. This lab is that loop, made reproducible.
-# MAGIC >
-# MAGIC > **Prerequisites:** the gateway endpoint exists (repo root README). Both judges are managed — no GPU,
-# MAGIC > no Hugging Face token, nothing to deploy.
+# MAGIC Benchmark guardrails (precision / recall / **FPR**) across five categories — **online** gateway
+# MAGIC guardrails vs two **managed** judges (`databricks-gpt-oss-20b` vs Claude Haiku) — with MLflow eval
+# MAGIC and DSPy/GEPA alignment. Nothing to deploy. See README.md for the full write-up.
 
 # COMMAND ----------
 

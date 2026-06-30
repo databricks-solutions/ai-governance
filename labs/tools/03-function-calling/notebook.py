@@ -2,20 +2,9 @@
 # MAGIC %md
 # MAGIC # Lab — Function calling with Unity Catalog functions
 # MAGIC
-# MAGIC **Unity AI Gateway for Tools**
+# MAGIC Hand a governed UC function to a model and run a full tool-calling round trip.
 # MAGIC
-# MAGIC Tools let a model take actions, not just generate text. On Databricks the cleanest
-# MAGIC governed tool is a **Unity Catalog function**: it lives in UC, is permissioned and
-# MAGIC audited like any other UC object, and can be handed to a model as an OpenAI-style tool.
-# MAGIC
-# MAGIC In this lab you will:
-# MAGIC 1. Create a Unity Catalog function (the tool).
-# MAGIC 2. Describe it to the governed endpoint as a `tools` definition.
-# MAGIC 3. Let the model decide to call it, then **execute the UC function** and feed the
-# MAGIC    result back for a final answer.
-# MAGIC
-# MAGIC Every model call still flows through the Gateway, so rate limits, guardrails, usage
-# MAGIC tracking, and payload logging all apply to the tool-calling traffic too.
+# MAGIC See README.md for details.
 
 # COMMAND ----------
 
@@ -23,10 +12,7 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 1. Create the tool (a Unity Catalog function)
-# MAGIC A small, deterministic SQL function so the lab is self-contained. In practice this is
-# MAGIC where you'd wrap a real lookup, calculation, or API behind a governed UC function.
+# MAGIC %md ### Create the tool (a Unity Catalog function)
 
 # COMMAND ----------
 
@@ -47,12 +33,7 @@ print(f"Created tool: {CATALOG}.{SCHEMA}.lookup_order_status")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 2. Describe the tool to the model
-# MAGIC The Gateway endpoint speaks the OpenAI chat schema, so tools are declared in the
-# MAGIC standard `tools` format. We map the UC function to a tool definition. (In production,
-# MAGIC `databricks-openai`'s `UCFunctionToolkit` generates these definitions and executes the
-# MAGIC calls for you — see the takeaways.)
+# MAGIC %md ### Describe the tool to the model
 
 # COMMAND ----------
 
@@ -87,11 +68,7 @@ def run_uc_tool(name: str, args: dict):
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 3. Tool-calling round trip
-# MAGIC Send the user question with the tool definition. The model returns `tool_calls`; we
-# MAGIC execute the UC function and send the result back so the model can answer in natural
-# MAGIC language.
+# MAGIC %md ### Tool-calling round trip
 
 # COMMAND ----------
 
@@ -125,20 +102,3 @@ for tc in tool_calls:
 final = invoke(messages, max_tokens=256)
 print("HTTP", final["status_code"])
 print(final["body"]["choices"][0]["message"]["content"])
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Takeaways
-# MAGIC - **Unity Catalog functions are governed tools**: permissions, lineage, and audit apply
-# MAGIC   exactly as they do for tables — no separate tool registry to secure.
-# MAGIC - The model never executes anything; it only *requests* a call. Your code executes the
-# MAGIC   UC function, so you control authorization and inputs.
-# MAGIC - All tool-calling traffic flows through the governed endpoint, inheriting rate limits,
-# MAGIC   guardrails, and logging from the Models labs.
-# MAGIC - **Production shortcut:** `databricks-openai`'s `UCFunctionToolkit` auto-generates the
-# MAGIC   tool definitions from UC function metadata and executes the calls — see
-# MAGIC   `agents/01-agent-framework` for the agent-grade pattern, and
-# MAGIC   `tools/01-managed-mcp` to expose the same functions over MCP.
-# MAGIC
-# MAGIC **Teardown:** `spark.sql(f"DROP FUNCTION IF EXISTS {CATALOG}.{SCHEMA}.lookup_order_status")`
