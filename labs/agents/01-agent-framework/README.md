@@ -1,25 +1,22 @@
 # Lab 01 — Mosaic AI Agent Framework
 
-**Category:** Unity AI Gateway for Agents · **Status:** ✅ Built
-
-Build a `ChatAgent` whose model calls run through the governed endpoint, then log it to MLflow and register it to Unity Catalog.
+**Build a first-class Databricks `ChatAgent` whose model calls run through the governed endpoint, then log it to MLflow and register it to Unity Catalog.**
 
 ## What you'll do
-1. Define a `ChatAgent` (models-from-code) that calls the governed endpoint.
+1. Define a `ChatAgent` (models-from-code) that answers through the governed endpoint.
 2. Log it to MLflow with the endpoint declared as a resource dependency.
 3. Load it back and test `predict`.
 4. Register it to Unity Catalog (deploy is included as an optional next step).
 
-## Databricks features
-- Mosaic AI Agent Framework (`mlflow.pyfunc.ChatAgent`), MLflow logging, Unity Catalog model registry.
-- `DatabricksServingEndpoint` resource so a deployed agent gets scoped access — no embedded tokens.
-- Governed endpoint for all model calls.
+## How it works
+The agent calls the governed endpoint via the Databricks deployments client, so it inherits
+every Gateway control — rate limits, guardrails, usage tracking, and payload logging — instead
+of reimplementing governance per agent. Declaring the endpoint as a `DatabricksServingEndpoint`
+resource gives a future deployment automatic, scoped access with no embedded tokens. Registered
+in Unity Catalog, the agent is versioned and permissioned like any other asset, and its own
+serving endpoint is itself governable by the Gateway. Deploying provisions dedicated capacity
+and takes several minutes, so it's left as an explicit step.
 
-## Prerequisites
-- The bundle deployed so the gateway endpoint + `${var.catalog}.${var.schema}` schema exist.
-- Installs `mlflow[databricks]`, `databricks-agents`, `openai` in the notebook.
-- Permission to register models in the schema.
-
-## Notes
-- Deploying the agent (`databricks.agents.deploy`) provisions a serving endpoint and takes
-  several minutes; the lab registers to UC and leaves deploy as an explicit step.
+## Run it
+Open `notebook.py` and run top-to-bottom, or run the `[AI Governance] Agent labs (framework + evaluation)` job. Requires the bundle deployed:
+`databricks bundle deploy -t dev`.

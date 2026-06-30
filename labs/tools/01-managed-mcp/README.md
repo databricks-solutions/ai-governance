@@ -1,8 +1,6 @@
 # Lab 01 — Managed MCP servers
 
-**Category:** Unity AI Gateway for Tools · **Status:** ✅ Built
-
-Expose governed Unity Catalog assets to any MCP client through Databricks **managed MCP servers** — no server to run.
+**Expose governed Unity Catalog assets to any MCP client through Databricks managed MCP servers — no server to run.**
 
 ## What you'll do
 1. Publish a Unity Catalog function (the tool).
@@ -10,15 +8,17 @@ Expose governed Unity Catalog assets to any MCP client through Databricks **mana
 3. List and call the tool over MCP — with Unity Catalog enforcing access.
 4. See how the same client targets the Vector Search and Genie MCP servers.
 
-## Databricks features
-- Managed MCP servers: `/api/2.0/mcp/functions|vector-search|genie/...`.
-- Unity Catalog functions as MCP tools; UC permissions as the authorization layer.
-- `databricks-mcp` client (`DatabricksMCPClient`).
+## How it works
+Databricks hosts managed MCP servers that expose governed assets to any MCP client (agents, Claude, Cursor, …) with no server to operate — each is a URL under your workspace:
 
-## Prerequisites
-- The bundle deployed so `${var.catalog}.${var.schema}` exists.
-- Permission to create UC functions and call the managed MCP servers.
+| Server | URL pattern | Exposes |
+|--------|-------------|---------|
+| Unity Catalog functions | `/api/2.0/mcp/functions/{catalog}/{schema}` | UC functions as tools |
+| Vector Search | `/api/2.0/mcp/vector-search/{catalog}/{schema}` | indexes as retrieval tools |
+| Genie | `/api/2.0/mcp/genie/{space_id}` | a Genie space as a tool |
+
+Access is governed by **Unity Catalog** — a caller only sees and runs what they're granted, and every call is audited. `DatabricksMCPClient` authenticates with the workspace client, so the same identity and UC grants apply. The same UC function is reusable as a direct tool (`tools/03-function-calling`) and an MCP tool. To host your own server, deploy it as a Databricks App; govern external-credential tools with UC connections and managed OAuth.
 
 ## Run it
-Open `notebook.py` and run top-to-bottom. The same UC function is reusable as a direct
-tool in `tools/03-function-calling`.
+Open `notebook.py` and run top-to-bottom, or run the `run_tools_labs` job. Requires the bundle deployed:
+`databricks bundle deploy -t dev`.
