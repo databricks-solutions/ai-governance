@@ -1,10 +1,6 @@
 # Zero to production
 
-**Status:** ✅ Built
-
-A capstone walkthrough that takes one endpoint from "returns text" to "production-ready,"
-applying each Unity AI Gateway control in adoption order and leaving the endpoint in a
-sensible governed state. It composes the individual Models/Tools labs into one narrative.
+**A capstone that takes one endpoint from "returns text" to "production-ready," applying each Unity AI Gateway control in adoption order.**
 
 ## What you'll do
 1. Confirm the governed endpoint.
@@ -17,13 +13,15 @@ sensible governed state. It composes the individual Models/Tools labs into one n
 8. Point at the usage/cost telemetry (FinOps).
 9. Review a production checklist (access control, budgets, evaluation, networking, change management).
 
-## Databricks features
-- The full Unity AI Gateway control set on one endpoint, plus Unity Catalog functions and system-table observability.
-
-## Prerequisites
-- The bundle deployed (`scripts/deploy.sh deploy`).
-- Permissions to update the endpoint's config + AI Gateway, and to create UC functions.
+## How it works
+This capstone composes the individual Models and Tools labs into one narrative, applying each
+control in the order you'd actually adopt it and leaving the endpoint in a sensible, governed
+state. Observability goes on first so you can always answer "who called what, and what did it
+cost?"; then guardrails, rate limits, and a fallback model; then governed tools published as
+Unity Catalog functions. Everything configures one endpoint that every caller (apps, agents,
+notebooks) goes through, and the notebook is idempotent so it's safe to re-run. For depth on any
+step, follow the linked lab in that section.
 
 ## Run it
-Open `notebook.py` and run top-to-bottom. It's idempotent — safe to re-run. For depth on
-any step, follow the linked lab in that section.
+Open `notebook.py` and run top-to-bottom, or run the `[AI Governance] Zero to production capstone` job. Requires the bundle deployed:
+`databricks bundle deploy -t dev`.
