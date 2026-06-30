@@ -11,7 +11,8 @@ The Unity AI Gateway puts a single, governed control plane in front of the model
 tools, and agents your organization uses. This repo shows how to stand that up as a
 proof of concept: deploy one endpoint, then layer on each control and watch it take
 effect. Labs are organized exactly the way you'd evaluate the platform — **Models**,
-**Tools**, **Agents**, and **Developer tools**.
+**Guardrails**, **Tools**, and **Agents** — and the whole workshop deploys from a single
+Databricks Asset Bundle.
 
 > The Unity AI Gateway is in Beta. Feature availability and API shapes may change; the
 > labs use the documented REST/SDK surfaces and are easy to adjust.
@@ -36,18 +37,29 @@ effect. Labs are organized exactly the way you'd evaluate the platform — **Mod
  Unity Catalog: inference tables, system tables, permissions, lineage
 ```
 
-See [`docs/architecture.md`](docs/architecture.md) for detail.
+**Where governance data lands:** per-request token usage in `system.serving.endpoint_usage`; DBU cost
+in `system.billing.usage`; full request/response payloads in Unity Catalog **inference tables**
+(`<catalog>.<schema>.gateway_*`) for audit, eval, and guardrail review.
 
 ## Labs
 
 ### 🧠 Unity AI Gateway for Models
+General platform governance — setup, cost control, tagging, resilience.
+
 | # | Lab | What it shows |
 |---|-----|---------------|
 | 01 | [Rate limiting](labs/models/01-rate-limiting) | Per-endpoint & per-user token/request limits; observe `429` |
-| 02 | [AI guardrails](labs/models/02-ai-guardrails) | PII masking, safety, topic moderation, keyword filtering |
-| 03 | [Usage tracking & FinOps](labs/models/03-usage-tracking-finops) | Tokens & cost via system tables + budget alert + AI/BI dashboard |
-| 04 | [Fallbacks](labs/models/04-fallbacks) | Automatic failover across served entities |
-| 05 | [Traffic routing](labs/models/05-traffic-routing) | Load balancing + A/B/canary across backends |
+| 02 | [Usage tracking & FinOps](labs/models/02-usage-tracking-finops) | Tokens & cost via system tables + budget alert + AI/BI dashboard |
+| 03 | [Fallbacks](labs/models/03-fallbacks) | Automatic failover across served entities |
+| 04 | [Traffic routing](labs/models/04-traffic-routing) | Load balancing + A/B/canary across backends |
+
+### 🛡️ Guardrails
+Self-contained guardrail track — apply, then benchmark. See [`labs/guardrails`](labs/guardrails).
+
+| Part | Lab | What it shows |
+|------|-----|---------------|
+| 1 | [Apply guardrails](labs/guardrails/01-apply-guardrails) | PII masking, safety, topic moderation, keyword filtering at the gateway |
+| 2 | [Guardrail benchmark](labs/guardrails/02-guardrail-benchmark) | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination; online vs two managed judges + DSPy/GEPA alignment |
 
 ### 🔧 Unity AI Gateway for Tools
 | Lab | What it shows |
@@ -76,32 +88,39 @@ utilities (tracing, streaming, rate-limit tester, mock server).
 
 ## Getting started
 
+The whole workshop deploys from **one Databricks Asset Bundle**.
+
 ```bash
-# 1. Install the Databricks CLI and authenticate (host + token, or a profile).
-export DATABRICKS_HOST=https://<your-workspace>.cloud.databricks.com
-export DATABRICKS_TOKEN=<token>
+# 1. Authenticate the Databricks CLI to your workspace (a profile, or host + token).
+# 2. Point the bundle at your workspace: set targets.dev.workspace.host in databricks.yml.
+# 3. Create the endpoint's backing secret (one time):
+databricks secrets create-scope ai_governance
+databricks secrets put-secret  ai_governance api_token      # paste a PAT
 
-# 2. Deploy the governed endpoint, schema, and job.
-scripts/deploy.sh validate
-scripts/deploy.sh deploy
+# 4. Deploy the gateway endpoint, schema, jobs, and every lab notebook:
+databricks bundle deploy -t dev
 
-# 3. Open labs/models/01-rate-limiting/notebook.py in the workspace and run it,
-#    or run all core labs as a job:
-scripts/deploy.sh run
+# 5. Run a lab group as a job — or just open a notebook and run it:
+databricks bundle run run_core_labs          -t dev    # rate limit · usage/FinOps · fallbacks · routing
+databricks bundle run run_guardrail_labs     -t dev    # apply guardrails
+databricks bundle run run_tools_labs         -t dev    # managed MCP · function calling
+databricks bundle run run_agent_labs         -t dev    # agent framework · evaluation
+databricks bundle run run_zero_to_production  -t dev    # capstone
 ```
 
-Full prerequisites and walkthrough: [`docs/getting-started.md`](docs/getting-started.md).
-Architecture and where governance data lands: [`docs/architecture.md`](docs/architecture.md).
+**Prerequisites:** a workspace with Model Serving + Foundation Model APIs, the Databricks CLI, and
+permission to create a serving endpoint, a Unity Catalog schema, and jobs. The guardrail **benchmark**
+(Part 2) is interactive — it streams datasets and calls models — so open it and set the `n_examples`
+widget rather than running it as a job.
 
 ## Repository layout
 
 ```
-databricks.yml          Asset Bundle root (endpoint + schema + job)
-resources/              Bundle resource definitions
-shared/setup.py         %run helper used by the labs
-labs/                   models / tools / agents / zero-to-production
-docs/                   getting started, architecture
-scripts/deploy.sh       CLI wrapper (validate / deploy / run / destroy)
+databricks.yml          Asset Bundle root — one bundle for the whole workshop
+resources/              Bundle resources (endpoint + schema + jobs)
+shared/setup.py         %run helper used by every lab
+labs/                   models · guardrails · tools · agents · zero-to-production
+                        (each lab folder = README.md + notebook.py)
 ```
 
 ## How to get help
