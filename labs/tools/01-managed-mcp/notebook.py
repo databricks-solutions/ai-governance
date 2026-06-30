@@ -8,12 +8,19 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --quiet --upgrade databricks-mcp databricks-sdk
+# MAGIC %pip install --quiet --upgrade databricks-mcp databricks-sdk nest_asyncio
 # MAGIC %restart_python
 
 # COMMAND ----------
 
 # MAGIC %run ../../../shared/setup
+
+# COMMAND ----------
+
+# The MCP client calls asyncio.run() internally; in a notebook/job there's already a
+# running event loop, so nest_asyncio is needed to allow the nested call.
+import nest_asyncio
+nest_asyncio.apply()
 
 # COMMAND ----------
 
