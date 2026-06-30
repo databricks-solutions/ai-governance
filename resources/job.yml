@@ -83,3 +83,23 @@ resources:
               endpoint_name: ${var.gateway_endpoint}
               catalog: ${var.catalog}
               schema: ${var.schema}
+
+    run_tools_labs:
+      name: "[AI Governance] Tools labs (MCP + function calling)"
+      tasks:
+        - task_key: managed_mcp
+          notebook_task:
+            notebook_path: ../labs/tools/01-managed-mcp/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+        - task_key: function_calling
+          depends_on:
+            - task_key: managed_mcp
+          notebook_task:
+            notebook_path: ../labs/tools/03-function-calling/notebook.py
+            base_parameters:
+              endpoint_name: ${var.gateway_endpoint}
+              catalog: ${var.catalog}
+              schema: ${var.schema}

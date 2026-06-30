@@ -50,5 +50,3 @@ at inference), **Granite Guardian 4.1-8B** (best GuardBench coverage incl. hallu
 ## Run it
 Open each lab's `notebook.py` and run top-to-bottom, or run Part 1 via the `run_guardrail_labs` job.
 Part 2 is interactive (and makes model calls) — run it manually.
-
-> See also: repo [`docs/`](../../docs) for architecture and getting-started.

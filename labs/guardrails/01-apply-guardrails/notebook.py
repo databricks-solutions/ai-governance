@@ -1,18 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # Guardrail Lab · Part 1 — Apply guardrails
-# MAGIC
-# MAGIC **Unity AI Gateway · Guardrails**
-# MAGIC
-# MAGIC Guardrails inspect prompts (input) and completions (output) and act on unsafe or
-# MAGIC non-compliant content. The Gateway supports:
-# MAGIC
-# MAGIC - **PII detection** — `BLOCK` the request or `MASK` detected entities.
-# MAGIC - **Safety filter** — block harmful / unsafe content.
-# MAGIC - **Topic moderation** — restrict conversation to an allow-list of `valid_topics`.
-# MAGIC - **Invalid keyword filtering** — block requests containing banned terms.
-# MAGIC
-# MAGIC In this lab you apply each guardrail and watch the Gateway enforce it.
+# MAGIC Apply Unity AI Gateway guardrails (PII, safety, topic, keyword) and watch the endpoint enforce them. See README.md for details.
 
 # COMMAND ----------
 
@@ -20,10 +9,7 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 1. Apply guardrails (input + output)
-# MAGIC We mask PII on the way in, block unsafe content both directions, restrict topics, and
-# MAGIC ban a sample keyword. Tune these to your POC's policy.
+# MAGIC %md ### 1. Apply guardrails (input + output)
 
 # COMMAND ----------
 
@@ -47,10 +33,7 @@ show_json(get_ai_gateway().get("guardrails"))
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 2. PII masking
-# MAGIC The Gateway masks detected PII before the prompt reaches the model. Inspect the
-# MAGIC response — the model never sees the raw email / phone number.
+# MAGIC %md ### 2. PII masking — the model never sees the raw email / phone
 
 # COMMAND ----------
 
@@ -63,10 +46,7 @@ show_json(r["body"])
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 3. Topic moderation
-# MAGIC A prompt outside the allow-list is refused by the Gateway. Expect a non-200 status or
-# MAGIC a guardrail-intervention message rather than a normal completion.
+# MAGIC %md ### 3. Topic moderation — off-topic prompt is refused
 
 # COMMAND ----------
 
@@ -76,9 +56,7 @@ show_json(r["body"])
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## 4. Invalid keyword filtering
-# MAGIC A prompt containing a banned keyword is blocked before reaching the model.
+# MAGIC %md ### 4. Invalid keyword filtering — banned term is blocked
 
 # COMMAND ----------
 
@@ -88,22 +66,7 @@ show_json(r["body"])
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Takeaways
-# MAGIC - Guardrails run at the Gateway, so every client of the endpoint is protected uniformly.
-# MAGIC - `MASK` keeps requests flowing while redacting PII; `BLOCK` rejects them outright.
-# MAGIC - Pair guardrails with **payload logging** (see the Models *Usage tracking* lab / inference tables) to audit what
-# MAGIC   was blocked and why.
-# MAGIC
-# MAGIC **Teardown:** `put_ai_gateway({"guardrails": None})` removes all guardrails.
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Cleanup
-# MAGIC Reset guardrails so the endpoint returns to a clean state for other labs (topic
-# MAGIC moderation in particular would otherwise block their generic test prompts). Comment
-# MAGIC this out if you want the guardrails to persist.
+# MAGIC %md ### Cleanup — reset guardrails so other labs start clean
 
 # COMMAND ----------
 
