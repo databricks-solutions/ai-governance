@@ -1,0 +1,57 @@
+# AI Governance Workshop — Databricks Asset Bundle (customer-deployable).
+#
+# Deploy on any customer workspace:
+#   1. Edit config/workshop.yaml (warehouse_id, catalog/schema, endpoints, mcp, project).
+#   2. Build the frontend:   cd frontend && npm install && npm run build && cd ..
+#   3. databricks bundle deploy -t dev -p <your-profile>
+#   4. databricks bundle run ai_governance_workshop_app -t dev -p <your-profile>
+#
+# workspace.host is intentionally not set — the target comes from --profile.
+bundle:
+  name: ai-governance-workshop
+
+# config/*.yaml must be synced with the app source (customer-edited config lives here).
+sync:
+  include:
+    - "config/*.yaml"
+  exclude:
+    - "**/node_modules"
+    - "**/__pycache__"
+    - "frontend/src"
+
+variables:
+  warehouse_id:
+    description: "SQL warehouse id the app uses (mirror of config workspace.warehouse_id)."
+    default: ""
+  lakebase_instance:
+    description: "Lakebase instance name that backs workshop progress."
+    default: ai-governance-workshop
+
+resources:
+  database_instances:
+    workshop_lakebase:
+      name: ${var.lakebase_instance}
+      capacity: CU_1
+
+  apps:
+    ai_governance_workshop_app:
+      name: ai-governance-workshop
+      description: "AI Governance Workshop — guided choice/control/clarity with live tests."
+      source_code_path: ./
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+        - name: database
+          database:
+            instance_name: ${var.lakebase_instance}
+            database_name: databricks_postgres
+            permission: CAN_CONNECT_AND_CREATE
+
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production

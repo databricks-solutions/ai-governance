@@ -1,0 +1,69 @@
+# AI Governance Workshop — customer configuration
+#
+# This is the ONE file a customer edits to run the workshop on their own workspace.
+# Everything the app does (which endpoints to govern, which MCP service to policy,
+# which catalog/schema to write to) is driven from here. Copy to workshop.local.yaml
+# to override locally without touching this file.
+
+workspace:
+  # Left blank on purpose: the deploy target comes from the --profile passed to
+  # `databricks bundle deploy`. Set warehouse_id to a SQL warehouse the app can use.
+  warehouse_id: "505ec857e6b4ea23"
+
+# Unity Catalog location for governance artifacts (inference tables, audit views,
+# the workshop's own progress schema mirror).
+catalog:
+  name: shm_skunkworks_catalog
+  schema: ai_governance_workshop
+
+# Foundation Model endpoints the workshop references (Choice pillar).
+gateway:
+  # A shared, out-of-the-box foundation-model endpoint (tags only, no per-project limits).
+  ootb_endpoint: databricks-claude-sonnet-4-5
+  # Alternate model used by the routing-agent cost demo (Choice).
+  cheap_endpoint: databricks-meta-llama-3-3-70b-instruct
+
+# The governed endpoint the workshop creates and layers controls onto (Control pillar).
+governed_endpoint:
+  name: ai-governance-workshop-governed
+  primary_model: databricks-claude-sonnet-4-5
+  fallback_model: databricks-meta-llama-3-3-70b-instruct
+  inference_table_prefix: workshop_governed
+  rate_limit_per_user_per_min: 50
+  guardrails:
+    pii_behavior: BLOCK
+    keyword_policy:
+      function_name: keyword_blocklist_policy
+      blocked_keywords:
+        - social security number
+        - credit card number
+
+# Managed / built-in MCP service to demonstrate contextual policies on (Control pillar).
+mcp:
+  builtin_service: system.ai.atlassian
+  service_policy:
+    function_name: confluence_mcp_policy
+    policy_name: confluence-write-block
+    # Tool names that the policy should DENY (write actions); everything else ALLOW.
+    deny_tools:
+      - create_confluence_page
+      - update_confluence_page
+      - reply_to_confluence_comment
+    allow_probe_tool: search_confluence_pages   # a read tool used to prove ALLOW works
+
+# Project tags for cost attribution (Clarity pillar).
+project:
+  name: ai_governance_workshop
+  cost_center: platform
+  environment: workshop
+  use_case: governance_enablement
+
+# MLflow experiment for agent traces (Clarity pillar). Leave blank to skip trace steps.
+mlflow:
+  experiment_id: ""
+
+# Lakebase instance that stores workshop progress (created by the asset bundle).
+lakebase:
+  instance_name: ai-governance-workshop
+  database: databricks_postgres
+  schema: workshop

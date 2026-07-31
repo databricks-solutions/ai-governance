@@ -1,0 +1,156 @@
+# AI Governance Workshop — step definitions (the guidebook content).
+#
+# Steps are grouped by pillar (choice / control / clarity). Each step has:
+#   id       : stable key used for progress tracking in Lakebase
+#   title    : shown in the UI
+#   concept  : the "why" (markdown) — the CONCEPT card
+#   action   : optional Try-It test; `test` names a backend test (see server/routes/tests.py)
+#   verify   : optional follow-up check that proves it worked
+#   manual   : optional UI-only step the customer does in the workspace (with a deep link)
+#
+# `test` values map to backend handlers; `null`/absent means the step is guided-only.
+
+intro:
+  title: What this workshop accomplishes
+  body: |
+    By the end of this half-day you will have stood up a **governed AI control plane** on
+    your own workspace and proven it works — not on slides, live. You'll work through three
+    pillars:
+
+    - **Choice** — put any model, tool, or agent behind one governed gateway, and see the
+      cost impact of routing between models.
+    - **Control** — apply rate limits, guardrails, and contextual MCP policies, and watch
+      them block the right requests.
+    - **Clarity** — attribute cost by team, log every payload, and trace every call.
+
+    Each step explains the concept, gives you a **Try It** action that exercises the control
+    against this workspace, and a **Verify** step that proves it fired. Your progress is saved
+    so you can pause and resume.
+
+pillars:
+  - id: choice
+    title: Choice
+    tagline: Any model, tool, or agent — one governed control plane.
+    steps:
+      - id: choice_connect
+        title: Connect to the workspace
+        concept: |
+          The workshop app runs as a governed Databricks App. First we confirm it can reach
+          your SQL warehouse and read the workshop config — everything downstream depends on it.
+        action:
+          label: Test connection
+          test: connection
+        verify:
+          label: Show workspace context
+          test: workspace_context
+
+      - id: choice_list_endpoints
+        title: Discover the model surface
+        concept: |
+          You can't govern what you can't see. This lists the serving endpoints available on
+          the workspace — foundation models, external models, and any custom endpoints — the
+          raw material of **choice**.
+        action:
+          label: List serving endpoints
+          test: list_endpoints
+
+      - id: choice_routing_cost
+        title: Routing & cost impact
+        concept: |
+          The same prompt sent to different models has very different cost and latency. A
+          **routing agent** can choose the cheapest model that meets quality — this step shows
+          the cost delta between a frontier model and a cost-efficient one for the same task.
+
+          _A fuller routing-agent example will be added here._
+        action:
+          label: Compare model cost
+          test: routing_cost
+
+  - id: control
+    title: Control
+    tagline: Limits, guardrails, and policies that propagate.
+    steps:
+      - id: control_governed_endpoint
+        title: Create a governed endpoint
+        concept: |
+          A **governed endpoint** puts a control layer in front of a model: a fallback for
+          resilience, an inference table that logs every payload, usage tracking, and an
+          attachment point for guardrails and rate limits.
+        action:
+          label: Create / verify governed endpoint
+          test: create_governed_endpoint
+        verify:
+          label: Check endpoint config
+          test: verify_governed_endpoint
+
+      - id: control_guardrails
+        title: Guardrails on a model service
+        concept: |
+          Guardrails screen inputs and outputs for PII, unsafe content, and blocked keywords.
+          PII and safety filters are configured in the AI Gateway UI (no full CRUD API yet);
+          the keyword blocklist is a UC SQL function you attach as a policy.
+        manual:
+          label: Open the endpoint's Guardrails tab
+          deep_link: serving_endpoint
+        action:
+          label: Test the guardrail (send a blocked prompt)
+          test: test_guardrail
+        verify:
+          label: Show guardrail activity from the inference table
+          test: guardrail_activity
+
+      - id: control_mcp_policy
+        title: Contextual policy for an MCP service
+        concept: |
+          MCP services expose tools to agents. A **service policy** is a UC SQL function that
+          inspects each tool call and returns ALLOW / DENY — e.g. allow reads, deny writes.
+          Identity propagates: the agent acts as the calling user, not a shared account.
+        action:
+          label: Create the policy function
+          test: create_mcp_policy
+        manual:
+          label: Attach the policy in the AI Gateway UI
+          deep_link: mcp_service
+        verify:
+          label: Test a write tool (expect DENY) and a read tool (expect ALLOW)
+          test: test_mcp_policy
+
+  - id: clarity
+    title: Clarity
+    tagline: Every call attributed, logged, and traced.
+    steps:
+      - id: clarity_tags
+        title: Tag for cost attribution
+        concept: |
+          Tags turn a single AI line item into cost-per-team. This applies the workshop's
+          project tags (project, cost_center, environment, use_case) to the governed endpoint.
+        action:
+          label: Apply project tags
+          test: apply_tags
+
+      - id: clarity_usage
+        title: Usage & cost by project
+        concept: |
+          With tags in place, `system.serving.endpoint_usage` and `system.billing.usage`
+          roll up tokens and DBU cost by project — the foundation of AI FinOps.
+        action:
+          label: Query usage by project tag
+          test: usage_by_project
+
+      - id: clarity_audit
+        title: Audit & secret-leak detection
+        concept: |
+          `system.access.audit` records who called what and whether policy fired. This scans
+          recent denied calls and looks for secret-shaped strings (API keys) in arguments.
+        action:
+          label: Query denied calls & scan for secrets
+          test: audit_scan
+
+      - id: clarity_traces
+        title: Traces in a table
+        concept: |
+          MLflow traces capture agent execution — tool calls, model responses, latencies.
+          Joined to the audit log by identity and time, they give end-to-end observability.
+        manual:
+          label: Open the MLflow experiment
+          deep_link: experiment

@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# Node
+node_modules/
+
+# Local config override
+config/workshop.local.yaml
+
+# Databricks
+.databricks/
+
+# OS/IDE
+.DS_Store
+.vscode/
