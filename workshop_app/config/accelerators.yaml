@@ -1,0 +1,179 @@
+# Optional add-on accelerators — each a ~4-hour deep dive on one customer need, run after
+# the core choice/control/clarity workshop. Same step shape as pillars (config/steps.yaml),
+# so they reuse the StepCard UI, the backend tests, and the outcomes export. `test` values
+# map to server/tests_registry.py; several reuse core tests.
+
+overview:
+  title: How to use the accelerators
+  body: |
+    The core workshop proves the governed control plane across **choice · control · clarity**.
+    The accelerators are optional **~4-hour add-ons**, each focused on one customer need —
+    run the one (or two) that matches what the customer is trying to unblock, not all five.
+
+    Each accelerator is a self-contained page with the same **concept → Try It → Verify**
+    flow as the core steps: a short setup, a live test against this workspace, and a check
+    that proves it works. Progress is tracked in Lakebase alongside the core steps and is
+    included in the exported outcomes, so an accelerator you run shows up in the sales app.
+
+    **How to run one:**
+    - Pick the accelerator that matches the customer's priority (below).
+    - Confirm its prerequisites (noted on the page) are in place on the workspace.
+    - Work through the steps top to bottom with the customer, capturing notes as you go.
+    - Export outcomes at the end (Introduction → Export) — the accelerator steps are included.
+
+accelerators:
+  - id: acc_mcp
+    title: MCP Server Setup & Testing
+    tagline: On-behalf-of authentication to a managed (or external) MCP server.
+    steps:
+      - id: acc_mcp_discover
+        title: Discover the MCP tool surface
+        concept: |
+          An MCP server exposes tools to agents. Before governing it, see the live tool list —
+          the same `tools/list` discovery the core Choice step uses, here as the accelerator's
+          starting point for a specific managed or external MCP.
+        action:
+          label: List MCP tools
+          test: list_endpoints
+      - id: acc_mcp_policy
+        title: Create a contextual service policy
+        concept: |
+          A service policy is a UC SQL function that inspects each tool call and returns
+          ALLOW / DENY — e.g. allow reads, deny writes — enforced before the tool runs.
+        action:
+          label: Create the policy function
+          test: create_mcp_policy
+        manual:
+          label: Attach the policy in the AI Gateway UI
+          deep_link: mcp_service
+      - id: acc_mcp_obo
+        title: Prove on-behalf-of identity
+        concept: |
+          The headline of MCP governance: when an agent calls the tool, it acts as the
+          **calling user**, not a shared service account — so if a user can't see a record,
+          neither can the agent. Probe a denied (write) tool and an allowed (read) tool to
+          prove the policy fires under the caller's identity.
+        verify:
+          label: Test write (expect DENY) and read (expect ALLOW)
+          test: test_mcp_policy
+
+  - id: acc_agent_registry
+    title: Agent Registry Setup & Testing
+    tagline: Register, version, and own a representative agent end to end.
+    steps:
+      - id: acc_agent_inventory
+        title: Inventory registered agents & tools
+        concept: |
+          An agent registry makes agents first-class Unity Catalog assets — discoverable,
+          versioned, and owned. Start by listing what's registered in the workshop schema.
+        action:
+          label: List registered agents & tools
+          test: list_registered_assets
+      - id: acc_agent_register
+        title: Register & version a representative agent
+        concept: |
+          Register one representative agent as a UC model with an owner, then log a new
+          version. This is the end-to-end pattern the customer repeats for their fleet.
+        manual:
+          label: Register the agent in Unity Catalog (MLflow → UC model)
+          deep_link: experiment
+      - id: acc_agent_trace
+        title: Confirm traces & ownership
+        concept: |
+          A registered agent should emit MLflow traces (tool calls, responses, latency) and
+          carry a clear UC owner. Confirm the telemetry tables that back this are populated.
+        verify:
+          label: Check AI telemetry tables
+          test: lakewatch_readiness
+
+  - id: acc_coding_agent
+    title: Coding Agent Setup & Testing
+    tagline: Govern dev-agent traffic with per-developer attribution and secret detection.
+    steps:
+      - id: acc_coding_route
+        title: Route coding-agent traffic through the Gateway
+        concept: |
+          Claude Code, Cursor, Codex, and Copilot-likes each hit model providers directly by
+          default. Point them at the governed Gateway endpoint (OpenAI-compatible base URL +
+          per-user token) so every request is governed and attributable.
+        manual:
+          label: Open the governed endpoint (copy the base URL)
+          deep_link: serving_endpoint
+      - id: acc_coding_attribution
+        title: Per-developer attribution
+        concept: |
+          With traffic through the Gateway and a `use_case` tag, coding-agent spend and usage
+          roll up per developer — the blind spot becomes a measured surface.
+        action:
+          label: Check coding-agent usage & attribution
+          test: coding_agent_usage
+      - id: acc_coding_secrets
+        title: Code-secret detection
+        concept: |
+          Coding agents can leak API keys and tokens in prompts. Scan recent activity for
+          secret-shaped strings (sk-*, AKIA*, ghp_*) to prove detection is in place.
+        verify:
+          label: Scan for leaked secrets in the audit log
+          test: audit_scan
+
+  - id: acc_external_provider
+    title: External Provider Setup & Testing
+    tagline: Route Bedrock, OpenAI, and Anthropic through the Gateway; migrate one shadow workload.
+    steps:
+      - id: acc_ext_inventory
+        title: Inventory current provider access
+        concept: |
+          Map how external providers are reached today (direct keys, another proxy). The goal
+          is one governed path; start by seeing the serving endpoints that exist.
+        action:
+          label: List serving endpoints
+          test: list_endpoints
+      - id: acc_ext_route
+        title: Route a provider through the Gateway
+        concept: |
+          Register Bedrock / OpenAI / Anthropic as external models behind a governed endpoint,
+          with business-relevant tags, so they inherit the same limits, guardrails, and logging.
+        manual:
+          label: Add an external-model endpoint in the workspace
+          deep_link: serving_endpoint
+      - id: acc_ext_migrate
+        title: Migrate one shadow workload as proof
+        concept: |
+          Pick one workload that currently bypasses governance and move it onto the governed
+          endpoint. Then confirm its traffic and cost now attribute by project tag.
+        verify:
+          label: Confirm routed usage by project
+          test: usage_by_project
+
+  - id: acc_policies_guardrails
+    title: Policies & Guardrails (PII & Safety) Setup & Testing
+    tagline: Safety filter on input & output, custom PII-leakage judge, red-team dataset.
+    steps:
+      - id: acc_pg_guardrail
+        title: Safety & PII guardrail on input and output
+        concept: |
+          Configure the Gateway safety filter and PII detection on the governed endpoint
+          (input and output), then send a prompt that should be blocked to prove it fires.
+        manual:
+          label: Configure guardrails in the AI Gateway UI
+          deep_link: serving_endpoint
+        action:
+          label: Send a blocked prompt (expect block)
+          test: test_guardrail
+      - id: acc_pg_readiness
+        title: Custom PII-leakage judge & red-team dataset
+        concept: |
+          Beyond the built-in filters, a custom LLM-as-judge scores responses for PII leakage
+          against a red-team evaluation dataset. Confirm the telemetry + inference tables the
+          judge and its evaluation read from are present.
+        verify:
+          label: Check guardrail activity + telemetry readiness
+          test: pii_safety_readiness
+      - id: acc_pg_review
+        title: Review guardrail activity
+        concept: |
+          Every blocked request lands in the inference table. Review which guardrails fired
+          and for whom — the evidence security teams ask for.
+        action:
+          label: Show guardrail activity
+          test: guardrail_activity

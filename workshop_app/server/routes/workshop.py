@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from .. import deep_links
-from ..config import get_steps
+from ..config import get_accelerators, get_steps
 from ..db import pool
 from ..tests_registry import run_test
 
@@ -17,20 +17,31 @@ router = APIRouter()
 OUTCOMES_SCHEMA_VERSION = 1
 
 
+def _resolve_group(group: dict) -> dict:
+    """Resolve manual deep_links on each step of a pillar/accelerator group to URLs."""
+    out_steps = []
+    for s in group.get("steps", []):
+        step = dict(s)
+        if step.get("manual", {}).get("deep_link"):
+            step["manual"] = {**step["manual"], "url": deep_links.resolve(step["manual"]["deep_link"])}
+        out_steps.append(step)
+    return {**group, "steps": out_steps}
+
+
 @router.get("/workshop")
 def workshop_content():
     """The full guidebook: intro + pillars/steps. Resolves manual deep links to URLs."""
     steps = get_steps()
-    pillars = []
-    for pillar in steps.get("pillars", []):
-        out_steps = []
-        for s in pillar.get("steps", []):
-            step = dict(s)
-            if step.get("manual", {}).get("deep_link"):
-                step["manual"] = {**step["manual"], "url": deep_links.resolve(step["manual"]["deep_link"])}
-            out_steps.append(step)
-        pillars.append({**pillar, "steps": out_steps})
+    pillars = [_resolve_group(p) for p in steps.get("pillars", [])]
     return {"intro": steps.get("intro", {}), "pillars": pillars}
+
+
+@router.get("/accelerators")
+def accelerators_content():
+    """Optional add-on accelerators: an overview + one group per accelerator."""
+    acc = get_accelerators()
+    groups = [_resolve_group(a) for a in acc.get("accelerators", [])]
+    return {"overview": acc.get("overview", {}), "accelerators": groups}
 
 
 class RunTest(BaseModel):
@@ -112,13 +123,11 @@ def _build_outcomes(run_id: str, customer_sfid: str, customer_name: str | None) 
     workshop definition (so every step appears, even untouched ones) with saved progress.
     """
     progress = get_progress(run_id)  # {step_id: {status, last_result, notes, ...}}
-    content = workshop_content()
-
-    pillars_out = []
     totals = {"total": 0, "done": 0}
-    for pillar in content["pillars"]:
+
+    def _group_out(group: dict) -> dict:
         steps_out = []
-        for s in pillar["steps"]:
+        for s in group["steps"]:
             saved = progress.get(s["id"], {})
             status = saved.get("status", "not_started")
             complete = status == "done"
@@ -134,12 +143,15 @@ def _build_outcomes(run_id: str, customer_sfid: str, customer_name: str | None) 
                 if isinstance(saved.get("last_result"), dict) else None,
                 "updated_at": saved.get("updated_at"),
             })
-        pillars_out.append({"pillar_id": pillar["id"], "title": pillar["title"], "steps": steps_out})
+        return {"pillar_id": group["id"], "title": group["title"], "steps": steps_out}
+
+    pillars_out = [_group_out(p) for p in workshop_content()["pillars"]]
+    accelerators_out = [_group_out(a) for a in accelerators_content()["accelerators"]]
 
     # Next steps = anything not complete, so the sales app can drive follow-up.
     next_steps = [
-        {"pillar_id": p["pillar_id"], "step_id": st["step_id"], "title": st["title"], "status": st["status"]}
-        for p in pillars_out for st in p["steps"] if not st["complete"]
+        {"pillar_id": g["pillar_id"], "step_id": st["step_id"], "title": st["title"], "status": st["status"]}
+        for g in pillars_out + accelerators_out for st in g["steps"] if not st["complete"]
     ]
 
     pct = round(100 * totals["done"] / totals["total"]) if totals["total"] else 0
@@ -152,6 +164,7 @@ def _build_outcomes(run_id: str, customer_sfid: str, customer_name: str | None) 
         "run_id": run_id,
         "summary": {"total": totals["total"], "done": totals["done"], "pct": pct},
         "pillars": pillars_out,
+        "accelerators": accelerators_out,
         "next_steps": next_steps,
     }
 
@@ -181,17 +194,24 @@ def export_report(run_id: str, customer_sfid: str, customer_name: str | None = N
         f"({o['summary']['pct']}%)",
         "",
     ]
-    for p in o["pillars"]:
-        done = sum(1 for s in p["steps"] if s["complete"])
-        lines.append(f"## {p['title']} — {done}/{len(p['steps'])}")
-        lines.append("")
-        for s in p["steps"]:
-            mark = "x" if s["complete"] else " "
-            line = f"- [{mark}] {s['title']} — **{s['status']}**"
-            if s.get("notes"):
-                line += f"  \n  _notes:_ {s['notes']}"
-            lines.append(line)
-        lines.append("")
+    def _section(groups, heading=None):
+        if heading and any(g["steps"] for g in groups):
+            lines.append(f"# {heading}")
+            lines.append("")
+        for p in groups:
+            done = sum(1 for s in p["steps"] if s["complete"])
+            lines.append(f"## {p['title']} — {done}/{len(p['steps'])}")
+            lines.append("")
+            for s in p["steps"]:
+                mark = "x" if s["complete"] else " "
+                line = f"- [{mark}] {s['title']} — **{s['status']}**"
+                if s.get("notes"):
+                    line += f"  \n  _notes:_ {s['notes']}"
+                lines.append(line)
+            lines.append("")
+
+    _section(o["pillars"])
+    _section(o.get("accelerators", []), heading="Accelerators (optional add-ons)")
     if o["next_steps"]:
         lines.append("## Next steps (incomplete items)")
         lines.append("")

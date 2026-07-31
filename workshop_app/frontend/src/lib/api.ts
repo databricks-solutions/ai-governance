@@ -43,8 +43,14 @@ async function j<T>(res: Response): Promise<T> {
   return res.json();
 }
 
+export interface Accelerators {
+  overview: { title: string; body: string };
+  accelerators: Pillar[]; // same shape as a pillar (id/title/tagline/steps)
+}
+
 export const api = {
   workshop: () => fetch("/api/workshop").then((r) => j<Workshop>(r)),
+  accelerators: () => fetch("/api/accelerators").then((r) => j<Accelerators>(r)),
   progress: (runId: string) => fetch(`/api/progress/${encodeURIComponent(runId)}`).then((r) => j<ProgressMap>(r)),
   runTest: (body: {
     test: string;

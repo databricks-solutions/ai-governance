@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Layers, Lock, Eye, Loader2 } from "lucide-react";
+import { ShieldCheck, Home, Layers, Lock, Eye, Loader2, Rocket } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { RunProvider, useRun } from "@/lib/run";
-import { api, type Workshop, type ProgressMap } from "@/lib/api";
+import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
+import AcceleratorsOverview from "@/pages/AcceleratorsOverview";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, control: Lock, clarity: Eye };
 
@@ -23,12 +24,14 @@ function Shell() {
   const { runId, setRunId } = useRun();
   const [route, setRoute] = useState<string>("intro");
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
+  const [accel, setAccel] = useState<Accelerators | null>(null);
   const [progress, setProgress] = useState<ProgressMap>({});
   const [editingRun, setEditingRun] = useState(false);
   const [runEntry, setRunEntry] = useState(runId);
 
   useEffect(() => {
     api.workshop().then(setWorkshop).catch(() => setWorkshop(null));
+    api.accelerators().then(setAccel).catch(() => setAccel(null));
   }, []);
 
   function refreshProgress() {
@@ -36,8 +39,7 @@ function Shell() {
   }
   useEffect(refreshProgress, [runId]);
 
-  function pillarProgress(pillarId: string): { done: number; total: number } {
-    const steps = workshop?.pillars.find((p) => p.id === pillarId)?.steps ?? [];
+  function groupProgress(steps: { id: string }[]): { done: number; total: number } {
     const done = steps.filter((s) => progress[s.id]?.status === "done").length;
     return { done, total: steps.length };
   }
@@ -56,7 +58,7 @@ function Shell() {
         <nav className="flex flex-col gap-1">
           <NavItem active={route === "intro"} onClick={() => setRoute("intro")} icon={Home} label="Introduction" />
           {workshop?.pillars.map((p) => {
-            const { done, total } = pillarProgress(p.id);
+            const { done, total } = groupProgress(p.steps);
             const Icon = PILLAR_ICONS[p.id] ?? Layers;
             return (
               <NavItem
@@ -70,6 +72,29 @@ function Shell() {
               />
             );
           })}
+
+          {accel && (
+            <>
+              <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                Accelerators
+              </div>
+              <NavItem active={route === "accelerators"} onClick={() => setRoute("accelerators")} icon={Rocket} label="Overview" />
+              {accel.accelerators.map((a) => {
+                const { done, total } = groupProgress(a.steps);
+                return (
+                  <NavItem
+                    key={a.id}
+                    active={route === a.id}
+                    onClick={() => setRoute(a.id)}
+                    icon={Rocket}
+                    label={a.title}
+                    badge={total ? `${done}/${total}` : undefined}
+                    complete={total > 0 && done === total}
+                  />
+                );
+              })}
+            </>
+          )}
         </nav>
 
         <div className="mt-auto text-xs text-white/40">
@@ -124,6 +149,16 @@ function Shell() {
             (p) =>
               route === p.id && (
                 <PillarPage key={p.id} pillar={p} progress={progress} onProgressChange={refreshProgress} />
+              ),
+          )}
+        {accel && route === "accelerators" && (
+          <AcceleratorsOverview overview={accel.overview} accelerators={accel.accelerators} progress={progress} go={setRoute} />
+        )}
+        {accel &&
+          accel.accelerators.map(
+            (a) =>
+              route === a.id && (
+                <PillarPage key={a.id} pillar={a} progress={progress} onProgressChange={refreshProgress} />
               ),
           )}
       </main>

@@ -338,6 +338,49 @@ def t_lakewatch_readiness() -> TestResult:
     )
 
 
+# --------------------------------------------------------------------------- Accelerator-only tests
+def t_external_provider_routing() -> TestResult:
+    """Report which serving endpoints look like external-model providers routed through the
+    Gateway (Bedrock / OpenAI / Anthropic), so the accelerator can prove shadow workloads moved."""
+    w = get_workspace_client()
+    external, all_names = [], []
+    for e in w.serving_endpoints.list():
+        all_names.append(e.name)
+        n = (e.name or "").lower()
+        if any(p in n for p in ("bedrock", "openai", "gpt", "anthropic", "claude", "external")):
+            external.append(e.name)
+    summary = (f"{len(external)} endpoint(s) look like external-provider routes, of "
+               f"{len(all_names)} total." if external
+               else "No external-provider-shaped endpoints found — add one behind a governed "
+                    "endpoint to route Bedrock/OpenAI/Anthropic through the Gateway.")
+    return _ok(summary, external_like=external[:25], total_endpoints=len(all_names))
+
+
+def t_pii_safety_readiness() -> TestResult:
+    """Confirm the pieces a PII/safety accelerator needs: the governed endpoint's inference
+    table (for the custom PII-leakage judge to read) and the audit log (for red-team review)."""
+    cfg = get_config()
+    live = cfg.get("governed_endpoint", {})
+    table = (f"{cfg.get('catalog', {}).get('name')}.{cfg.get('catalog', {}).get('schema')}"
+             f".{live.get('inference_table_prefix', 'workshop_governed')}_payload")
+    checks = []
+    for label, sql in (
+        ("inference_table", f"SELECT COUNT(*) AS n FROM {table}"),
+        ("audit_log", "SELECT COUNT(*) AS n FROM system.access.audit WHERE event_date >= current_date() - INTERVAL 1 DAY"),
+    ):
+        try:
+            rows = fetchall(sql)
+            checks.append({"source": label, "available": True, "count": rows[0].get("n") if rows else None})
+        except Exception as e:
+            checks.append({"source": label, "available": False, "error": str(e)[:120]})
+    ok = any(c["available"] for c in checks)
+    return (_ok if ok else _fail)(
+        "Ready for the PII-leakage judge + red-team review." if ok
+        else "Neither the inference table nor the audit log is reachable yet.",
+        checks=checks, inference_table=table,
+    )
+
+
 REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
@@ -356,6 +399,8 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "budget_status": t_budget_status,
     "coding_agent_usage": t_coding_agent_usage,
     "lakewatch_readiness": t_lakewatch_readiness,
+    "external_provider_routing": t_external_provider_routing,
+    "pii_safety_readiness": t_pii_safety_readiness,
 }
 
 
