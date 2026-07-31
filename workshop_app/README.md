@@ -41,6 +41,24 @@ The governance tests are ported from the `l200_demo` Streamlit app into FastAPI 
 each step's **Try It** button runs a real check (list endpoints, create/verify a governed
 endpoint, query system/inference tables, create an MCP policy function, etc.).
 
+## Accelerators (optional add-ons)
+
+Beyond the core workshop, five optional **~4-hour accelerators** each get their own page (same
+concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
+
+- **MCP Server Setup & Testing** — on-behalf-of auth to a managed/external MCP.
+- **Agent Registry Setup & Testing** — register, version, and own a representative agent.
+- **Coding Agent Setup & Testing** — govern dev-agent traffic with per-developer attribution
+  and code-secret detection.
+- **External Provider Setup & Testing** — route Bedrock/OpenAI/Anthropic through the Gateway;
+  migrate one shadow workload.
+- **Policies & Guardrails (PII & Safety)** — safety filter on input/output, custom PII-leakage
+  judge, red-team dataset.
+
+Run the one that matches the customer's priority (see the in-app **Accelerators → Overview**).
+Accelerator progress is tracked in Lakebase and included in the exported outcomes, so anything
+you run shows up in the internal sales app.
+
 ## Deploy on a customer workspace
 
 Prereqs: Databricks CLI ≥ 0.297 authenticated to the workspace, a SQL warehouse, and Node
