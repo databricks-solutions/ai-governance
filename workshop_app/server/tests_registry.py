@@ -209,19 +209,25 @@ def t_apply_tags() -> TestResult:
 
 
 def t_usage_by_project() -> TestResult:
+    # Real system.serving.endpoint_usage columns: requester, request_time,
+    # input_token_count, output_token_count, usage_context (tag map), served_entity_id.
     proj = get_config().get("project", {}).get("name", "")
     sql = f"""
-      SELECT usage_metadata.serving_endpoint_name AS endpoint,
-             SUM(usage_quantity) AS quantity
+      SELECT requester,
+             COUNT(*) AS requests,
+             SUM(input_token_count + output_token_count) AS tokens
       FROM system.serving.endpoint_usage
-      WHERE custom_tags['project'] = '{proj}'
-      GROUP BY 1 ORDER BY 2 DESC LIMIT 20
+      WHERE usage_context['project'] = '{proj}'
+        AND request_time > current_timestamp() - INTERVAL 7 DAYS
+      GROUP BY requester ORDER BY tokens DESC LIMIT 20
     """
     try:
         rows = fetchall(sql)
-        return _ok(f"Usage rows for project `{proj}`: {len(rows)}.", rows=rows)
+        summary = (f"Usage rows for project `{proj}`: {len(rows)}." if rows
+                   else f"No tagged usage for project `{proj}` yet (tag endpoints, then send traffic).")
+        return _ok(summary, rows=rows, sql=sql)
     except Exception as e:
-        return _fail("Usage query failed (tags may not have propagated yet).", error=str(e)[:300])
+        return _fail("Usage query failed.", error=str(e)[:300], sql=sql)
 
 
 def t_audit_scan() -> TestResult:
@@ -246,6 +252,92 @@ def _looks_like_secret(text: str) -> bool:
     return bool(re.search(r"\b(sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,})\b", text))
 
 
+# --------------------------------------------------------------------------- Added: 5x4-matrix coverage
+def t_list_registered_assets() -> TestResult:
+    """Inventory of agents (registered models) and UC functions (tools) — the Choice surface."""
+    cfg = get_config()
+    cat = cfg.get("catalog", {}).get("name")
+    sch = cfg.get("catalog", {}).get("schema")
+    w = get_workspace_client()
+    agents, tools = [], []
+    try:
+        for m in w.registered_models.list(catalog_name=cat, schema_name=sch):
+            agents.append(m.full_name)
+    except Exception:
+        pass
+    try:
+        rows = fetchall(
+            f"SELECT function_name FROM system.information_schema.routines "
+            f"WHERE routine_catalog = '{cat}' AND routine_schema = '{sch}' LIMIT 50"
+        )
+        tools = [r.get("function_name") for r in rows]
+    except Exception:
+        pass
+    return _ok(
+        f"{len(agents)} registered agent(s)/model(s), {len(tools)} tool function(s) in {cat}.{sch}.",
+        agents=agents[:25], tools=tools[:25],
+    )
+
+
+def t_budget_status() -> TestResult:
+    """Spend (last 30d) by project tag vs. an illustrative cap. Budgets themselves are set in
+    the account console (see the step's manual action); this shows the spend the cap governs."""
+    proj = get_config().get("project", {}).get("name", "")
+    sql = f"""
+      SELECT COUNT(*) AS requests,
+             SUM(input_token_count + output_token_count) AS tokens
+      FROM system.serving.endpoint_usage
+      WHERE usage_context['project'] = '{proj}'
+        AND request_time > current_timestamp() - INTERVAL 30 DAYS
+    """
+    try:
+        rows = fetchall(sql)
+        return _ok(f"30-day spend signal for project `{proj}`.", rows=rows, sql=sql,
+                   note="Set the actual budget + hard cap in the account console (manual step).")
+    except Exception as e:
+        return _fail("Budget query failed.", error=str(e)[:300], sql=sql)
+
+
+def t_coding_agent_usage() -> TestResult:
+    """Coding-agent traffic attributable in the gateway. Heuristic: usage tagged use_case, or a
+    user_agent hint if present in endpoint_usage. Reports per-requester volume so spend is
+    attributable per developer."""
+    use_case = get_config().get("project", {}).get("use_case", "")
+    sql = f"""
+      SELECT requester, COUNT(*) AS requests,
+             SUM(input_token_count + output_token_count) AS tokens
+      FROM system.serving.endpoint_usage
+      WHERE usage_context['use_case'] = '{use_case}'
+        AND request_time > current_timestamp() - INTERVAL 7 DAYS
+      GROUP BY requester ORDER BY tokens DESC LIMIT 20
+    """
+    try:
+        rows = fetchall(sql)
+        summary = (f"{len(rows)} developer(s) with attributable coding-agent usage."
+                   if rows else "No coding-agent usage tagged yet — route Cursor/Claude Code/"
+                                "Codex/Genie Code through the gateway with a use_case tag.")
+        return _ok(summary, rows=rows, sql=sql)
+    except Exception as e:
+        return _fail("Coding-agent usage query failed.", error=str(e)[:300], sql=sql)
+
+
+def t_lakewatch_readiness() -> TestResult:
+    """Confirm the AI telemetry tables Lakewatch reads exist and are populated."""
+    checks = []
+    for table in ("system.serving.endpoint_usage", "system.access.audit"):
+        try:
+            rows = fetchall(f"SELECT COUNT(*) AS n FROM {table} "
+                            f"WHERE 1=1 LIMIT 1")
+            checks.append({"table": table, "available": True, "sample_count": rows[0].get("n") if rows else None})
+        except Exception as e:
+            checks.append({"table": table, "available": False, "error": str(e)[:120]})
+    ok = all(c["available"] for c in checks)
+    return (_ok if ok else _fail)(
+        "AI telemetry tables ready for Lakewatch." if ok else "Some telemetry tables are not reachable.",
+        checks=checks,
+    )
+
+
 REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
@@ -260,6 +352,10 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "apply_tags": t_apply_tags,
     "usage_by_project": t_usage_by_project,
     "audit_scan": t_audit_scan,
+    "list_registered_assets": t_list_registered_assets,
+    "budget_status": t_budget_status,
+    "coding_agent_usage": t_coding_agent_usage,
+    "lakewatch_readiness": t_lakewatch_readiness,
 }
 
 

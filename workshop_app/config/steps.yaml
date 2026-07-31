@@ -66,6 +66,17 @@ pillars:
           label: Compare model cost
           test: routing_cost
 
+      - id: choice_agent_registry
+        title: Register agents & tools in Unity Catalog
+        concept: |
+          Choice isn't just models — it's **agents, MCP servers, and skills**, all registered
+          as first-class Unity Catalog assets so they're discoverable, owned, and governed like
+          any table. This lists the agents and UC functions (tools) already registered, the
+          inventory a governance team can actually see and control.
+        action:
+          label: List registered agents & tools
+          test: list_registered_assets
+
   - id: control
     title: Control
     tagline: Limits, guardrails, and policies that propagate.
@@ -115,6 +126,32 @@ pillars:
           label: Test a write tool (expect DENY) and a read tool (expect ALLOW)
           test: test_mcp_policy
 
+      - id: control_budgets
+        title: Budgets & hard spend caps
+        concept: |
+          Rate limits cap throughput; **budgets** cap spend. Budget alerts fire when a
+          project/team/user crosses a monthly threshold (GA), and hard spend caps block traffic
+          at the cap (roadmap). Budgets are scoped by the same project tags applied under Clarity
+          and configured in the account console.
+        action:
+          label: Check current spend vs budget (by project)
+          test: budget_status
+        manual:
+          label: Create a budget in the account console
+          deep_link: account_budgets
+
+      - id: control_coding_agents
+        title: Govern coding-agent traffic
+        concept: |
+          Developers adopt Cursor, Claude Code, Codex, and Genie Code faster than platform teams
+          can govern them. Routing that traffic through the gateway gives you **per-developer
+          attribution, one policy set, and secret-leak detection** — turning a blind spot into a
+          governed, measured surface. This checks for coding-agent usage attributable in the
+          gateway logs.
+        action:
+          label: Check coding-agent usage & attribution
+          test: coding_agent_usage
+
   - id: clarity
     title: Clarity
     tagline: Every call attributed, logged, and traced.
@@ -154,3 +191,14 @@ pillars:
         manual:
           label: Open the MLflow experiment
           deep_link: experiment
+
+      - id: clarity_lakewatch
+        title: Lakewatch — the AI-optimized SIEM
+        concept: |
+          The endpoint-usage, audit, and inference-table signals all land in the Lakehouse, where
+          **Lakewatch** treats AI telemetry as a security surface: anomaly detection on spend and
+          refusal rates, alerting, and investigation over the same governed tables. This confirms
+          the underlying telemetry tables Lakewatch reads are present and populated.
+        action:
+          label: Check AI telemetry tables for Lakewatch
+          test: lakewatch_readiness

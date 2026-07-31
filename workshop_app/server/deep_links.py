@@ -35,4 +35,7 @@ def resolve(kind: str) -> str:
         return experiment(exp) if exp else f"{_host()}/ml/experiments"
     if kind == "system_audit":
         return system_audit()
+    if kind == "account_budgets":
+        # Account console budgets live at the account level, not the workspace host.
+        return "https://accounts.cloud.databricks.com/usage/budgets"
     return _host()

@@ -8,6 +8,9 @@ import PillarPage from "@/pages/PillarPage";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, control: Lock, clarity: Eye };
 
+// Customer-facing (external) repo — for feedback links in the sidebar.
+const REPO_URL = "https://github.com/databricks-solutions/ai-governance";
+
 export default function App() {
   return (
     <RunProvider>
@@ -94,7 +97,18 @@ function Shell() {
             </button>
           )}
           <div className="mt-3 h-px w-8 bg-lava" />
-          <div className="mt-2">Choice · Control · Clarity</div>
+          <div className="mt-3 flex flex-col gap-1.5">
+            <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-white/80">
+              Repository ↗
+            </a>
+            <a href={`${REPO_URL}/issues/new?labels=enhancement&title=${encodeURIComponent("[Feature] ")}`} target="_blank" rel="noreferrer" className="hover:text-white/80">
+              Submit feature request ↗
+            </a>
+            <a href={`${REPO_URL}/issues/new?labels=bug&title=${encodeURIComponent("[Bug] ")}`} target="_blank" rel="noreferrer" className="hover:text-white/80">
+              File an issue ↗
+            </a>
+          </div>
+          <div className="mt-3">Choice · Control · Clarity</div>
         </div>
       </aside>
 
