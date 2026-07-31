@@ -1,6 +1,7 @@
 import { Layers, Lock, Eye, ArrowRight } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
+import ExportPanel from "@/components/ExportPanel";
 import type { Pillar, ProgressMap } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
@@ -86,6 +87,11 @@ export default function Intro({
               );
             })}
           </div>
+        </section>
+
+        <section>
+          <Eyebrow>Wrap up</Eyebrow>
+          <ExportPanel />
         </section>
       </div>
     </>

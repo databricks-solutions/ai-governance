@@ -1,7 +1,9 @@
 """Workshop content, test execution, and progress tracking."""
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from .. import deep_links
@@ -10,6 +12,9 @@ from ..db import pool
 from ..tests_registry import run_test
 
 router = APIRouter()
+
+# Version of the outcomes-JSON contract the internal sales app ingests.
+OUTCOMES_SCHEMA_VERSION = 1
 
 
 @router.get("/workshop")
@@ -97,3 +102,100 @@ def _save_progress(run_id, step_id, pillar_id, status, result, updated_by, notes
                  json.dumps(result) if result is not None else None, notes, updated_by),
             )
         conn.commit()
+
+
+# --------------------------------------------------------------------------- Export
+def _build_outcomes(run_id: str, customer_sfid: str, customer_name: str | None) -> dict:
+    """Assemble the workshop outcomes: every step with its status, keyed to a Salesforce id.
+
+    This is the contract the internal sales app ingests (schema_version). It merges the
+    workshop definition (so every step appears, even untouched ones) with saved progress.
+    """
+    progress = get_progress(run_id)  # {step_id: {status, last_result, notes, ...}}
+    content = workshop_content()
+
+    pillars_out = []
+    totals = {"total": 0, "done": 0}
+    for pillar in content["pillars"]:
+        steps_out = []
+        for s in pillar["steps"]:
+            saved = progress.get(s["id"], {})
+            status = saved.get("status", "not_started")
+            complete = status == "done"
+            totals["total"] += 1
+            totals["done"] += 1 if complete else 0
+            steps_out.append({
+                "step_id": s["id"],
+                "title": s["title"],
+                "status": status,
+                "complete": complete,
+                "notes": saved.get("notes"),
+                "last_result_summary": (saved.get("last_result") or {}).get("summary")
+                if isinstance(saved.get("last_result"), dict) else None,
+                "updated_at": saved.get("updated_at"),
+            })
+        pillars_out.append({"pillar_id": pillar["id"], "title": pillar["title"], "steps": steps_out})
+
+    # Next steps = anything not complete, so the sales app can drive follow-up.
+    next_steps = [
+        {"pillar_id": p["pillar_id"], "step_id": st["step_id"], "title": st["title"], "status": st["status"]}
+        for p in pillars_out for st in p["steps"] if not st["complete"]
+    ]
+
+    pct = round(100 * totals["done"] / totals["total"]) if totals["total"] else 0
+    return {
+        "schema_version": OUTCOMES_SCHEMA_VERSION,
+        "source": "ai-governance-workshop",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "customer_sfid": customer_sfid,
+        "customer_name": customer_name,
+        "run_id": run_id,
+        "summary": {"total": totals["total"], "done": totals["done"], "pct": pct},
+        "pillars": pillars_out,
+        "next_steps": next_steps,
+    }
+
+
+@router.get("/export/outcomes")
+def export_outcomes(run_id: str, customer_sfid: str, customer_name: str | None = None):
+    """The JSON the internal sales app loads to track workshop outcomes + next steps."""
+    if not customer_sfid:
+        raise HTTPException(400, "customer_sfid is required")
+    return _build_outcomes(run_id, customer_sfid, customer_name)
+
+
+@router.get("/export/report", response_class=PlainTextResponse)
+def export_report(run_id: str, customer_sfid: str, customer_name: str | None = None):
+    """A human-readable per-step report (complete / incomplete) as Markdown."""
+    if not customer_sfid:
+        raise HTTPException(400, "customer_sfid is required")
+    o = _build_outcomes(run_id, customer_sfid, customer_name)
+    lines = [
+        f"# AI Governance Workshop — Outcomes Report",
+        "",
+        f"**Account:** {o['customer_name'] or o['customer_sfid']}  ",
+        f"**Salesforce id:** {o['customer_sfid']}  ",
+        f"**Run:** {o['run_id']}  ",
+        f"**Generated:** {o['generated_at']}  ",
+        f"**Progress:** {o['summary']['done']}/{o['summary']['total']} steps complete "
+        f"({o['summary']['pct']}%)",
+        "",
+    ]
+    for p in o["pillars"]:
+        done = sum(1 for s in p["steps"] if s["complete"])
+        lines.append(f"## {p['title']} — {done}/{len(p['steps'])}")
+        lines.append("")
+        for s in p["steps"]:
+            mark = "x" if s["complete"] else " "
+            line = f"- [{mark}] {s['title']} — **{s['status']}**"
+            if s.get("notes"):
+                line += f"  \n  _notes:_ {s['notes']}"
+            lines.append(line)
+        lines.append("")
+    if o["next_steps"]:
+        lines.append("## Next steps (incomplete items)")
+        lines.append("")
+        for n in o["next_steps"]:
+            lines.append(f"- {n['title']} ({n['pillar_id']}) — {n['status']}")
+        lines.append("")
+    return "\n".join(lines)

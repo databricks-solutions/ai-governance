@@ -64,4 +64,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => j<{ ok: boolean }>(r)),
+
+  // Export — build the URLs the browser downloads (outcomes JSON + Markdown report).
+  exportUrl: (kind: "outcomes" | "report", runId: string, sfid: string, name: string) => {
+    const q = new URLSearchParams({ run_id: runId, customer_sfid: sfid });
+    if (name) q.set("customer_name", name);
+    return `/api/export/${kind}?${q.toString()}`;
+  },
 };
