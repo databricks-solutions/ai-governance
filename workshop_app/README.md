@@ -80,6 +80,17 @@ one row per `(run_id, step_id)` with `status` (not_started / in_progress / done 
 last Try-It/Verify `last_result` (JSON), and timestamps. `run_id` is a team/session label so
 multiple teams can track independently on the same deployment.
 
+## Export → the internal sales app
+
+The Intro page's **Export workshop outcomes** panel produces two files (the deliverer confirms
+the Salesforce account id first):
+
+- **`<sfid>_workshop_report.md`** — a per-step complete/incomplete report grouped by pillar, for
+  the customer leave-behind (`GET /api/export/report`).
+- **`<sfid>_workshop_outcomes.json`** — the machine-readable outcomes (`schema_version` 1) the
+  internal AI Governance sales app ingests to track the account and drive next steps
+  (`GET /api/export/outcomes`). Load it in that app's **Account Journey → Workshop handoff**.
+
 ## Extending
 
 - **Add a step:** add an entry under a pillar in `config/steps.yaml`. If it has a `test`, add a
