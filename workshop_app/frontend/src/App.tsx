@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Layers, Lock, Eye, Loader2, Rocket } from "lucide-react";
+import { ShieldCheck, Home, Layers, Lock, Eye, Loader2, Rocket, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { RunProvider, useRun } from "@/lib/run";
 import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
 import AcceleratorsOverview from "@/pages/AcceleratorsOverview";
+import Faq from "@/pages/Faq";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, control: Lock, clarity: Eye };
 
@@ -57,6 +58,7 @@ function Shell() {
 
         <nav className="flex flex-col gap-1">
           <NavItem active={route === "intro"} onClick={() => setRoute("intro")} icon={Home} label="Introduction" />
+          <NavItem active={route === "faq"} onClick={() => setRoute("faq")} icon={HelpCircle} label="FAQ" />
           {workshop?.pillars.map((p) => {
             const { done, total } = groupProgress(p.steps);
             const Icon = PILLAR_ICONS[p.id] ?? Layers;
@@ -143,6 +145,7 @@ function Shell() {
             <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading workshop…
           </div>
         )}
+        {route === "faq" && <Faq />}
         {workshop && route === "intro" && <Intro intro={workshop.intro} pillars={workshop.pillars} progress={progress} go={setRoute} />}
         {workshop &&
           workshop.pillars.map(

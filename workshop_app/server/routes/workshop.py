@@ -44,6 +44,18 @@ def accelerators_content():
     return {"overview": acc.get("overview", {}), "accelerators": groups}
 
 
+@router.get("/faq", response_class=PlainTextResponse)
+def faq():
+    """Serve the repo's FAQ.md so the in-app FAQ and the repo file are the same source."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "FAQ.md")
+    try:
+        with open(os.path.abspath(path)) as f:
+            return f.read()
+    except FileNotFoundError:
+        return "# FAQ\n\nFAQ.md not found."
+
+
 class RunTest(BaseModel):
     test: str
     run_id: str

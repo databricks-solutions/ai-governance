@@ -51,6 +51,7 @@ export interface Accelerators {
 export const api = {
   workshop: () => fetch("/api/workshop").then((r) => j<Workshop>(r)),
   accelerators: () => fetch("/api/accelerators").then((r) => j<Accelerators>(r)),
+  faq: () => fetch("/api/faq").then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))),
   progress: (runId: string) => fetch(`/api/progress/${encodeURIComponent(runId)}`).then((r) => j<ProgressMap>(r)),
   runTest: (body: {
     test: string;
