@@ -1,4 +1,4 @@
-import { Layers, Lock, Eye, ArrowRight } from "lucide-react";
+import { Layers, Lock, Eye, ArrowRight, Rocket } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
 import ExportPanel from "@/components/ExportPanel";
@@ -43,11 +43,15 @@ function inline(s: string): string {
 export default function Intro({
   intro,
   pillars,
+  accelOverview,
+  accelerators,
   progress,
   go,
 }: {
   intro: { title: string; body: string };
   pillars: Pillar[];
+  accelOverview?: { title: string; body: string };
+  accelerators?: Pillar[];
   progress: ProgressMap;
   go: (r: string) => void;
 }) {
@@ -88,6 +92,45 @@ export default function Intro({
             })}
           </div>
         </section>
+
+        {accelerators && accelerators.length > 0 && (
+          <section>
+            <Eyebrow>Accelerators</Eyebrow>
+            {accelOverview && (
+              <>
+                <h2 className="mb-3 text-xl font-semibold text-navy">{accelOverview.title}</h2>
+                <Markdown text={accelOverview.body} />
+              </>
+            )}
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {accelerators.map((a) => {
+                const done = a.steps.filter((s) => progress[s.id]?.status === "done").length;
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => go(a.id)}
+                    className={cn(
+                      "group flex flex-col items-start rounded-2xl border border-navy/10 bg-white p-6 text-left transition-all",
+                      "hover:-translate-y-0.5 hover:border-navy/30",
+                    )}
+                  >
+                    <div className="mb-4 flex w-full items-center justify-between">
+                      <Rocket className="h-6 w-6 text-navy" strokeWidth={2} />
+                      <Pill tone={done === a.steps.length && a.steps.length > 0 ? "lava" : "muted"}>
+                        {done}/{a.steps.length}
+                      </Pill>
+                    </div>
+                    <h3 className="text-lg font-semibold text-navy">{a.title}</h3>
+                    <p className="mt-1.5 text-sm leading-snug text-muted">{a.tagline}</p>
+                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-navy opacity-0 transition-opacity group-hover:opacity-100">
+                      Open <ArrowRight className="h-4 w-4" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         <section>
           <Eyebrow>Wrap up</Eyebrow>

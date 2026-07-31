@@ -5,7 +5,6 @@ import { RunProvider, useRun } from "@/lib/run";
 import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
-import AcceleratorsOverview from "@/pages/AcceleratorsOverview";
 import Faq from "@/pages/Faq";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, control: Lock, clarity: Eye };
@@ -80,7 +79,6 @@ function Shell() {
               <div className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-white/40">
                 Accelerators
               </div>
-              <NavItem active={route === "accelerators"} onClick={() => setRoute("accelerators")} icon={Rocket} label="Overview" />
               {accel.accelerators.map((a) => {
                 const { done, total } = groupProgress(a.steps);
                 return (
@@ -146,7 +144,16 @@ function Shell() {
           </div>
         )}
         {route === "faq" && <Faq />}
-        {workshop && route === "intro" && <Intro intro={workshop.intro} pillars={workshop.pillars} progress={progress} go={setRoute} />}
+        {workshop && route === "intro" && (
+          <Intro
+            intro={workshop.intro}
+            pillars={workshop.pillars}
+            accelOverview={accel?.overview}
+            accelerators={accel?.accelerators}
+            progress={progress}
+            go={setRoute}
+          />
+        )}
         {workshop &&
           workshop.pillars.map(
             (p) =>
@@ -154,9 +161,6 @@ function Shell() {
                 <PillarPage key={p.id} pillar={p} progress={progress} onProgressChange={refreshProgress} />
               ),
           )}
-        {accel && route === "accelerators" && (
-          <AcceleratorsOverview overview={accel.overview} accelerators={accel.accelerators} progress={progress} go={setRoute} />
-        )}
         {accel &&
           accel.accelerators.map(
             (a) =>

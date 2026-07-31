@@ -23,7 +23,7 @@ overview:
 
 accelerators:
   - id: acc_mcp
-    title: MCP Server Setup & Testing
+    title: MCP Servers
     tagline: On-behalf-of authentication to a managed (or external) MCP server.
     steps:
       - id: acc_mcp_discover
@@ -58,7 +58,7 @@ accelerators:
           test: test_mcp_policy
 
   - id: acc_agent_registry
-    title: Agent Registry Setup & Testing
+    title: Agent Registry
     tagline: Register, version, and own a representative agent end to end.
     steps:
       - id: acc_agent_inventory
@@ -87,7 +87,7 @@ accelerators:
           test: lakewatch_readiness
 
   - id: acc_coding_agent
-    title: Coding Agent Setup & Testing
+    title: Coding Agents
     tagline: Govern dev-agent traffic with per-developer attribution and secret detection.
     steps:
       - id: acc_coding_route
@@ -117,7 +117,7 @@ accelerators:
           test: audit_scan
 
   - id: acc_external_provider
-    title: External Provider Setup & Testing
+    title: External Providers
     tagline: Route Bedrock, OpenAI, and Anthropic through the Gateway; migrate one shadow workload.
     steps:
       - id: acc_ext_inventory
@@ -146,7 +146,7 @@ accelerators:
           test: usage_by_project
 
   - id: acc_policies_guardrails
-    title: Policies & Guardrails (PII & Safety) Setup & Testing
+    title: Policies & Guardrails
     tagline: Safety filter on input & output, custom PII-leakage judge, red-team dataset.
     steps:
       - id: acc_pg_guardrail
