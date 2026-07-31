@@ -9,11 +9,10 @@ import { useRun } from "@/lib/run";
 export default function ExportPanel() {
   const { runId } = useRun();
   const [sfid, setSfid] = useState("");
-  const [name, setName] = useState("");
 
   function download(kind: "outcomes" | "report") {
     if (!sfid.trim()) return;
-    const url = api.exportUrl(kind, runId, sfid.trim(), name.trim());
+    const url = api.exportUrl(kind, runId, sfid.trim());
     // Force a download with a sensible filename.
     const a = document.createElement("a");
     a.href = url;
@@ -33,26 +32,15 @@ export default function ExportPanel() {
         Generate the leave-behind report and the outcomes file the internal sales app loads to
         track this account's workshop and next steps. Confirm the Salesforce account id first.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">Salesforce id</span>
-          <input
-            value={sfid}
-            onChange={(e) => setSfid(e.target.value)}
-            placeholder="0016100001Qcv4uAAB"
-            className="mt-1.5 w-full rounded-xl border border-navy/15 bg-oat px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">Account name (optional)</span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Acme Corp"
-            className="mt-1.5 w-full rounded-xl border border-navy/15 bg-oat px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy"
-          />
-        </label>
-      </div>
+      <label className="block">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted">Salesforce id</span>
+        <input
+          value={sfid}
+          onChange={(e) => setSfid(e.target.value)}
+          placeholder="0016100001Qcv4uAAB"
+          className="mt-1.5 w-full rounded-xl border border-navy/15 bg-oat px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy sm:max-w-sm"
+        />
+      </label>
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           onClick={() => download("report")}
