@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import { Eyebrow } from "@/components/ui";
 
 export default function PageHeader({
-  part,
+  eyebrow,
   title,
   lead,
   children,
 }: {
-  part: string;
+  eyebrow?: string;
   title: string;
   lead?: string;
   children?: ReactNode;
@@ -15,7 +15,7 @@ export default function PageHeader({
   return (
     <header className="border-b border-navy/10 bg-oat px-8 pb-10 pt-14 lg:px-14">
       <div className="mx-auto max-w-4xl">
-        <Eyebrow>Part {part}</Eyebrow>
+        {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
         <h1 className="text-4xl font-bold text-navy lg:text-5xl">{title}</h1>
         {lead && <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">{lead}</p>}
         {children}

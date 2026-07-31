@@ -2,7 +2,7 @@
 
 A customer-facing, guided workshop app for standing up a **governed AI control plane** on a
 Databricks workspace and proving it works live. It's organized around three pillars —
-**Choice · Control · Clarity** — and every step has a **concept**, a **Try It** action that
+**Choice · Cost · Control** — and every step has a **concept**, a **Try It** action that
 exercises the control against the connected workspace, and a **Verify** step that proves it
 fired. Progress is tracked per team in Lakebase so a room can pause and resume.
 
@@ -29,13 +29,15 @@ workshop_app/
 
 ## What each pillar covers
 
-- **Choice** — connect, discover the model surface, and see the cost impact of routing between
-  models (a routing-agent example plugs in here).
-- **Control** — create a governed endpoint, apply guardrails on a model service, and attach a
-  contextual policy to an MCP service (allow reads, deny writes). Try-It steps send blocked
-  prompts / probe tool calls and show the control firing.
-- **Clarity** — tag for cost attribution, query usage/cost by project, scan the audit log for
-  denied calls and leaked secrets, and open traces.
+- **Choice** — open, multi-AI ecosystem: connect, discover the model surface, and register
+  agents, tools, and MCP servers as first-class Unity Catalog assets.
+- **Cost** — intelligent cost controls: see the cost impact of routing between models (a
+  routing-agent example plugs in here), set budgets and hard spend caps, tag for cost
+  attribution, and query usage/cost by project.
+- **Control** — agent-aware data + AI governance: create a governed endpoint, apply guardrails
+  on a model service, attach a contextual policy to an MCP service (allow reads, deny writes),
+  govern coding-agent traffic, and get end-to-end observability — scan the audit log for denied
+  calls and leaked secrets, open traces, and confirm Lakewatch telemetry.
 
 The governance tests are ported from the `l200_demo` Streamlit app into FastAPI endpoints, so
 each step's **Try It** button runs a real check (list endpoints, create/verify a governed
@@ -99,9 +101,11 @@ cd frontend && npm run dev
 ## Progress tracking (Lakebase)
 
 Progress is stored in the bundle's Lakebase instance, schema `workshop`, table `step_progress`:
-one row per `(run_id, step_id)` with `status` (not_started / in_progress / done / failed), the
-last Try-It/Verify `last_result` (JSON), and timestamps. `run_id` is a team/session label so
-multiple teams can track independently on the same deployment.
+one row per `(customer_sfid, step_id)` with `status` (not_started / in_progress / done / failed),
+the last Try-It/Verify `last_result` (JSON), and timestamps. The whole workshop is keyed to the
+Salesforce account id set on the Introduction page, so progress and the outcomes export flow
+straight into the internal sales app. (Deployments from before this change auto-migrate the
+legacy `run_id` column to `customer_sfid` on startup.)
 
 ## Export → the internal sales app
 
@@ -118,7 +122,7 @@ the Salesforce account id first):
 
 - **Add a step:** add an entry under a pillar in `config/steps.yaml`. If it has a `test`, add a
   matching function to `server/tests_registry.py` and register it in `REGISTRY`.
-- **Routing agent (Choice):** the `routing_cost` test is a placeholder that names the frontier
+- **Routing agent (Cost):** the `routing_cost` test is a placeholder that names the frontier
   vs cost-efficient endpoints; replace it with a real routing agent that reports live token cost
   per model.
 - **Point at a different workspace:** edit `config/workshop.yaml` (or a `workshop.local.yaml`

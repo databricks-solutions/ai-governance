@@ -58,7 +58,7 @@ def faq():
 
 class RunTest(BaseModel):
     test: str
-    run_id: str
+    customer_sfid: str
     step_id: str
     pillar_id: str
     kind: str = "action"          # 'action' | 'verify'
@@ -69,12 +69,12 @@ class RunTest(BaseModel):
 def run_and_record(body: RunTest):
     result = run_test(body.test)
     status = "done" if result.get("ok") else "failed"
-    _save_progress(body.run_id, body.step_id, body.pillar_id, status, result, body.updated_by)
+    _save_progress(body.customer_sfid, body.step_id, body.pillar_id, status, result, body.updated_by)
     return result
 
 
 class Progress(BaseModel):
-    run_id: str
+    customer_sfid: str
     step_id: str
     pillar_id: str
     status: str
@@ -84,18 +84,18 @@ class Progress(BaseModel):
 
 @router.post("/progress")
 def set_progress(body: Progress):
-    _save_progress(body.run_id, body.step_id, body.pillar_id, body.status, None, body.updated_by, body.notes)
+    _save_progress(body.customer_sfid, body.step_id, body.pillar_id, body.status, None, body.updated_by, body.notes)
     return {"ok": True}
 
 
-@router.get("/progress/{run_id}")
-def get_progress(run_id: str):
+@router.get("/progress/{customer_sfid}")
+def get_progress(customer_sfid: str):
     with pool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """SELECT step_id, pillar_id, status, last_result, notes, updated_at
-                   FROM step_progress WHERE run_id = %s""",
-                (run_id,),
+                   FROM step_progress WHERE customer_sfid = %s""",
+                (customer_sfid,),
             )
             rows = cur.fetchall()
     return {
@@ -105,36 +105,36 @@ def get_progress(run_id: str):
     }
 
 
-def _save_progress(run_id, step_id, pillar_id, status, result, updated_by, notes=None):
-    if not run_id:
-        raise HTTPException(400, "run_id is required")
+def _save_progress(customer_sfid, step_id, pillar_id, status, result, updated_by, notes=None):
+    if not customer_sfid:
+        raise HTTPException(400, "customer_sfid is required")
     with pool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO step_progress
-                   (run_id, step_id, pillar_id, status, last_result, notes, updated_by, updated_at)
+                   (customer_sfid, step_id, pillar_id, status, last_result, notes, updated_by, updated_at)
                    VALUES (%s,%s,%s,%s,%s,%s,%s, now())
-                   ON CONFLICT (run_id, step_id) DO UPDATE SET
+                   ON CONFLICT (customer_sfid, step_id) DO UPDATE SET
                      status = EXCLUDED.status,
                      last_result = COALESCE(EXCLUDED.last_result, step_progress.last_result),
                      notes = COALESCE(EXCLUDED.notes, step_progress.notes),
                      pillar_id = EXCLUDED.pillar_id,
                      updated_by = EXCLUDED.updated_by,
                      updated_at = now()""",
-                (run_id, step_id, pillar_id, status,
+                (customer_sfid, step_id, pillar_id, status,
                  json.dumps(result) if result is not None else None, notes, updated_by),
             )
         conn.commit()
 
 
 # --------------------------------------------------------------------------- Export
-def _build_outcomes(run_id: str, customer_sfid: str, customer_name: str | None) -> dict:
+def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
     """Assemble the workshop outcomes: every step with its status, keyed to a Salesforce id.
 
     This is the contract the internal sales app ingests (schema_version). It merges the
     workshop definition (so every step appears, even untouched ones) with saved progress.
     """
-    progress = get_progress(run_id)  # {step_id: {status, last_result, notes, ...}}
+    progress = get_progress(customer_sfid)  # {step_id: {status, last_result, notes, ...}}
     totals = {"total": 0, "done": 0}
 
     def _group_out(group: dict) -> dict:
@@ -173,7 +173,6 @@ def _build_outcomes(run_id: str, customer_sfid: str, customer_name: str | None) 
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "customer_sfid": customer_sfid,
         "customer_name": customer_name,
-        "run_id": run_id,
         "summary": {"total": totals["total"], "done": totals["done"], "pct": pct},
         "pillars": pillars_out,
         "accelerators": accelerators_out,
@@ -182,25 +181,24 @@ def _build_outcomes(run_id: str, customer_sfid: str, customer_name: str | None) 
 
 
 @router.get("/export/outcomes")
-def export_outcomes(run_id: str, customer_sfid: str, customer_name: str | None = None):
+def export_outcomes(customer_sfid: str, customer_name: str | None = None):
     """The JSON the internal sales app loads to track workshop outcomes + next steps."""
     if not customer_sfid:
         raise HTTPException(400, "customer_sfid is required")
-    return _build_outcomes(run_id, customer_sfid, customer_name)
+    return _build_outcomes(customer_sfid, customer_name)
 
 
 @router.get("/export/report", response_class=PlainTextResponse)
-def export_report(run_id: str, customer_sfid: str, customer_name: str | None = None):
+def export_report(customer_sfid: str, customer_name: str | None = None):
     """A human-readable per-step report (complete / incomplete) as Markdown."""
     if not customer_sfid:
         raise HTTPException(400, "customer_sfid is required")
-    o = _build_outcomes(run_id, customer_sfid, customer_name)
+    o = _build_outcomes(customer_sfid, customer_name)
     lines = [
         f"# AI Governance Workshop — Outcomes Report",
         "",
         f"**Account:** {o['customer_name'] or o['customer_sfid']}  ",
         f"**Salesforce id:** {o['customer_sfid']}  ",
-        f"**Run:** {o['run_id']}  ",
         f"**Generated:** {o['generated_at']}  ",
         f"**Progress:** {o['summary']['done']}/{o['summary']['total']} steps complete "
         f"({o['summary']['pct']}%)",

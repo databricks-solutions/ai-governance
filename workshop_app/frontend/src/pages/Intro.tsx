@@ -1,11 +1,12 @@
-import { Layers, Lock, Eye, ArrowRight, Rocket } from "lucide-react";
+import { Layers, Lock, DollarSign, ArrowRight, Rocket } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
 import ExportPanel from "@/components/ExportPanel";
 import type { Pillar, ProgressMap } from "@/lib/api";
+import { useAccount } from "@/lib/account";
 import { cn } from "@/lib/cn";
 
-const ICONS: Record<string, typeof Layers> = { choice: Layers, control: Lock, clarity: Eye };
+const ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
 
 // Minimal, safe markdown: paragraphs, **bold**, and - bullets.
 function Markdown({ text }: { text: string }) {
@@ -55,9 +56,26 @@ export default function Intro({
   progress: ProgressMap;
   go: (r: string) => void;
 }) {
+  const { sfid, setSfid } = useAccount();
   return (
     <>
-      <PageHeader part="00" title={intro.title} />
+      <PageHeader title={intro.title}>
+        <div className="mt-6">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Salesforce account id</span>
+            <input
+              value={sfid}
+              onChange={(e) => setSfid(e.target.value)}
+              placeholder="0016100001Qcv4uAAB"
+              className="mt-1.5 block w-72 rounded-xl border border-navy/15 bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy"
+            />
+          </label>
+          <p className="mt-2 max-w-xl text-xs text-muted">
+            The whole workshop is tracked against this account. Progress and the outcomes export are keyed to it,
+            so results flow straight into the internal sales app. {!sfid && <span className="text-lava">Set it before running steps.</span>}
+          </p>
+        </div>
+      </PageHeader>
       <div className="mx-auto max-w-4xl space-y-12 px-8 py-12 lg:px-14">
         <Markdown text={intro.body} />
 

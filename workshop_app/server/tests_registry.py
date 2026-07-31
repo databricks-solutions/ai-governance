@@ -193,7 +193,7 @@ def t_test_mcp_policy() -> TestResult:
     )
 
 
-# --------------------------------------------------------------------------- Clarity
+# --------------------------------------------------------------------------- Cost + Control (attribution, usage & observability)
 def t_apply_tags() -> TestResult:
     cfg = get_config()
     proj = cfg.get("project", {})

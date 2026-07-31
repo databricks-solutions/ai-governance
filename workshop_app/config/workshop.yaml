@@ -20,7 +20,7 @@ catalog:
 gateway:
   # A shared, out-of-the-box foundation-model endpoint (tags only, no per-project limits).
   ootb_endpoint: databricks-claude-sonnet-4-5
-  # Alternate model used by the routing-agent cost demo (Choice).
+  # Alternate model used by the routing-agent cost demo (Cost pillar).
   cheap_endpoint: databricks-meta-llama-3-3-70b-instruct
 
 # The governed endpoint the workshop creates and layers controls onto (Control pillar).
@@ -51,14 +51,14 @@ mcp:
       - reply_to_confluence_comment
     allow_probe_tool: search_confluence_pages   # a read tool used to prove ALLOW works
 
-# Project tags for cost attribution (Clarity pillar).
+# Project tags for cost attribution (Cost pillar).
 project:
   name: ai_governance_workshop
   cost_center: platform
   environment: workshop
   use_case: governance_enablement
 
-# MLflow experiment for agent traces (Clarity pillar). Leave blank to skip trace steps.
+# MLflow experiment for agent traces (Control pillar — observability). Leave blank to skip trace steps.
 mlflow:
   experiment_id: ""
 

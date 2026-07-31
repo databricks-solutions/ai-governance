@@ -36,7 +36,7 @@ resources:
   apps:
     ai_governance_workshop_app:
       name: ai-governance-workshop
-      description: "AI Governance Workshop — guided choice/control/clarity with live tests."
+      description: "AI Governance Workshop — guided choice/cost/control with live tests."
       source_code_path: ./
       resources:
         - name: sql-warehouse

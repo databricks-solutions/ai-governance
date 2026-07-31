@@ -16,7 +16,7 @@ export default function PillarPage({
 
   return (
     <>
-      <PageHeader part={pillar.title} title={pillar.title} lead={pillar.tagline}>
+      <PageHeader title={pillar.title} lead={pillar.tagline}>
         <div className="mt-6 flex items-center gap-4">
           <div className="h-2 w-full max-w-md overflow-hidden rounded-full bg-navy/10">
             <div className="h-full bg-navy transition-all" style={{ width: `${pct}%` }} />

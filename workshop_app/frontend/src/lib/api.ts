@@ -52,10 +52,10 @@ export const api = {
   workshop: () => fetch("/api/workshop").then((r) => j<Workshop>(r)),
   accelerators: () => fetch("/api/accelerators").then((r) => j<Accelerators>(r)),
   faq: () => fetch("/api/faq").then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))),
-  progress: (runId: string) => fetch(`/api/progress/${encodeURIComponent(runId)}`).then((r) => j<ProgressMap>(r)),
+  progress: (sfid: string) => fetch(`/api/progress/${encodeURIComponent(sfid)}`).then((r) => j<ProgressMap>(r)),
   runTest: (body: {
     test: string;
-    run_id: string;
+    customer_sfid: string;
     step_id: string;
     pillar_id: string;
     kind?: string;
@@ -65,7 +65,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => j<TestResult>(r)),
-  setProgress: (body: { run_id: string; step_id: string; pillar_id: string; status: string; notes?: string }) =>
+  setProgress: (body: { customer_sfid: string; step_id: string; pillar_id: string; status: string; notes?: string }) =>
     fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -73,8 +73,8 @@ export const api = {
     }).then((r) => j<{ ok: boolean }>(r)),
 
   // Export — build the URLs the browser downloads (outcomes JSON + Markdown report).
-  exportUrl: (kind: "outcomes" | "report", runId: string, sfid: string) => {
-    const q = new URLSearchParams({ run_id: runId, customer_sfid: sfid });
+  exportUrl: (kind: "outcomes" | "report", sfid: string) => {
+    const q = new URLSearchParams({ customer_sfid: sfid });
     return `/api/export/${kind}?${q.toString()}`;
   },
 };

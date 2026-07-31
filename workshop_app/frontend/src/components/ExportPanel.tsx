@@ -1,18 +1,16 @@
-import { useState } from "react";
 import { FileText, FileJson, Download } from "lucide-react";
 import { api } from "@/lib/api";
-import { useRun } from "@/lib/run";
+import { useAccount } from "@/lib/account";
 
 // Export the workshop outcomes: a Markdown report (per-step complete/incomplete) and an
-// outcomes.json the internal sales app ingests. The deliverer confirms the Salesforce id
-// so the JSON links to the right account.
+// outcomes.json the internal sales app ingests. Everything is keyed to the Salesforce id
+// set for this account at the top of the workshop.
 export default function ExportPanel() {
-  const { runId } = useRun();
-  const [sfid, setSfid] = useState("");
+  const { sfid } = useAccount();
 
   function download(kind: "outcomes" | "report") {
     if (!sfid.trim()) return;
-    const url = api.exportUrl(kind, runId, sfid.trim());
+    const url = api.exportUrl(kind, sfid.trim());
     // Force a download with a sensible filename.
     const a = document.createElement("a");
     a.href = url;
@@ -30,36 +28,30 @@ export default function ExportPanel() {
       </div>
       <p className="mb-4 text-sm leading-relaxed text-muted">
         Generate the leave-behind report and the outcomes file the internal sales app loads to
-        track this account's workshop and next steps. Confirm the Salesforce account id first.
+        track this account's workshop and next steps. Everything is keyed to the Salesforce id
+        set at the top of the workshop.
       </p>
-      <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted">Salesforce id</span>
-        <input
-          value={sfid}
-          onChange={(e) => setSfid(e.target.value)}
-          placeholder="0016100001Qcv4uAAB"
-          className="mt-1.5 w-full rounded-xl border border-navy/15 bg-oat px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy sm:max-w-sm"
-        />
-      </label>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          onClick={() => download("report")}
-          disabled={!sfid.trim()}
-          className="inline-flex items-center gap-2 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:border-navy/50 disabled:opacity-40"
-        >
-          <FileText className="h-4 w-4" /> Download report (.md)
-        </button>
-        <button
-          onClick={() => download("outcomes")}
-          disabled={!sfid.trim()}
-          className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700 disabled:opacity-40"
-        >
-          <FileJson className="h-4 w-4" /> Download outcomes (.json)
-        </button>
-      </div>
+      {!sfid.trim() ? (
+        <p className="text-sm text-lava">Set a Salesforce id at the top of the Introduction to enable export.</p>
+      ) : (
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => download("report")}
+            className="inline-flex items-center gap-2 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:border-navy/50"
+          >
+            <FileText className="h-4 w-4" /> Download report (.md)
+          </button>
+          <button
+            onClick={() => download("outcomes")}
+            className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
+          >
+            <FileJson className="h-4 w-4" /> Download outcomes (.json)
+          </button>
+        </div>
+      )}
       <p className="mt-3 text-xs text-muted">
-        Run: <code className="rounded bg-navy/5 px-1 py-0.5">{runId}</code> — load the .json in the internal
-        sales app's account journey.
+        Account: <code className="rounded bg-navy/5 px-1 py-0.5">{sfid || "not set"}</code> — load the .json in the
+        internal sales app's account journey.
       </p>
     </div>
   );

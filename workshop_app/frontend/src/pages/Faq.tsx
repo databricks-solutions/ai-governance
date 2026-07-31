@@ -54,7 +54,7 @@ export default function Faq() {
 
   return (
     <>
-      <PageHeader part="FAQ" title="Frequently asked questions" lead="Common questions about the hands-on workshop.">
+      <PageHeader title="Frequently asked questions" lead="Common questions about the hands-on workshop.">
         <div className="mt-4">
           <a href={REPO_FAQ} target="_blank" rel="noreferrer"
             className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy underline decoration-lava decoration-2 underline-offset-4 hover:text-lava">

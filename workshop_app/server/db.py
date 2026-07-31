@@ -74,10 +74,10 @@ _DDL = """
 CREATE SCHEMA IF NOT EXISTS workshop;
 SET search_path TO workshop;
 
--- One row per (workshop run, step). A "run" is keyed by a workspace/team label so
--- multiple teams can track progress independently on the same deployment.
+-- One row per (account, step). The whole workshop is tracked against one Salesforce
+-- account id, so progress and the outcomes export flow straight into the sales app.
 CREATE TABLE IF NOT EXISTS step_progress (
-    run_id       TEXT        NOT NULL,      -- team/workspace label
+    customer_sfid TEXT       NOT NULL,      -- Salesforce account id
     step_id      TEXT        NOT NULL,
     pillar_id    TEXT        NOT NULL,
     status       TEXT        NOT NULL DEFAULT 'not_started'
@@ -86,14 +86,35 @@ CREATE TABLE IF NOT EXISTS step_progress (
     notes        TEXT,
     updated_by   TEXT,
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (run_id, step_id)
+    PRIMARY KEY (customer_sfid, step_id)
 );
-CREATE INDEX IF NOT EXISTS ix_progress_run ON step_progress (run_id);
+CREATE INDEX IF NOT EXISTS ix_progress_sfid ON step_progress (customer_sfid);
+"""
+
+
+# Idempotent migration: earlier versions keyed step_progress on run_id. Rename the
+# column to customer_sfid in place (the PK/index follow the column) so existing
+# deployments keep their data. Safe to run every startup — no-op once migrated.
+_MIGRATE = """
+SET search_path TO workshop;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'workshop' AND table_name = 'step_progress' AND column_name = 'run_id'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'workshop' AND table_name = 'step_progress' AND column_name = 'customer_sfid'
+  ) THEN
+    ALTER TABLE step_progress RENAME COLUMN run_id TO customer_sfid;
+  END IF;
+END $$;
 """
 
 
 def init_schema() -> None:
     with pool.connection() as conn:
         with conn.cursor() as cur:
+            cur.execute(_MIGRATE)   # migrate legacy run_id column before ensuring schema
             cur.execute(_DDL)
         conn.commit()

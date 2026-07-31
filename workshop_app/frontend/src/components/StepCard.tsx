@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Play, ExternalLink, CheckCircle2, XCircle, Loader2, Check, Circle } from "lucide-react";
 import { api, type Step, type TestResult, type ProgressMap } from "@/lib/api";
-import { useRun } from "@/lib/run";
+import { useAccount } from "@/lib/account";
 import { cn } from "@/lib/cn";
 
 type Saved = ProgressMap[string] | null;
@@ -32,7 +32,7 @@ export default function StepCard({
   saved: Saved;
   onProgressChange: () => void;
 }) {
-  const { runId } = useRun();
+  const { sfid } = useAccount();
   const [running, setRunning] = useState<null | "action" | "verify">(null);
   const [result, setResult] = useState<TestResult | null>(saved?.last_result ?? null);
   const status = saved?.status ?? "not_started";
@@ -40,7 +40,7 @@ export default function StepCard({
   async function run(kind: "action" | "verify", test: string) {
     setRunning(kind);
     try {
-      const res = await api.runTest({ test, run_id: runId, step_id: step.id, pillar_id: pillarId, kind });
+      const res = await api.runTest({ test, customer_sfid: sfid, step_id: step.id, pillar_id: pillarId, kind });
       setResult(res);
     } catch (e) {
       setResult({ ok: false, summary: String(e) });
@@ -52,7 +52,7 @@ export default function StepCard({
 
   async function toggleDone() {
     const next = status === "done" ? "in_progress" : "done";
-    await api.setProgress({ run_id: runId, step_id: step.id, pillar_id: pillarId, status: next });
+    await api.setProgress({ customer_sfid: sfid, step_id: step.id, pillar_id: pillarId, status: next });
     onProgressChange();
   }
 

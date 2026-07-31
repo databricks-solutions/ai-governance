@@ -1,12 +1,12 @@
 # Optional add-on accelerators — each a ~4-hour deep dive on one customer need, run after
-# the core choice/control/clarity workshop. Same step shape as pillars (config/steps.yaml),
+# the core choice/cost/control workshop. Same step shape as pillars (config/steps.yaml),
 # so they reuse the StepCard UI, the backend tests, and the outcomes export. `test` values
 # map to server/tests_registry.py; several reuse core tests.
 
 overview:
   title: How to use the accelerators
   body: |
-    The core workshop proves the governed control plane across **choice · control · clarity**.
+    The core workshop proves the governed control plane across **choice · cost · control**.
     The accelerators are optional **~4-hour add-ons**, each focused on one customer need —
     run the one (or two) that matches what the customer is trying to unblock, not all five.
 

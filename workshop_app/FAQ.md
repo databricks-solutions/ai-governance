@@ -6,8 +6,8 @@ and is also rendered in the app under **FAQ**.
 ## What is this workshop?
 
 A guided, hands-on session where the customer's platform team stands up a **governed AI
-control plane** on their own workspace — organized around three pillars: **choice, control,
-and clarity**. Each step has a concept, a live "Try It" test against the workspace, and a
+control plane** on their own workspace — organized around three pillars: **choice, cost,
+and control**. Each step has a concept, a live "Try It" test against the workspace, and a
 "Verify" check that proves the control fired.
 
 ## How long does it take?
@@ -31,8 +31,8 @@ them before the day so the room isn't blocked.
 
 ## How is my progress tracked?
 
-Progress is stored per team (`run_id`) in a Lakebase table on the deployment. You can pause
-and resume; nothing is lost between sessions.
+Progress is stored per account (by Salesforce id) in a Lakebase table on the deployment. You
+can pause and resume; nothing is lost between sessions.
 
 ## What are the "Try It" and "Verify" actions actually doing?
 

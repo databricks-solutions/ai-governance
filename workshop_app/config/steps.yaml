@@ -1,6 +1,7 @@
 # AI Governance Workshop — step definitions (the guidebook content).
 #
-# Steps are grouped by pillar (choice / control / clarity). Each step has:
+# Steps are grouped by pillar (choice / cost / control) — the Aug 2026 messaging
+# source of truth. Each step has:
 #   id       : stable key used for progress tracking in Lakebase
 #   title    : shown in the UI
 #   concept  : the "why" (markdown) — the CONCEPT card
@@ -17,11 +18,12 @@ intro:
     your own workspace and proven it works — not on slides, live. You'll work through three
     pillars:
 
-    - **Choice** — put any model, tool, or agent behind one governed gateway, and see the
-      cost impact of routing between models.
-    - **Control** — apply rate limits, guardrails, and contextual MCP policies, and watch
-      them block the right requests.
-    - **Clarity** — attribute cost by team, log every payload, and trace every call.
+    - **Choice** — an open, multi-AI ecosystem: put any model, tool, or agent behind one
+      governed control plane, and register them as first-class Unity Catalog assets.
+    - **Cost** — intelligent cost controls: see the cost impact of routing between models,
+      set budgets and hard spend caps, and attribute every AI dollar to a team.
+    - **Control** — agent-aware data + AI governance: rate limits, guardrails, and contextual
+      MCP policies that block the right requests, plus end-to-end observability of every call.
 
     Each step explains the concept, gives you a **Try It** action that exercises the control
     against this workspace, and a **Verify** step that proves it fired. Your progress is saved
@@ -30,7 +32,7 @@ intro:
 pillars:
   - id: choice
     title: Choice
-    tagline: Any model, tool, or agent — one governed control plane.
+    tagline: Open, multi-AI ecosystem — any model, tool, or agent behind one control plane.
     steps:
       - id: choice_connect
         title: Connect to the workspace
@@ -49,22 +51,11 @@ pillars:
         concept: |
           You can't govern what you can't see. This lists the serving endpoints available on
           the workspace — foundation models, external models, and any custom endpoints — the
-          raw material of **choice**.
+          raw material of **choice**. An open ecosystem means adopting any of them without
+          rebuilding governance for each.
         action:
           label: List serving endpoints
           test: list_endpoints
-
-      - id: choice_routing_cost
-        title: Routing & cost impact
-        concept: |
-          The same prompt sent to different models has very different cost and latency. A
-          **routing agent** can choose the cheapest model that meets quality — this step shows
-          the cost delta between a frontier model and a cost-efficient one for the same task.
-
-          _A fuller routing-agent example will be added here._
-        action:
-          label: Compare model cost
-          test: routing_cost
 
       - id: choice_agent_registry
         title: Register agents & tools in Unity Catalog
@@ -77,9 +68,60 @@ pillars:
           label: List registered agents & tools
           test: list_registered_assets
 
+  - id: cost
+    title: Cost
+    tagline: Intelligent cost controls — visibility, budgets, attribution, and routing.
+    steps:
+      - id: cost_routing
+        title: Routing & cost impact
+        concept: |
+          The same prompt sent to different models has very different cost and latency. A
+          **routing agent** can choose the cheapest model that meets quality — this step shows
+          the cost delta between a frontier model and a cost-efficient one for the same task.
+          Intelligent routing is how you optimize cost, latency, and quality at once.
+
+          _A fuller routing-agent example will be added here._
+        action:
+          label: Compare model cost
+          test: routing_cost
+
+      - id: cost_budgets
+        title: Budgets & hard spend caps
+        concept: |
+          Rate limits cap throughput; **budgets** cap spend. Budget alerts fire when a
+          project/team/user crosses a monthly threshold (GA), and hard spend caps block traffic
+          at the cap (roadmap). Budgets are scoped by the same project tags applied below and
+          configured in the account console.
+        action:
+          label: Check current spend vs budget (by project)
+          test: budget_status
+        manual:
+          label: Create a budget in the account console
+          deep_link: account_budgets
+
+      - id: cost_tags
+        title: Tag for cost attribution
+        concept: |
+          Tags turn a single AI line item into cost-per-team. This applies the workshop's
+          project tags (project, cost_center, environment, use_case) to the governed endpoint —
+          so every AI dollar attributes to a team, project, and use case.
+        action:
+          label: Apply project tags
+          test: apply_tags
+
+      - id: cost_usage
+        title: Usage & cost by project
+        concept: |
+          With tags in place, `system.serving.endpoint_usage` and `system.billing.usage`
+          roll up tokens and DBU cost by project — the foundation of AI FinOps and the
+          visibility that makes AI spend predictable.
+        action:
+          label: Query usage by project tag
+          test: usage_by_project
+
   - id: control
     title: Control
-    tagline: Limits, guardrails, and policies that propagate.
+    tagline: Agent-aware data + AI governance — policies, guardrails, identity, and observability.
     steps:
       - id: control_governed_endpoint
         title: Create a governed endpoint
@@ -126,20 +168,6 @@ pillars:
           label: Test a write tool (expect DENY) and a read tool (expect ALLOW)
           test: test_mcp_policy
 
-      - id: control_budgets
-        title: Budgets & hard spend caps
-        concept: |
-          Rate limits cap throughput; **budgets** cap spend. Budget alerts fire when a
-          project/team/user crosses a monthly threshold (GA), and hard spend caps block traffic
-          at the cap (roadmap). Budgets are scoped by the same project tags applied under Clarity
-          and configured in the account console.
-        action:
-          label: Check current spend vs budget (by project)
-          test: budget_status
-        manual:
-          label: Create a budget in the account console
-          deep_link: account_budgets
-
       - id: control_coding_agents
         title: Govern coding-agent traffic
         concept: |
@@ -152,47 +180,27 @@ pillars:
           label: Check coding-agent usage & attribution
           test: coding_agent_usage
 
-  - id: clarity
-    title: Clarity
-    tagline: Every call attributed, logged, and traced.
-    steps:
-      - id: clarity_tags
-        title: Tag for cost attribution
-        concept: |
-          Tags turn a single AI line item into cost-per-team. This applies the workshop's
-          project tags (project, cost_center, environment, use_case) to the governed endpoint.
-        action:
-          label: Apply project tags
-          test: apply_tags
-
-      - id: clarity_usage
-        title: Usage & cost by project
-        concept: |
-          With tags in place, `system.serving.endpoint_usage` and `system.billing.usage`
-          roll up tokens and DBU cost by project — the foundation of AI FinOps.
-        action:
-          label: Query usage by project tag
-          test: usage_by_project
-
-      - id: clarity_audit
+      - id: control_audit
         title: Audit & secret-leak detection
         concept: |
-          `system.access.audit` records who called what and whether policy fired. This scans
-          recent denied calls and looks for secret-shaped strings (API keys) in arguments.
+          Governing what agents *do* means seeing it. `system.access.audit` records who called
+          what and whether policy fired. This scans recent denied calls and looks for
+          secret-shaped strings (API keys) in arguments.
         action:
           label: Query denied calls & scan for secrets
           test: audit_scan
 
-      - id: clarity_traces
+      - id: control_traces
         title: Traces in a table
         concept: |
           MLflow traces capture agent execution — tool calls, model responses, latencies.
-          Joined to the audit log by identity and time, they give end-to-end observability.
+          Joined to the audit log by identity and time, they give end-to-end observability of
+          agent behavior for investigation and optimization.
         manual:
           label: Open the MLflow experiment
           deep_link: experiment
 
-      - id: clarity_lakewatch
+      - id: control_lakewatch
         title: Lakewatch — the AI-optimized SIEM
         concept: |
           The endpoint-usage, audit, and inference-table signals all land in the Lakehouse, where

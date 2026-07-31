@@ -1,33 +1,31 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Layers, Lock, Eye, Loader2, Rocket, HelpCircle } from "lucide-react";
+import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { RunProvider, useRun } from "@/lib/run";
+import { AccountProvider, useAccount } from "@/lib/account";
 import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
 import Faq from "@/pages/Faq";
 
-const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, control: Lock, clarity: Eye };
+const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
 
 // Customer-facing (external) repo — for feedback links in the sidebar.
 const REPO_URL = "https://github.com/databricks-solutions/ai-governance";
 
 export default function App() {
   return (
-    <RunProvider>
+    <AccountProvider>
       <Shell />
-    </RunProvider>
+    </AccountProvider>
   );
 }
 
 function Shell() {
-  const { runId, setRunId } = useRun();
+  const { sfid } = useAccount();
   const [route, setRoute] = useState<string>("intro");
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [accel, setAccel] = useState<Accelerators | null>(null);
   const [progress, setProgress] = useState<ProgressMap>({});
-  const [editingRun, setEditingRun] = useState(false);
-  const [runEntry, setRunEntry] = useState(runId);
 
   useEffect(() => {
     api.workshop().then(setWorkshop).catch(() => setWorkshop(null));
@@ -35,9 +33,10 @@ function Shell() {
   }, []);
 
   function refreshProgress() {
-    api.progress(runId).then(setProgress).catch(() => setProgress({}));
+    if (!sfid) { setProgress({}); return; }
+    api.progress(sfid).then(setProgress).catch(() => setProgress({}));
   }
-  useEffect(refreshProgress, [runId]);
+  useEffect(refreshProgress, [sfid]);
 
   function groupProgress(steps: { id: string }[]): { done: number; total: number } {
     const done = steps.filter((s) => progress[s.id]?.status === "done").length;
@@ -98,31 +97,14 @@ function Shell() {
         </nav>
 
         <div className="mt-auto text-xs text-white/40">
-          <div className="mb-1 text-[10px] uppercase tracking-wide">Workshop run</div>
-          {editingRun ? (
-            <div className="flex gap-1">
-              <input
-                value={runEntry}
-                onChange={(e) => setRunEntry(e.target.value)}
-                className="w-full rounded bg-white/10 px-2 py-1 text-xs text-white outline-none"
-              />
-              <button
-                onClick={() => {
-                  setRunId(runEntry);
-                  setEditingRun(false);
-                }}
-                className="rounded bg-white/15 px-2 text-xs"
-              >
-                ✓
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setEditingRun(true)} className="text-sm font-semibold text-white/90 hover:text-white">
-              {runId} <span className="text-white/40">✎</span>
-            </button>
-          )}
-          <div className="mt-3 h-px w-8 bg-lava" />
-          <div className="mt-3 flex flex-col gap-1.5">
+          <button
+            onClick={() => setRoute("intro")}
+            className="mb-3 block w-full rounded-lg bg-white/5 px-3 py-2 text-left hover:bg-white/10"
+          >
+            <div className="text-[10px] uppercase tracking-wide text-white/40">Active account</div>
+            <div className="truncate text-sm font-semibold text-white/90">{sfid || "Set on Introduction →"}</div>
+          </button>
+          <div className="flex flex-col gap-1.5">
             <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-white/80">
               Repository ↗
             </a>
@@ -133,7 +115,8 @@ function Shell() {
               File an issue ↗
             </a>
           </div>
-          <div className="mt-3">Choice · Control · Clarity</div>
+          <div className="mt-3 h-px w-8 bg-lava" />
+          <div className="mt-3">Choice · Cost · Control</div>
         </div>
       </aside>
 
