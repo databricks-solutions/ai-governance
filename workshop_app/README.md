@@ -46,23 +46,28 @@ endpoint, query system/inference tables, create an MCP policy function, etc.).
 Beyond the core workshop, five optional **~4-hour accelerators** each get their own page (same
 concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
-- **MCP Server Setup & Testing** — on-behalf-of auth to a managed/external MCP.
-- **Agent Registry Setup & Testing** — register, version, and own a representative agent.
-- **Coding Agent Setup & Testing** — govern dev-agent traffic with per-developer attribution
+- **MCP Servers** — on-behalf-of auth to a managed/external MCP.
+- **Agent Registry** — register, version, and own a representative agent.
+- **Coding Agents** — govern dev-agent traffic with per-developer attribution
   and code-secret detection.
-- **External Provider Setup & Testing** — route Bedrock/OpenAI/Anthropic through the Gateway;
+- **External Providers** — route Bedrock/OpenAI/Anthropic through the Gateway;
   migrate one shadow workload.
-- **Policies & Guardrails (PII & Safety)** — safety filter on input/output, custom PII-leakage
+- **Policies & Guardrails** — safety filter on input/output, custom PII-leakage
   judge, red-team dataset.
 
-Run the one that matches the customer's priority (see the in-app **Accelerators → Overview**).
-Accelerator progress is tracked in Lakebase and included in the exported outcomes, so anything
-you run shows up in the internal sales app.
+Run the one that matches the customer's priority (the accelerator overview and links live on
+the in-app **Introduction** page). Accelerator progress is tracked in Lakebase and included in
+the exported outcomes, so anything you run shows up in the internal sales app.
 
 ## Deploy on a customer workspace
 
 Prereqs: Databricks CLI ≥ 0.297 authenticated to the workspace, a SQL warehouse, and Node
 (to build the frontend locally — `node_modules` is never uploaded, but `frontend/dist` is).
+
+> **You must supply a SQL warehouse id on every `bundle` command.** The bundle has no
+> default warehouse (it's customer-deployable and can't assume one exists), so both
+> `bundle deploy` and `bundle run` require `--var="warehouse_id=<sql-warehouse-id>"`.
+> Omitting it fails with `Invalid SQL warehouse resource sql-warehouse: ID  is invalid.`
 
 ```bash
 # 1. Edit config/workshop.yaml — set at minimum:
@@ -71,11 +76,11 @@ Prereqs: Databricks CLI ≥ 0.297 authenticated to the workspace, a SQL warehous
 # 2. Build the frontend
 cd frontend && npm install && npm run build && cd ..
 
-# 3. Deploy the bundle (creates the Lakebase instance + the app)
+# 3. Deploy the bundle (creates the Lakebase instance + the app) — warehouse id is required
 databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<sql-warehouse-id>"
 
-# 4. Start the app
-databricks bundle run ai_governance_workshop_app -t dev -p <profile>
+# 4. Start the app — warehouse id is required here too
+databricks bundle run ai_governance_workshop_app -t dev -p <profile> --var="warehouse_id=<sql-warehouse-id>"
 ```
 
 App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.com`.
