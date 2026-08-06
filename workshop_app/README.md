@@ -117,6 +117,14 @@ Also set `catalog.name`/`catalog.schema` in `config/workshop.yaml` to the same v
 the app will write to a different schema than the bundle created.
 </details>
 
+> **No lockfile yet.** `frontend/package-lock.json` is intentionally absent — the one
+> generated here was missing `resolved`/`integrity` for nearly every package, so `npm ci`
+> produced an unusable `node_modules`. Run a real `npm install` in `frontend/` on a machine
+> with npm registry access and commit the result, then `npm ci` (and reproducible builds)
+> work. Until then `deploy.sh` falls back to `npm install`, and only builds when
+> `frontend/dist` is actually stale — so a deploy from a prebuilt `dist` needs no registry
+> access at all.
+
 ### The one manual step: two `system` grants (account admin)
 
 `deploy.sh` handles the warehouse, Lakebase, schema, and app-group grants. Unity Catalog
