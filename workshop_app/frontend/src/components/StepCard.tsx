@@ -166,6 +166,25 @@ export default function StepCard({
             )}
             <span className="text-navy">{result.summary}</span>
           </div>
+          {/* What this step actually called. Shown so the room can see exactly what the app
+              does to their workspace — the first question a platform team asks. */}
+          {result.api && (
+            <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted">
+              <span className="font-semibold uppercase tracking-wider text-[10px]">API</span>
+              <code className="rounded bg-navy/5 px-1.5 py-0.5 text-[11px] text-navy">{result.api}</code>
+              {result.api_index && (
+                <a
+                  href={result.api_index}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 underline decoration-navy/20 hover:decoration-navy/60"
+                >
+                  reference <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+              {result.api_note && <span className="italic">{result.api_note}</span>}
+            </div>
+          )}
           {result.detail && Object.keys(result.detail).length > 0 && (
             <pre className="mt-3 max-h-64 overflow-auto rounded-lg bg-navy/[0.03] p-3 text-xs leading-relaxed text-navy/80">
               {JSON.stringify(result.detail, null, 2)}

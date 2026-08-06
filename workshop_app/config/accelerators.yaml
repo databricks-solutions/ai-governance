@@ -146,8 +146,11 @@ accelerators:
           `to_variant_object(...)` (not `to_variant`, which doesn't exist), and VARIANT paths
           need casting — `event:context.tool.name::STRING`.
 
-          There are three built-ins (`system.ai.block_unsafe_content`, `block_jailbreak`,
-          `block_hallucination`). There is **no** `block_pii` built-in.
+          There are built-in LLM-as-judge guardrails (`system.ai.block_unsafe_content`,
+          `block_jailbreak`, `block_hallucination`, and possibly `block_pii` — internal docs
+          disagree, and none of them resolve as SQL functions during Beta). **Read the actual
+          list in the AI Gateway UI Policies tab** rather than quoting a name from memory, and
+          don't commit to a specific built-in until you've seen it on this account.
         action:
           label: Create the policy function
           test: create_mcp_policy

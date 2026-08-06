@@ -76,6 +76,60 @@ def _fq_schema() -> tuple[str, str]:
             _sql_ident(cat.get("schema"), "catalog.schema"))
 
 
+# The API reference index. Only the group-level URL is cited: the Databricks API reference is
+# a JS-rendered SPA that returns HTTP 200 for every path under /api/workspace/ (including
+# nonsense), so deep links cannot be verified programmatically and a 404 in front of a
+# customer is worse than no link. Exact method+path per test is in API_DOCS below, and
+# docs/API_REFERENCE.md carries the full table.
+API_INDEX = "https://docs.databricks.com/api/workspace/aigateway"
+
+# test name -> the API surface it exercises, shown in the UI so the room can see exactly what
+# the app is doing to their workspace.
+API_DOCS: dict[str, dict[str, str]] = {
+    "connection": {"api": "POST /api/2.0/sql/statements (SELECT 1)"},
+    "workspace_context": {"api": "local config + GET /api/2.0/preview/scim/v2/Me"},
+    "routing_panel": {"api": "none — reads config/workshop.yaml",
+                      "note": "Prices are config, not a live API."},
+    "test_mcp_policy": {"api": "POST /api/2.0/sql/statements (evaluate the policy function)"},
+    "external_provider_routing": {"api": "GET /api/2.0/serving-endpoints"},
+    "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
+    "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
+    "list_registered_assets": {
+        "api": "GET /api/2.1/unity-catalog/models + /api/2.1/unity-catalog/functions"},
+    "verify_governed_endpoint": {"api": "GET /api/2.0/serving-endpoints/{name}"},
+    "rate_limits": {"api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway.rate_limits)"},
+    "test_guardrail": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
+    "routing_compare": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
+    "routing_roi": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
+    "create_mcp_policy": {"api": "POST /api/2.0/sql/statements (CREATE OR REPLACE FUNCTION)"},
+    "mcp_policy_enforcement": {"api": "POST /api/2.0/sql/statements"},
+    "mcp_inventory": {"api": "GET /api/2.1/unity-catalog/mcp-services"},
+    "mcp_policy_target": {"api": "GET /api/2.1/unity-catalog/mcp-services"},
+    "mcp_grants": {"api": "GET /api/2.1/unity-catalog/permissions/mcp_service/{name}"},
+    "mcp_service_tools": {
+        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)"},
+    "mcp_obo": {"api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/call (not REST)"},
+    "mcp_managed_tools": {
+        "api": "POST /api/2.0/mcp/functions/{catalog}/{schema} — JSON-RPC (not REST)"},
+    "mcp_external_readiness": {"api": "GET /api/2.1/unity-catalog/connections"},
+    # SQL-only tests: name the table rather than a REST path, which is the useful detail.
+    "usage_by_project": {"api": "SQL: system.ai_gateway.usage"},
+    "coding_agent_usage": {"api": "SQL: system.ai_gateway.usage (user_agent)"},
+    "mcp_telemetry": {"api": "SQL: system.ai_gateway.usage (service_type = 'MCP_SERVICE')"},
+    "telemetry_readiness": {"api": "SQL: system.ai_gateway.usage, system.access.audit"},
+    "gateway_spend_by_model": {"api": "SQL: system.ai_gateway.external_model_spend"},
+    "budget_status": {"api": "SQL: system.ai_gateway.external_model_spend"},
+    "audit_scan": {"api": "SQL: system.access.audit"},
+    "guardrail_activity": {"api": "SQL: <catalog>.<schema>.<prefix>_payload (inference table)"},
+    "pii_safety_readiness": {"api": "SQL: inference table + system.access.audit"},
+    # Deliberately not automated — say so, and say why.
+    "create_governed_endpoint": {"api": "read-only: GET /api/2.0/serving-endpoints",
+                                 "note": "Creation is a guided UI step, never automated."},
+    "apply_tags": {"api": "none — guided UI step",
+                   "note": "The app does not write tags to a customer endpoint."},
+}
+
+
 # --------------------------------------------------------------------------- Choice
 def t_connection() -> TestResult:
     return _ok("Workspace reachable.") if test_connection() else _fail("Could not reach the SQL warehouse.")
@@ -1153,6 +1207,15 @@ def run_test(name: str) -> TestResult:
     if not fn:
         return _fail(f"Unknown test '{name}'.")
     try:
-        return fn()
+        result = fn()
     except Exception as e:  # never let a test crash the request
-        return _fail(f"Test '{name}' raised an error.", error=str(e)[:400])
+        result = _fail(f"Test '{name}' raised an error.", error=str(e)[:400])
+    # Attach the API surface so the UI can show what this step did to the workspace. Kept
+    # out of `detail` so it renders as a caption rather than another line of JSON.
+    doc = API_DOCS.get(name)
+    if doc:
+        result["api"] = doc["api"]
+        result["api_index"] = API_INDEX
+        if doc.get("note"):
+            result["api_note"] = doc["note"]
+    return result

@@ -36,6 +36,12 @@ export interface TestResult {
   status?: "action_required";
   summary: string;
   detail?: Record<string, unknown>;
+  /** The API surface this step exercised, e.g. "GET /api/2.1/unity-catalog/mcp-services". */
+  api?: string;
+  /** Link to the Databricks API reference index. */
+  api_index?: string;
+  /** Why a step is read-only or guided, when that needs saying. */
+  api_note?: string;
 }
 
 export type ProgressMap = Record<
