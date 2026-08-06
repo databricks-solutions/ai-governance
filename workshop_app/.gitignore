@@ -6,8 +6,11 @@ __pycache__/
 
 # Node
 node_modules/
-# frontend/dist IS committed so the app deploys without Node — rebuild it after
-# editing frontend/src (npm ci && npm run build).
+
+# Built frontend. NOT committed: the minified single-line bundle is ~240KB, which
+# dominates every diff and overflows code-review tooling. `bundle deploy` uploads
+# whatever is in dist/, so build before deploying (npm ci && npm run build).
+frontend/dist/
 
 # Local config override
 config/workshop.local.yaml

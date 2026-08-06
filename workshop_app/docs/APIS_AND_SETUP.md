@@ -23,8 +23,8 @@ called out per row rather than glossed.
 | Guardrails on Unity AI Gateway | **Beta** (via service policies) | Legacy model-serving guardrails are separately Public Preview. |
 | `system.ai_gateway.usage` | **Beta** | Works; schema is additive, so `DESCRIBE` before relying on a column. |
 | `system.ai_gateway.external_model_spend` | **Beta** | Gives **USD directly** — no price join. |
-| `system.serving.endpoint_usage` | Public Preview | 90-day retention. Misses Gateway-native routes. |
-| `system.billing.usage` | **GA** | Needs a `list_prices` join for dollars. |
+| `system.serving.endpoint_usage` | Public Preview | **Not used** — 90-day retention, empty tag map, misses Gateway routes. |
+| `system.billing.usage` | **GA** | **Not used** — `external_model_spend` already gives USD. |
 | MCP payload logging | **Not available** | Do not claim it. |
 | Smart routing (Databricks-managed) | **Beta** | Position as roadmap; the app does not demo it. |
 | Omnigent (managed) | **Beta** (OSS available) | Partner/meta-harness layer; positioned, not demoed. |
@@ -44,6 +44,7 @@ principal** — see §5 on why that matters.
 | Serving endpoints — query | `w.serving_endpoints.query(name, messages=[ChatMessage(...)], max_tokens=...)` | `test_guardrail`, all routing steps |
 | SQL Statement Execution | `w.statement_execution.execute_statement(warehouse_id, statement, wait_timeout)` | every system-table query, the policy DDL |
 | Registered models — list | `w.registered_models.list(catalog_name, schema_name)` | `list_registered_assets` |
+| UC functions — list | `w.functions.list(catalog_name, schema_name)` | `list_registered_assets` (avoids a `system` grant) |
 | Current user | `w.current_user.me()` | Lakebase user resolution |
 | Database (Lakebase) — get instance | `w.database.get_database_instance(name)` | progress store host |
 | Database (Lakebase) — credentials | `w.database.generate_database_credential(...)` | per-connection OAuth token |
@@ -98,8 +99,12 @@ user_identity.email, response.status_code, request_params
 `response:status_code` fails with `DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE`. This bug was
 present in the app and is fixed.
 
-### `system.billing.usage` + `system.billing.list_prices` *(GA)*
-No dollar column on `usage`; join for cost:
+### `system.billing.usage` + `list_prices` *(GA)* — **not used**
+The app does not read these, so it needs no `system.billing` grant.
+`system.ai_gateway.external_model_spend` already reports USD, which covers the workshop's
+need. Recorded here because it is the right tool for *total platform* AI spend (including
+serverless inference DBUs, which `external_model_spend` excludes) — useful for a follow-up
+FinOps conversation, not for the workshop:
 
 ```sql
 SELECT u.sku_name,
@@ -113,13 +118,15 @@ WHERE u.usage_date > current_date() - 14
 GROUP BY 1 ORDER BY usd DESC
 ```
 
-Relevant SKUs seen live: `ENTERPRISE_SERVERLESS_REAL_TIME_INFERENCE_*`,
+Verified live — relevant SKUs: `ENTERPRISE_SERVERLESS_REAL_TIME_INFERENCE_*`,
 `ENTERPRISE_ANTHROPIC_MODEL_SERVING`, `ENTERPRISE_OPENAI_MODEL_SERVING`.
 
-### `system.serving.endpoint_usage` *(Public Preview)*
-Retained for legacy model-serving comparison. Tag map is `usage_context` (not
-`request_tags`), and in practice it is **almost always empty** — the reason the workshop's
-tag-based queries returned nothing and now key off `system.ai_gateway.usage`.
+### `system.serving.endpoint_usage` *(Public Preview)* — **not used**
+Mentioned only for contrast. Its tag map is `usage_context` (not `request_tags`) and in
+practice it is **almost always empty** — the reason the workshop's tag-based queries returned
+nothing before switching to `system.ai_gateway.usage`. It also has 90-day retention and
+misses Gateway-native routes, so reading it would cost a `system.serving` grant for no
+signal. Dropped deliberately (see §8).
 
 ---
 
@@ -250,14 +257,41 @@ normally inherit `CAN CREATE`); `CAN_USE` on the warehouse; `USE CATALOG` + `CRE
 on the target catalog.
 
 **App service principal** — granted by the bundle: `CAN_USE` on the warehouse,
-`CAN_CONNECT_AND_CREATE` on Lakebase. **Everything else is manual** (see the README grant
+`CAN_CONNECT_AND_CREATE` on Lakebase. Unity Catalog grants are manual (see the README grant
 block): `USE CATALOG` + `USE SCHEMA`/`CREATE FUNCTION`/`EXECUTE`/`SELECT`/`MODIFY` on the
-workshop schema, and `USE SCHEMA` + `SELECT` on `system.ai_gateway`, `system.serving`,
-`system.access`, `system.billing`.
+workshop schema, plus `USE SCHEMA` + `SELECT` on exactly **two** system schemas.
 
-**Account admin needed for:** granting on `system` schemas, creating budgets, enabling the
-service-policies Beta. Line these up before the workshop — they are the most common cause of
-a stalled session.
+### Keeping the `system` grant surface to two schemas
+
+Granting on `system` needs an account or metastore admin, so the app minimizes what it asks
+for. It reads **only** `system.ai_gateway` and `system.access`:
+
+| Schema | Why | Alternative considered |
+|---|---|---|
+| `system.ai_gateway` | `usage` (attribution, coding agents, telemetry) and `external_model_spend` (USD) | None — this is the only source of Gateway-native traffic and direct USD |
+| `system.access` | `audit` — denied calls, secret-shaped args | None — no API equivalent |
+
+Three schemas were **removed** after checking each was avoidable:
+
+- **`system.billing`** — never actually queried. `system.ai_gateway.external_model_spend`
+  reports USD directly, so the `list_prices` join was unnecessary.
+- **`system.information_schema`** — replaced with the UC Functions API
+  (`w.functions.list(catalog_name=..., schema_name=...)`), which reads the same inventory
+  from the schema the app already has `USE SCHEMA` on. Verified live: returns the policy
+  functions correctly.
+- **`system.serving`** — only a legacy readiness check. `endpoint_usage` has 90-day
+  retention, an almost-always-empty `usage_context` tag map, and misses Gateway-native
+  routes, so it added a grant requirement for no signal.
+
+**What still works with no `system` grant at all:** the model panel, the full routing ROI
+(compare + route + saving), endpoint discovery, asset inventory, governed-endpoint checks,
+rate limits, guardrail tests, and the MCP policy create/verify. Those use the serving and
+Unity Catalog APIs. Only `usage_by_project`, `coding_agent_usage`, `gateway_spend_by_model`,
+`budget_status`, `audit_scan`, `lakewatch_readiness`, and `pii_safety_readiness` need
+`system` — and they degrade to `action_required`, not a crash.
+
+**Account admin still needed for:** the two `system` grants, creating budgets, and enabling
+the service-policies Beta. Line these up before the workshop.
 
 ---
 
@@ -266,7 +300,8 @@ a stalled session.
 - [ ] Unity AI Gateway enabled on the account/workspace
 - [ ] Target catalog exists; deployer can create a schema in it
 - [ ] SQL warehouse running; app SP has `CAN_USE`
-- [ ] App SP granted `SELECT` on the four `system` schemas *(account admin)*
+- [ ] App SP granted `SELECT` on `system.ai_gateway` and `system.access` — just these two
+      *(account admin; without them 7 telemetry steps report `action_required`, the rest work)*
 - [ ] `GET /api/health` returns `{"status":"ok"}`
 - [ ] Governed endpoint created, with an inference table if guardrail steps are in scope
       *(external-storage catalog required)*

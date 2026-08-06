@@ -11,9 +11,14 @@ bundle:
   name: ai-governance-workshop
 
 # config/*.yaml must be synced with the app source (customer-edited config lives here).
-# frontend/src is excluded because only the built frontend/dist is served. node_modules and
-# __pycache__ are already covered by .gitignore, which sync honors.
+# Sync honors .gitignore, and frontend/dist is gitignored (a 240KB single-line bundle
+# dominates every diff and overflows review tooling). It still has to reach the app, so
+# re-include it explicitly here — build it before deploying:
+#     cd frontend && npm ci && npm run build
+# frontend/src is excluded because only the built output is served.
 sync:
+  include:
+    - "frontend/dist/**"
   exclude:
     - "frontend/src"
 

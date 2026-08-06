@@ -104,7 +104,7 @@ of a stalled session — they cannot be fixed live.
 | Unity AI Gateway enabled on account + workspace | Account admin | Days | ☐ |
 | UC catalog exists; deployer can create a schema | Metastore admin | Hours | ☐ |
 | SQL warehouse available | Platform | Hours | ☐ |
-| **`SELECT` on `system.ai_gateway`, `.serving`, `.access`, `.billing` for the app SP** | **Account admin** | **Days** | ☐ |
+| **`SELECT` on `system.ai_gateway` + `system.access` for the app SP** (only these two) | **Account admin** | **Days** | ☐ |
 | App SP granted `USE SCHEMA` + `CREATE FUNCTION` on the workshop schema | Metastore admin | Hours | ☐ |
 | Service-policies **Beta** enabled (for MCP policy steps) | Account admin | Days | ☐ |
 | External-storage catalog (for inference tables) | Platform | Hours | ☐ |
@@ -224,7 +224,7 @@ Fill during delivery — these become the pipeline.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| `system` grants not in place | Cost/Control steps fail live | Pre-flight the day before; `/api/health` |
+| `system` grants not in place | 7 telemetry steps unavailable | Pre-flight the day before. Only `system.ai_gateway` + `system.access` are needed, and the routing ROI, policy, and guardrail proofs work without them — so the workshop still lands |
 | Service-policies Beta not enabled | MCP policy step can't run | Confirm at prereq stage; account admin |
 | Customer expects hard budget caps | Credibility loss | Lead with rate limits as the hard control (F1) |
 | Inference tables need external-storage catalog | Guardrail evidence unavailable | Identify the catalog in prereqs |

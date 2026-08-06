@@ -200,9 +200,10 @@ def t_rate_limits() -> TestResult:
 def t_gateway_spend_by_model() -> TestResult:
     """Real dollars per model from system.ai_gateway.external_model_spend.
 
-    That table reports estimated USD directly (usage_unit = 'USD'), so unlike
-    system.billing.usage it needs no join to list_prices. It covers external-provider
-    models routed through the Gateway — the spend a router actually shifts.
+    That table reports estimated USD directly (usage_unit = 'USD'), so it needs no join to
+    a price list — which is why the workshop reads it instead of the billing tables, and
+    why the app needs no grant on system.billing. It covers external-provider models routed
+    through the Gateway: the spend a router actually shifts.
     """
     sql = """
       SELECT usage_metadata.model      AS model,
@@ -530,14 +531,12 @@ def t_list_registered_assets() -> TestResult:
     except Exception as e:
         errors["registered_models"] = str(e)[:300]
     try:
-        rows = fetchall(
-            f"SELECT routine_name FROM system.information_schema.routines "
-            f"WHERE routine_catalog = {_sql_str(cat)} AND routine_schema = {_sql_str(sch)} "
-            f"LIMIT 50"
-        )
-        tools = [r.get("routine_name") for r in rows]
+        # UC Functions API rather than system.information_schema.routines: it reads the same
+        # inventory from the schema the app already has USE SCHEMA on, so this step needs no
+        # grant on the `system` catalog.
+        tools = [f.name for f in w.functions.list(catalog_name=cat, schema_name=sch)]
     except Exception as e:
-        errors["routines"] = str(e)[:300]
+        errors["functions"] = str(e)[:300]
     # Surface why an inventory is empty — a missing schema or a missing grant reads very
     # differently from "nothing registered yet", and the room needs to know which it is.
     if errors and not agents and not tools:
@@ -630,7 +629,6 @@ def t_lakewatch_readiness() -> TestResult:
     checks = []
     for table, pred in (
         ("system.ai_gateway.usage", "event_time > current_timestamp() - INTERVAL 1 DAY"),
-        ("system.serving.endpoint_usage", "request_time > current_timestamp() - INTERVAL 1 DAY"),
         ("system.access.audit", "event_date >= current_date() - INTERVAL 1 DAY"),
     ):
         try:

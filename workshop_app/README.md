@@ -101,26 +101,38 @@ what is unset.
 ### Grant the app's service principal (required)
 
 The bundle grants the app **only** `CAN_USE` on the warehouse and `CAN_CONNECT_AND_CREATE`
-on the Lakebase instance. Every Unity Catalog and system-table grant is manual, and without
-them the policy-function step and all usage/cost queries fail. Get the app's service
-principal id from `databricks apps get ai-governance-workshop`, then:
+on the Lakebase instance. Unity Catalog grants are manual. Get the app's service principal id
+from `databricks apps get ai-governance-workshop`, then:
 
 ```sql
--- Workshop artifacts (the MCP service-policy function lives here)
+-- Required. Workshop artifacts — the MCP service-policy function lives here.
 GRANT USE CATALOG ON CATALOG <catalog> TO `<app-sp-client-id>`;
 GRANT USE SCHEMA, CREATE FUNCTION, EXECUTE, SELECT, MODIFY
   ON SCHEMA <catalog>.<schema> TO `<app-sp-client-id>`;
-
--- Telemetry the Cost and Control pillars read
-GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
-GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;
-GRANT USE SCHEMA, SELECT ON SCHEMA system.serving    TO `<app-sp-client-id>`;
-GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;
-GRANT USE SCHEMA, SELECT ON SCHEMA system.billing    TO `<app-sp-client-id>`;
 ```
 
-Granting on `system` schemas needs a metastore or account admin — line that up before the
-workshop rather than during it. See `docs/APIS_AND_SETUP.md` for the full dependency list.
+Two `system` schemas are needed for the telemetry steps. Keep the grant surface to these
+two — the app deliberately reads **no** other system schema:
+
+```sql
+-- Needed by the Cost + Control telemetry steps (account/metastore admin).
+GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;  -- usage, spend
+GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;  -- audit trail
+```
+
+| Grant | Unlocks | Skippable? |
+|---|---|---|
+| `<catalog>.<schema>` | MCP policy function, inference-table reads, asset inventory | No |
+| `system.ai_gateway` | Spend by model, budgets, per-developer attribution, routing ROI context | Only if you drop the Cost pillar's telemetry steps |
+| `system.access` | Audit trail, secret-leak scan | Only if you drop `audit_scan` |
+
+Everything else — the model panel, the routing ROI, endpoint discovery, guardrail and policy
+tests — works with **no `system` grant at all**, because they use the serving and Unity
+Catalog APIs directly. If `system` access can't be arranged in time, the workshop still
+delivers; those two steps report `action_required` instead of failing.
+
+See `docs/APIS_AND_SETUP.md` for the full dependency list.
 
 ### Known deployment caveats
 
