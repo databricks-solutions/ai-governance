@@ -57,6 +57,34 @@ pillars:
           label: List serving endpoints
           test: list_endpoints
 
+      - id: choice_model_services
+        title: The governed object — and the one client change
+        concept: |
+          The step that makes the rest of the workshop coherent. Previously, controls hung off
+          a **workspace serving endpoint**: the endpoint name *was* the application contract,
+          and access was a workspace ACL. Now they hang off a **model service** — a Unity
+          Catalog securable with a fully-qualified name.
+
+          Why that matters: the runtime can change behind a stable contract. Swap the model,
+          add a fallback, split traffic — the application keeps calling the same FQN, and
+          permissions are UC grants that work across every workspace on the metastore.
+
+          The client change is exactly two things, and they must move **together**:
+
+          - **Base URL** — `/serving-endpoints` → `/ai-gateway/mlflow/v1`
+          - **Model selector** — `<endpoint-name>` → `<catalog>.<schema>.<service>`
+
+          A new base URL with an old endpoint name fails; so does an FQN against the legacy
+          path. Both paths still work today, which is what makes a staged migration safe —
+          and also why teams don't notice they never actually migrated.
+
+          There is **no in-place rename**. Stand the service up alongside the old endpoint,
+          validate on real traffic, move clients in stages, then revoke the old path. A 200
+          is not acceptance: compare latency, tokens, cost, and output quality.
+        action:
+          label: Show model services & the client contract
+          test: model_services
+
       - id: choice_agent_registry
         title: Register agents & tools in Unity Catalog
         concept: |
@@ -180,8 +208,15 @@ pillars:
         title: Tag for cost attribution
         concept: |
           Tags turn a single AI line item into cost-per-team. This applies the workshop's
-          project tags (project, cost_center, environment, use_case) to the governed endpoint —
+          project tags (project, cost_center, environment, use_case) to the governed service —
           so every AI dollar attributes to a team, project, and use case.
+
+          One distinction that matters for anything financial: **server-side** tags are set by
+          the platform owner on the service and apply to every request through it — those are
+          the only ones you can trust as a budget filter. **Request tags** are supplied
+          per-request by the caller (`Databricks-Ai-Gateway-Request-Tags`) and are great for
+          attribution and analytics, but they are **caller-controlled** — never use them as an
+          enforcement boundary.
         action:
           label: Apply project tags
           test: apply_tags

@@ -100,6 +100,58 @@ def t_list_endpoints() -> TestResult:
     return _ok(f"Found {len(names)} serving endpoints.", endpoints=names[:50])
 
 
+def t_model_services() -> TestResult:
+    """Model services as UC securables — the object the client contract should point at.
+
+    The migration story in one step. Legacy Model Serving addressed an ENDPOINT NAME on
+    /serving-endpoints/<name>/invocations, with workspace ACLs. Unity AI Gateway addresses a
+    UC **service FQN** on /ai-gateway/mlflow/v1, with UC privileges — so the runtime can
+    change behind a stable application contract.
+
+    There is no in-place rename: the new service is created alongside the old endpoint,
+    validated, then clients move. This lists what already exists so a customer can see which
+    of their endpoints has a governed equivalent.
+    """
+    w = get_workspace_client()
+    host = (w.config.host or "").rstrip("/")
+    try:
+        resp = w.api_client.do("GET", "/api/2.1/unity-catalog/model-services")
+    except Exception as e:
+        return _fail("Could not list model services — Unity AI Gateway may not be enabled "
+                     "on this workspace.", error=str(e)[:400])
+    services = [s.get("name", "").split("/", 1)[-1]
+                for s in (resp or {}).get("model_services", [])]
+    provided = [s for s in services if s.startswith("system.ai.")]
+    customer = [s for s in services if not s.startswith("system.ai.")]
+    contract = {
+        "legacy": {
+            "base_url": f"{host}/serving-endpoints",
+            "invoke": f"{host}/serving-endpoints/<endpoint-name>/invocations",
+            "model": "<endpoint-name>",
+            "authz": "endpoint ACL (CAN_QUERY)",
+        },
+        "unity_ai_gateway": {
+            "base_url": f"{host}/ai-gateway/mlflow/v1",
+            "invoke": f"{host}/ai-gateway/mlflow/v1/chat/completions",
+            "model": "<catalog>.<schema>.<service>   (the FQN)",
+            "authz": "USE CATALOG + USE SCHEMA + EXECUTE on the service",
+        },
+        "note": "Change the base URL and the model selector TOGETHER — a new base URL with "
+                "an old endpoint name, or an FQN against the legacy path, both fail.",
+    }
+    if not services:
+        return _todo("No model services registered yet. Create one in front of an approved "
+                     "destination, then point clients at its FQN.",
+                     client_contract=contract)
+    return _ok(f"{len(services)} model service(s) available "
+               f"({len(provided)} provided, {len(customer)} customer-defined).",
+               provided=provided[:15], customer_defined=customer[:15],
+               client_contract=contract,
+               migration_note="No in-place rename exists. Run the new service alongside the "
+                              "old endpoint, validate on real traffic, move clients in "
+                              "stages, then revoke the old path.")
+
+
 def t_routing_panel() -> TestResult:
     """Show the model panel, prices, and the routing policy before anything is run."""
     p = routing.panel()
@@ -1057,6 +1109,7 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
     "list_endpoints": t_list_endpoints,
+    "model_services": t_model_services,
     "rate_limits": t_rate_limits,
     "routing_panel": t_routing_panel,
     "routing_compare": t_routing_compare,
