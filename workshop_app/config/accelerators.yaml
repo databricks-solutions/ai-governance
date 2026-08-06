@@ -221,7 +221,7 @@ accelerators:
           carry a clear UC owner. Confirm the telemetry tables that back this are populated.
         verify:
           label: Check AI telemetry tables
-          test: lakewatch_readiness
+          test: telemetry_readiness
 
   - id: acc_coding_agent
     title: Coding Agents

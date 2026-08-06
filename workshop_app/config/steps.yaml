@@ -312,13 +312,7 @@ pillars:
           label: Open the MLflow experiment
           deep_link: experiment
 
-      - id: control_lakewatch
-        title: Lakewatch — the AI-optimized SIEM
-        concept: |
-          The endpoint-usage, audit, and inference-table signals all land in the Lakehouse, where
-          **Lakewatch** treats AI telemetry as a security surface: anomaly detection on spend and
-          refusal rates, alerting, and investigation over the same governed tables. This confirms
-          the underlying telemetry tables Lakewatch reads are present and populated.
-        action:
-          label: Check AI telemetry tables for Lakewatch
-          test: lakewatch_readiness
+      # control_lakewatch removed: Lakewatch is not enabled on most accounts, so the step
+      # was a readiness check for a product the room could not use. The telemetry it probed
+      # is already proven by cost_usage and control_audit, and the same check survives in the
+      # Agent Registry accelerator as `telemetry_readiness`. Recovers ~10 minutes.

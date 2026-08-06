@@ -2,33 +2,39 @@
 #
 # One-command deploy of the AI Governance Workshop onto a customer workspace.
 #
-#   ./deploy.sh -p <cli-profile> -w <warehouse-id> -c <uc-catalog> [-g <group>]
+#   ./deploy.sh -p <cli-profile> -w <warehouse-id> -c <uc-catalog> [-g <group>] [-B]
 #
 # Does the whole sequence, in order, and checks its own work:
-#   1. builds the frontend (if Node is available; skipped if dist/ is already built)
+#   1. builds the frontend (only when dist/ is missing or older than src/)
 #   2. deploys the bundle  -> Lakebase instance, UC schema, the app
 #   3. reads back the app's service principal and re-deploys so UC grants attach to it
 #   4. prints the two `system` GRANT statements an account admin must run
 #   5. starts the app and polls /api/health until it reports ok
+#
+#   -B   skip the frontend build and ship whatever is in dist/. Use only when you know the
+#        backend/config changed and the UI did not, or on a host with no npm registry access.
+#        The script warns loudly if dist/ is stale.
 #
 # Safe to re-run: every step is idempotent.
 
 set -euo pipefail
 
 PROFILE="" WAREHOUSE="" CATALOG="" GROUP="users" SCHEMA="ai_governance_workshop"
+SKIP_BUILD=0
 
 usage() {
   sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-1}"
 }
 
-while getopts "p:w:c:g:s:h" opt; do
+while getopts "p:w:c:g:s:Bh" opt; do
   case "$opt" in
     p) PROFILE=$OPTARG ;;
     w) WAREHOUSE=$OPTARG ;;
     c) CATALOG=$OPTARG ;;
     g) GROUP=$OPTARG ;;
     s) SCHEMA=$OPTARG ;;
+    B) SKIP_BUILD=1 ;;
     h) usage 0 ;;
     *) usage 1 ;;
   esac
@@ -101,7 +107,20 @@ build_frontend() {
     npm run build >/dev/null )
 }
 
-if [[ ! -f frontend/dist/index.html ]]; then
+STALE=""
+[[ -f frontend/dist/index.html ]] && STALE=$(find frontend/src frontend/index.html \
+  frontend/package.json -newer frontend/dist/index.html 2>/dev/null | head -1)
+
+if (( SKIP_BUILD )); then
+  [[ -f frontend/dist/index.html ]] || die "-B given but frontend/dist is missing — there is nothing to ship."
+  if [[ -n $STALE ]]; then
+    warn "-B given and frontend/dist is STALE: UI changes in frontend/src are NOT in this deploy."
+    warn "Backend and config changes will ship. Rebuild on a host with npm registry access:"
+    warn "    cd frontend && npm install && npm run build   # then re-run without -B"
+  else
+    ok "-B given; frontend/dist is current, shipping as-is"
+  fi
+elif [[ ! -f frontend/dist/index.html ]]; then
   command -v npm >/dev/null || die \
     "frontend/dist is missing and npm is not installed. Install Node 20+, or build dist on
     another machine (cd frontend && npm install && npm run build) and copy it in."
@@ -110,10 +129,12 @@ if [[ ! -f frontend/dist/index.html ]]; then
     "the frontend build failed. If this host has no npm registry access, build dist
     elsewhere and copy frontend/dist/ in, then re-run."
   ok "built frontend/dist"
-elif [[ -n $(find frontend/src frontend/index.html frontend/package.json \
-              -newer frontend/dist/index.html 2>/dev/null) ]]; then
+elif [[ -n $STALE ]]; then
   warn "frontend sources are newer than dist — rebuilding."
-  build_frontend || die "the frontend build failed; frontend/dist is stale."
+  build_frontend || die \
+    "the frontend build failed and frontend/dist is stale. If this host has no npm registry
+    access, either build dist elsewhere and copy it in, or re-run with -B to ship the
+    backend/config changes with the existing (stale) UI."
   ok "rebuilt frontend/dist"
 else
   ok "frontend/dist is up to date"

@@ -36,7 +36,7 @@ avoidable, precisely to keep this ask small.
 
 **If the grants don't land in time, run the workshop anyway.** The routing ROI, endpoint
 discovery, asset inventory, rate limits, guardrail tests, and MCP policy create/verify all
-use the serving and Unity Catalog APIs and need **no `system` access**. Seven telemetry steps
+use the serving and Unity Catalog APIs and need **no `system` access**. The telemetry steps
 will report "action needed" instead of passing. That is a visible, honest gap — not a failure.
 
 ---
@@ -125,14 +125,16 @@ The workshop is 4 hours and deliberately does **not** try to prove every Gateway
 Resist adding boxes; the goal is a governed path that demonstrably works, not exhaustive
 coverage.
 
-**In scope — the ~17 core steps:** one governed endpoint, model/tool/agent inventory, a
+**In scope — the 18 core steps:** one governed endpoint, model/tool/agent inventory, a
 policy that visibly denies something, a guardrail that blocks a prompt, a rate limit, spend
 visible in dollars, per-developer coding-agent attribution, a measured routing saving, cost
 attribution by tag, and an audit trail.
 
 **Deferred to accelerators or follow-up:** exhaustive per-agent parity, enterprise-wide role
 design, whole-agent runtime guardrails, budget hard-blocking (still rolling out), MCP payload
-logging (not in Beta), and Lakewatch workflows.
+logging (not in Beta), and Lakewatch (not enabled on most accounts, so it is not a step).
 
-If a customer wants more, that's an accelerator (~4h) or a follow-up item in the POC doc —
-not extra steps crammed into the core session.
+If a customer wants more, that's an accelerator (~4h) or a follow-up item in the exported
+outcomes — not extra steps crammed into the core session. For adopting UAIG fresh or
+migrating from a previous Databricks or external gateway, point them at the Adoption and
+Migration field guides rather than growing the workshop.

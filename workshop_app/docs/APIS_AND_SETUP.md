@@ -28,7 +28,7 @@ called out per row rather than glossed.
 | MCP payload logging | **Not available** | Do not claim it. |
 | Smart routing (Databricks-managed) | **Beta** | Position as roadmap; the app does not demo it. |
 | Omnigent (managed) | **Beta** (OSS available) | Partner/meta-harness layer; positioned, not demoed. |
-| Lakewatch | Announced | Confirm status before committing to it. |
+| Lakewatch | Announced | Not a workshop step — not enabled on most accounts. Confirm status before positioning it. |
 
 ---
 
@@ -76,7 +76,7 @@ destination_model, input_tokens, output_tokens, total_tokens,
 status_code, latency_ms, routing_information, mcp_metadata
 ```
 
-Used by `usage_by_project`, `coding_agent_usage`, `lakewatch_readiness`.
+Used by `usage_by_project`, `coding_agent_usage`, `telemetry_readiness`.
 
 ### `system.ai_gateway.external_model_spend` *(Beta)* — dollars, no join
 ```
@@ -362,9 +362,10 @@ Three schemas were **removed** after checking each was avoidable:
 **What still works with no `system` grant at all:** the model panel, the full routing ROI
 (compare + route + saving), endpoint discovery, asset inventory, governed-endpoint checks,
 rate limits, guardrail tests, and the MCP policy create/verify. Those use the serving and
-Unity Catalog APIs. Only `usage_by_project`, `coding_agent_usage`, `gateway_spend_by_model`,
-`budget_status`, `audit_scan`, `lakewatch_readiness`, and `pii_safety_readiness` need
-`system` — and they degrade to `action_required`, not a crash.
+Unity Catalog APIs. Only the telemetry steps need `system` — `usage_by_project`, `coding_agent_usage`,
+`gateway_spend_by_model`, `budget_status`, `audit_scan`, `mcp_telemetry`,
+`telemetry_readiness`, and `pii_safety_readiness` — and they degrade to `action_required`,
+not a crash.
 
 **Account admin still needed for:** the two `system` grants, creating budgets, and enabling
 the service-policies Beta. Line these up before the workshop.

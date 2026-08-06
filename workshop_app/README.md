@@ -37,7 +37,7 @@ workshop_app/
 - **Control** — agent-aware data + AI governance: create a governed endpoint, apply guardrails
   on a model service, attach a contextual policy to an MCP service (allow reads, deny writes),
   govern coding-agent traffic, and get end-to-end observability — scan the audit log for denied
-  calls and leaked secrets, open traces, and confirm Lakewatch telemetry.
+  calls and leaked secrets, and open traces.
 
 The governance tests are ported from the `l200_demo` Streamlit app into FastAPI endpoints, so
 each step's **Try It** button runs a real check (list endpoints, create/verify a governed
@@ -143,8 +143,8 @@ be avoidable (see `docs/APIS_AND_SETUP.md`).
 
 **If the grants aren't ready, the workshop still runs.** The model panel, full routing ROI,
 endpoint discovery, asset inventory, rate limits, guardrail tests, and MCP policy
-create/verify all use the serving and UC APIs and need no `system` access. Only the seven
-telemetry steps do, and they report "action needed" rather than failing.
+create/verify all use the serving and UC APIs and need no `system` access. Only the telemetry
+steps do, and they report "action needed" rather than failing.
 
 | Grant | Unlocks | Skippable? |
 |---|---|---|

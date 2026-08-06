@@ -673,12 +673,17 @@ def t_coding_agent_usage() -> TestResult:
         return _fail("Coding-agent usage query failed.", error=str(e)[:600], sql=sql)
 
 
-def t_lakewatch_readiness() -> TestResult:
-    """Confirm the AI telemetry tables a SIEM/Lakewatch workflow reads are present.
+def t_telemetry_readiness() -> TestResult:
+    """Confirm the AI telemetry tables are present and actually receiving rows.
+
+    Was `lakewatch_readiness`, and was a core step. Renamed and demoted to the Agent
+    Registry accelerator because Lakewatch is not enabled on most accounts, so a core step
+    named after it checked readiness for a product the room could not use. The check itself
+    is still worth having where telemetry is the point.
 
     Counts rows in the last day rather than the whole table: an existing-but-empty table is
-    not the same as a populated one, and a bare COUNT(*) over all history is slow and
-    tells the room nothing about whether telemetry is flowing NOW.
+    not the same as a populated one, and a bare COUNT(*) over all history is slow and tells
+    the room nothing about whether telemetry is flowing NOW.
     """
     checks = []
     for table, pred in (
@@ -1127,7 +1132,7 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "list_registered_assets": t_list_registered_assets,
     "budget_status": t_budget_status,
     "coding_agent_usage": t_coding_agent_usage,
-    "lakewatch_readiness": t_lakewatch_readiness,
+    "telemetry_readiness": t_telemetry_readiness,
     "external_provider_routing": t_external_provider_routing,
     "pii_safety_readiness": t_pii_safety_readiness,
     # MCP accelerator (three planes of MCP governance)

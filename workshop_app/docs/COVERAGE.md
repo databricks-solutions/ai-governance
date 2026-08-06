@@ -1,6 +1,6 @@
 # Coverage: workshop vs. the POC DOC, Adoption, and Migration guides
 
-Gap-check of the 19 core workshop steps against three sources of truth:
+Gap-check of the 18 core workshop steps against three sources of truth:
 
 - **AI Governance POC DOC** — the four pillars the POC is measured on
   (**Cost / Usage / Access / Inventory**) and its three phases.
@@ -16,10 +16,10 @@ All three are marked IN PROGRESS (GA launch edition, 2026-08-04).
 | Phase | Duration | What happens |
 |---|---|---|
 | **Prereqs** | ~1 week | Entitlements, grants, previews, pilot users. See `PREREQUISITES.md`. |
-| **Workshop** | **4 hours** | Test and validate live, in their workspace. The 19 core steps. |
+| **Workshop** | **4 hours** | Test and validate live, in their workspace. The 18 core steps. |
 | **Follow-up (POC)** | 1–2 weeks | Close what didn't land; the app's exported outcomes drive it. |
 
-Everything below is judged against that budget. **4 hours is ~19 steps at ~10 minutes each
+Everything below is judged against that budget. **4 hours is ~18 steps at ~12 minutes each
 including discussion** — there is no room for a feature checklist, so every "not covered" is
 a deliberate call with a stated reason.
 
@@ -60,7 +60,7 @@ explicit so an SA can report against the POC DOC without re-deriving it.
 | POC DOC pillar | Its primary measure | Our steps |
 |---|---|---|
 | **Cost** | Budget alerts wired; cost-per-team SQL returns a table | `cost_budgets`, `cost_rate_limits`, `cost_tags`, `cost_usage`, `cost_spend_by_model`, + the routing ROI trio |
-| **Usage** | Discovery dashboard + monitoring live | `cost_usage`, `control_coding_agents`, `control_traces`, `control_lakewatch` |
+| **Usage** | Discovery dashboard + monitoring live | `cost_usage`, `control_coding_agents`, `control_traces` |
 | **Access** | RBAC + ABAC + identity-aware invocation enforced at the Gateway | `control_mcp_policy`, `control_guardrails`, `mcp_grants`, `mcp_obo` (accelerator) |
 | **Inventory** | Every endpoint, agent, MCP server registered and owned in UC | `choice_list_endpoints`, `choice_model_services`, `choice_agent_registry`, `mcp_inventory` |
 
@@ -86,7 +86,7 @@ Two POC DOC items we do **not** cover, deliberately:
 | Rate limits (the hard control) | `cost_rate_limits` | ✅ |
 | Budgets + thresholds | `cost_budgets` | ✅ |
 | Server-side vs. request tags | `cost_tags` | ⚠️ **Partial** — see §4 |
-| `system.ai_gateway.usage` telemetry | `cost_usage`, `control_lakewatch` | ✅ |
+| `system.ai_gateway.usage` telemetry | `cost_usage`, `control_coding_agents` | ✅ |
 | External-model spend in USD | `cost_spend_by_model` | ✅ |
 | Inference tables / payload logging | `control_guardrails` verify, `acc_pg_readiness` | ✅ |
 | Audit trail | `control_audit` | ✅ |
@@ -203,14 +203,14 @@ From the guides' risk tables — the ones that actually bite:
 
 ## 7. Verdict
 
-**19 core steps + 21 accelerator steps.** Coverage of the POC DOC's four pillars is complete
+**18 core steps + 21 accelerator steps.** Coverage of the POC DOC's four pillars is complete
 except two items that need accumulated traffic (monitoring drift, latency benchmark). Coverage
 of the Adoption Guide's target state is good; the one real gap was the *object model and client
 contract*, now `choice_model_services`.
 
-Fits the delivery shape: **~1 week prereqs → 4 hours live → 1–2 weeks follow-up.** 19 steps at
-~10 minutes each with discussion is a full 4 hours with no slack, which is the correct amount
-of pressure — it forces every step to earn its place.
+Fits the delivery shape: **~1 week prereqs → 4 hours live → 1–2 weeks follow-up.** 18 steps at
+~12 minutes each with discussion is a full 4 hours with a little air in it — enough to let a
+good question run without losing the last pillar.
 
 The omissions are right for that budget. Inventory is pre-work, migration is a multi-week
 sequence, network is account-level infrastructure, passthrough is an anti-pattern, and the
@@ -220,6 +220,11 @@ that makes this work (a governed path the customer's own team stood up and watch
 breadth nobody absorbs in half a day.
 
 **If you need to cut further**, the honest order to drop from the core is:
-`control_lakewatch` (readiness check, not a control) → `control_traces` (manual link only) →
-`cost_routing_compare` (the ROI story survives on `cost_routing_roi` alone). That recovers
-~30 minutes.
+`control_traces` (a manual link only) → `cost_routing_compare` (the ROI story survives on
+`cost_routing_roi` alone). That recovers ~20 minutes.
+
+**Already cut:** `control_lakewatch`. Lakewatch is not enabled on most accounts, so a core
+step named after it checked readiness for a product the room could not use — and the
+telemetry it probed is already proven by `cost_usage` and `control_audit`. The check itself
+survives as `telemetry_readiness` in the Agent Registry accelerator, where telemetry is the
+point. Recovered ~10 minutes.
