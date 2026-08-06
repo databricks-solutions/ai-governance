@@ -80,8 +80,11 @@ CREATE TABLE IF NOT EXISTS step_progress (
     customer_sfid TEXT       NOT NULL,      -- Salesforce account id
     step_id      TEXT        NOT NULL,
     pillar_id    TEXT        NOT NULL,
+    -- action_required: the step ran but proved nothing yet (a guided UI step, or a
+    -- telemetry query with no data). Deliberately not 'done' — see run_and_record.
     status       TEXT        NOT NULL DEFAULT 'not_started'
-                 CHECK (status IN ('not_started', 'in_progress', 'done', 'failed')),
+                 CHECK (status IN ('not_started', 'in_progress', 'action_required',
+                                   'done', 'failed')),
     last_result  JSONB,                      -- last Try-It / Verify output
     notes        TEXT,
     updated_by   TEXT,
@@ -107,6 +110,19 @@ BEGIN
     WHERE table_schema = 'workshop' AND table_name = 'step_progress' AND column_name = 'customer_sfid'
   ) THEN
     ALTER TABLE step_progress RENAME COLUMN run_id TO customer_sfid;
+  END IF;
+END $$;
+
+-- Widen the status CHECK to allow 'action_required'. Existing deployments carry the older
+-- 4-value constraint, which would reject the new status and fail the write mid-workshop.
+-- Drop and re-add by name; CREATE TABLE IF NOT EXISTS would not alter an existing table.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables
+             WHERE table_schema = 'workshop' AND table_name = 'step_progress') THEN
+    ALTER TABLE step_progress DROP CONSTRAINT IF EXISTS step_progress_status_check;
+    ALTER TABLE step_progress ADD CONSTRAINT step_progress_status_check
+      CHECK (status IN ('not_started', 'in_progress', 'action_required', 'done', 'failed'));
   END IF;
 END $$;
 """

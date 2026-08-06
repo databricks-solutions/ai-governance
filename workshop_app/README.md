@@ -63,63 +63,80 @@ the exported outcomes, so anything you run shows up in the internal sales app.
 
 ## Deploy on a customer workspace
 
-Prereqs: Databricks CLI ≥ 0.297 authenticated to the workspace, a SQL warehouse, and an
-existing Unity Catalog catalog. `frontend/dist` is committed, so Node is only needed if you
-change anything under `frontend/src`.
-
-> **`warehouse_id` and `catalog` are required on every `bundle` command.** Neither has a
-> default — a customer-deployable bundle can't assume a warehouse or catalog exists. Omit
-> either and the command fails immediately with
-> `no value assigned to required variable ...`, which is deliberate: the alternative is a
-> deploy that succeeds and then fails every governance step in front of the customer.
+**Prereqs:** Databricks CLI authenticated to the workspace, a SQL warehouse, an existing
+Unity Catalog catalog, and Node (to build the frontend).
 
 ```bash
-# 1. Edit config/workshop.yaml — set at minimum:
-#      catalog.name (same value you pass as --var="catalog=..."), and the
-#      endpoint / mcp / project names. Leave workspace.warehouse_id blank: the deployed app
-#      reads the warehouse from the bundle resource (see app.yaml).
-
-# 2. Deploy — creates the Lakebase instance, the UC schema, and the app
-databricks bundle deploy -t dev -p <profile> \
-  --var="warehouse_id=<sql-warehouse-id>" \
-  --var="catalog=<existing-uc-catalog>"
-
-# 3. Grant the app's service principal what it needs (see below) — REQUIRED
-
-# 4. Start the app
-databricks bundle run ai_governance_workshop_app -t dev -p <profile> \
-  --var="warehouse_id=<sql-warehouse-id>" \
-  --var="catalog=<existing-uc-catalog>"
+./deploy.sh -p <cli-profile> -w <warehouse-id> -c <uc-catalog>
 ```
+
+That's the whole deploy. The script is idempotent — re-run it any time — and it:
+
+1. checks the profile authenticates and that the warehouse **and catalog actually exist**,
+   failing early with the command to list them rather than mid-deploy
+2. builds the frontend
+3. pins `catalog`/`schema` into `config/workshop.local.yaml` so the app and the bundle can
+   never disagree
+4. deploys the bundle — Lakebase instance, UC schema, the app
+5. reads back the app's service principal and re-deploys so the **UC grants attach
+   automatically**
+6. prints the two `system` GRANT statements for your account admin
+7. starts the app and polls until it reports healthy
+
+Add `-g <group>` to grant a specific group `CAN_USE` on the app (default: `users`), and
+`-s <schema>` to change the schema name.
+
+Only one thing is left for a human: the two `system` grants below. Everything else is done.
 
 App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.com`.
+`GET /api/health` returns `{"status":"ok"}`, or `misconfigured` naming exactly what is unset.
 
-Confirm the deploy is healthy before the workshop starts — `GET /api/health` returns
-`{"status":"ok"}`, or `{"status":"misconfigured", "config_problems":[...]}` naming exactly
-what is unset.
+<details>
+<summary>Manual equivalent, if you can't run the script</summary>
 
-### Grant the app's service principal (required)
+```bash
+cd frontend && npm ci && npm run build && cd ..
 
-The bundle grants the app **only** `CAN_USE` on the warehouse and `CAN_CONNECT_AND_CREATE`
-on the Lakebase instance. Unity Catalog grants are manual. Get the app's service principal id
-from `databricks apps get ai-governance-workshop`, then:
+# warehouse_id and catalog are required — no defaults, so a missing one fails immediately
+# rather than deploying an app that fails every governance step in front of the customer.
+databricks bundle deploy -t dev -p <profile> \
+  --var="warehouse_id=<id>" --var="catalog=<catalog>"
 
-```sql
--- Required. Workshop artifacts — the MCP service-policy function lives here.
-GRANT USE CATALOG ON CATALOG <catalog> TO `<app-sp-client-id>`;
-GRANT USE SCHEMA, CREATE FUNCTION, EXECUTE, SELECT, MODIFY
-  ON SCHEMA <catalog>.<schema> TO `<app-sp-client-id>`;
+# Read the app's service principal, then re-deploy so the schema grants attach to it
+APP_SP=$(databricks apps get ai-governance-workshop -p <profile> --output json \
+          | jq -r .service_principal_client_id)
+databricks bundle deploy -t dev -p <profile> \
+  --var="warehouse_id=<id>" --var="catalog=<catalog>" \
+  --var="app_service_principal_id=$APP_SP"
+
+databricks bundle run ai_governance_workshop_app -t dev -p <profile> \
+  --var="warehouse_id=<id>" --var="catalog=<catalog>"
 ```
 
-Two `system` schemas are needed for the telemetry steps. Keep the grant surface to these
-two — the app deliberately reads **no** other system schema:
+Also set `catalog.name`/`catalog.schema` in `config/workshop.yaml` to the same values, or
+the app will write to a different schema than the bundle created.
+</details>
+
+### The one manual step: two `system` grants (account admin)
+
+`deploy.sh` handles the warehouse, Lakebase, schema, and app-group grants. Unity Catalog
+`system` schemas can't be granted from a bundle and need an account or metastore admin, so
+the script prints these with the real service principal filled in:
 
 ```sql
--- Needed by the Cost + Control telemetry steps (account/metastore admin).
 GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
 GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;  -- usage, spend
 GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;  -- audit trail
 ```
+
+**Only these two schemas.** The app deliberately reads no other — `system.billing`,
+`system.serving`, and `system.information_schema` were all removed once each turned out to
+be avoidable (see `docs/APIS_AND_SETUP.md`).
+
+**If the grants aren't ready, the workshop still runs.** The model panel, full routing ROI,
+endpoint discovery, asset inventory, rate limits, guardrail tests, and MCP policy
+create/verify all use the serving and UC APIs and need no `system` access. Only the seven
+telemetry steps do, and they report "action needed" rather than failing.
 
 | Grant | Unlocks | Skippable? |
 |---|---|---|

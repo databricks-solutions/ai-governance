@@ -29,6 +29,9 @@ export interface Workshop {
 
 export interface TestResult {
   ok: boolean;
+  // 'action_required' means the test ran but proved nothing yet (a guided UI step, or a
+  // telemetry query with no data). Rendered amber, never as a pass.
+  status?: "action_required";
   summary: string;
   detail?: Record<string, unknown>;
 }

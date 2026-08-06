@@ -12,13 +12,32 @@ _CONFIG_DIR = Path(__file__).parent.parent / "config"
 
 @lru_cache(maxsize=1)
 def get_config() -> dict:
-    """Load config/workshop.yaml, preferring workshop.local.yaml if present."""
+    """Load config/workshop.yaml, preferring workshop.local.yaml if present.
+
+    Environment variables injected by the bundle win over the file, so the values passed to
+    `bundle deploy` are the single source of truth and nobody has to keep the YAML and the
+    deploy command in sync. That duplication was previously a live footgun: the bundle
+    created one schema while the app wrote to another.
+    """
     override = os.environ.get("WORKSHOP_CONFIG")
+    cfg = None
     for candidate in (override, _CONFIG_DIR / "workshop.local.yaml", _CONFIG_DIR / "workshop.yaml"):
         if candidate and Path(candidate).exists():
             with open(candidate) as f:
-                return yaml.safe_load(f)
-    raise FileNotFoundError("No workshop.yaml found in config/.")
+                cfg = yaml.safe_load(f) or {}
+            break
+    if cfg is None:
+        raise FileNotFoundError("No workshop.yaml found in config/.")
+
+    catalog = os.environ.get("WORKSHOP_CATALOG")
+    schema = os.environ.get("WORKSHOP_SCHEMA")
+    if catalog or schema:
+        cfg.setdefault("catalog", {})
+        if catalog:
+            cfg["catalog"]["name"] = catalog
+        if schema:
+            cfg["catalog"]["schema"] = schema
+    return cfg
 
 
 @lru_cache(maxsize=1)

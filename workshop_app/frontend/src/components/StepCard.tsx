@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, ExternalLink, CheckCircle2, XCircle, Loader2, Check, Circle } from "lucide-react";
+import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle } from "lucide-react";
 import { api, type Step, type TestResult, type ProgressMap } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 import { cn } from "@/lib/cn";
@@ -56,6 +56,11 @@ export default function StepCard({
     onProgressChange();
   }
 
+  // A step that ran but proved nothing (a guided UI action, or telemetry with no data yet)
+  // must not look complete — that is the difference between an honest workshop record and
+  // a green wall of checks.
+  const actionRequired = status === "action_required";
+
   return (
     <div className={cn("rounded-2xl border bg-white p-6", status === "done" ? "border-navy/25" : "border-navy/10")}>
       {/* Header */}
@@ -71,7 +76,14 @@ export default function StepCard({
           {status === "done" ? <Check className="h-4 w-4" strokeWidth={3} /> : <Circle className="h-3.5 w-3.5" />}
         </button>
         <div className="flex-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-navy-300">Step {index}</div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-navy-300">Step {index}</div>
+            {actionRequired && (
+              <span className="rounded bg-[#FDF3E0] px-2 py-0.5 text-[11px] font-semibold text-[#B7791F]">
+                ACTION NEEDED
+              </span>
+            )}
+          </div>
           <h3 className="text-lg font-semibold text-navy">{step.title}</h3>
         </div>
       </div>
@@ -120,19 +132,25 @@ export default function StepCard({
         )}
       </div>
 
-      {/* Result */}
+      {/* Result — three states, not two: passed, action needed, failed. */}
       {result && (
         <div
           className={cn(
             "mt-4 rounded-xl border p-4",
-            result.ok ? "border-[#1E7E34]/20 bg-[#E6F4EA]/50" : "border-lava/30 bg-lava/[0.04]",
+            result.status === "action_required"
+              ? "border-[#B7791F]/30 bg-[#FDF3E0]/60"
+              : result.ok
+                ? "border-[#1E7E34]/20 bg-[#E6F4EA]/50"
+                : "border-lava/30 bg-lava/[0.04]",
           )}
         >
           <div className="flex items-center gap-2 text-sm font-semibold">
-            {result.ok ? (
-              <CheckCircle2 className="h-4.5 w-4.5 text-[#1E7E34]" />
+            {result.status === "action_required" ? (
+              <AlertCircle className="h-4.5 w-4.5 shrink-0 text-[#B7791F]" />
+            ) : result.ok ? (
+              <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-[#1E7E34]" />
             ) : (
-              <XCircle className="h-4.5 w-4.5 text-lava" />
+              <XCircle className="h-4.5 w-4.5 shrink-0 text-lava" />
             )}
             <span className="text-navy">{result.summary}</span>
           </div>

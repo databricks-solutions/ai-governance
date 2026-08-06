@@ -93,7 +93,16 @@ class RunTest(BaseModel):
 @router.post("/test")
 def run_and_record(body: RunTest):
     result = run_test(body.test)
-    status = "done" if result.get("ok") else "failed"
+    # A test can come back three ways, and collapsing them would overstate progress:
+    # ok + action_required means "ran fine, but nothing is proven yet" (a guided step, or
+    # telemetry with no data). Recording that as `done` would inflate the progress bar and
+    # the outcomes JSON the sales app ingests.
+    if result.get("status") == "action_required":
+        status = "action_required"
+    elif result.get("ok"):
+        status = "done"
+    else:
+        status = "failed"
     _save_progress(body.customer_sfid, body.step_id, body.pillar_id, status, result, body.updated_by)
     return result
 
