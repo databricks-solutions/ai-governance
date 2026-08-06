@@ -15,7 +15,7 @@ from typing import Any, Callable
 
 from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
-from . import deep_links, routing
+from . import deep_links, mcp, routing
 from .config import get_config, get_workspace_client
 from .workspace_sql import fetchall, test_connection
 
@@ -367,13 +367,15 @@ def t_create_mcp_policy() -> TestResult:
     deny = pol.get("deny_tools", []) or []
     # Tool names are values, not identifiers — quote and escape them.
     deny_sql = ", ".join(_sql_str(d) for d in deny) or "''"
+    reason = _sql_str(pol.get("deny_reason")
+                      or "This tool is blocked by workshop policy.")
     fqn = f"{cat}.{sch}.{fn}"
     ddl = f"""
     CREATE OR REPLACE FUNCTION {fqn}(event VARIANT)
     RETURNS VARIANT
     RETURN CASE
       WHEN event:context.tool.name::STRING IN ({deny_sql})
-      THEN to_variant_object(named_struct('result','DENY','reason','write tools are blocked by workshop policy'))
+      THEN to_variant_object(named_struct('result','DENY','reason',{reason}))
       ELSE to_variant_object(named_struct('result','ALLOW','reason',''))
     END;
     """
@@ -651,6 +653,352 @@ def t_lakewatch_readiness() -> TestResult:
                "in the last 24h.", checks=checks)
 
 
+# --------------------------------------------------------------------------- MCP accelerator
+# Structured on the three planes of MCP governance:
+#   Plane 1 Authenticate — the OAuth scope decides which endpoint FAMILY you reach.
+#   Plane 2 Authorize    — UC grants decide whether you can see/call a specific tool.
+#   Plane 3 Behavior     — service policies (ALLOW/DENY/ASK) on an MCP_SERVICE securable.
+# The managed UC-native endpoints have planes 1+2 only; MCP Services have all three. Every
+# test below says which plane it is exercising, because that distinction is the whole point.
+def t_mcp_inventory() -> TestResult:
+    """Plane 2 — every MCP_SERVICE securable on the metastore, provided and external.
+
+    Replaces an earlier placeholder that listed serving endpoints (i.e. models), which is a
+    different surface entirely and the thing reviewers rightly flagged.
+    """
+    out = mcp.list_mcp_services()
+    if not out["ok"]:
+        return _fail("Could not list MCP services. The MCP/AI Gateway preview may not be "
+                     "enabled on this account, or the caller lacks metastore access.",
+                     error=out["error"],
+                     hint="GET /api/2.1/unity-catalog/mcp-services")
+    svcs = out["services"]
+    if not svcs:
+        return _todo("No MCP services registered yet. The provided `system.ai.*` services "
+                     "appear once the preview is enabled; register an external server to "
+                     "add your own.", services=[])
+    provided = [s["name"] for s in svcs if s["provided"]]
+    external = [s["name"] for s in svcs if not s["provided"]]
+    summary = f"{len(svcs)} MCP service(s): {len(provided)} Databricks-provided"
+    summary += f", {len(external)} external/custom." if external else ", 0 external/custom."
+    return _ok(summary, provided=provided, external=external,
+               note="Provided and external services are both MCP_SERVICE securables, so "
+                    "both support service policies. The managed UC-native endpoints "
+                    "(/api/2.0/mcp/functions/...) do NOT — see the next steps.",
+               services=svcs)
+
+
+def t_mcp_managed_tools() -> TestResult:
+    """Planes 1+2 — the managed UC-native endpoint: UC functions exposed as MCP tools.
+
+    Deny-by-absence at object grain: a caller without USE CATALOG + USE SCHEMA gets an
+    EMPTY list, not an error. An empty result is therefore ambiguous and is reported as a
+    to-do with both explanations rather than as a pass.
+    """
+    cat, sch = _fq_schema()
+    url = mcp.managed_functions_url(cat, sch)
+    out = mcp.list_tools(url)
+    if not out["ok"]:
+        return _fail("Managed MCP functions endpoint did not answer.", url=url,
+                     error=out["error"],
+                     hint="Needs the Managed MCP preview and an OAuth token with the "
+                          "`unity-catalog` scope. A PAT must carry `all-apis`.")
+    tools = out["tools"]
+    if not tools:
+        return _todo(
+            f"Endpoint reachable, but no tools visible in `{cat}.{sch}`. Either the schema "
+            "has no UC functions yet, or the caller lacks USE CATALOG + USE SCHEMA — "
+            "managed MCP hides ungranted objects instead of erroring, so both look "
+            "identical here. Create a UC function (the MCP policy step makes one), then re-run.",
+            url=url, plane="1+2 (authenticate + authorize)")
+    return _ok(f"{len(tools)} UC function(s) exposed as MCP tools from `{cat}.{sch}`.",
+               url=url, tools=tools, plane="1+2 (authenticate + authorize)",
+               note="These are raw UC-native endpoints, NOT MCP_SERVICE securables — no "
+                    "service policy can attach here. Governance is UC grants + column "
+                    "masks/ABAC on the underlying data.")
+
+
+def t_mcp_service_tools() -> TestResult:
+    """Planes 1+2 — live tools/list against the configured MCP Service.
+
+    Proves the tool surface is real rather than described. Also reports whether the service
+    is already filtered to read-only tools, which changes how the policy step should be
+    framed (see t_mcp_policy_target).
+    """
+    svc = mcp.configured_service()
+    if not svc:
+        return _fail("No MCP service configured — set `mcp.builtin_service` in "
+                     "config/workshop.yaml (e.g. system.ai.github).")
+    url = mcp.service_url(svc)
+    out = mcp.list_tools(url)
+    if not out["ok"]:
+        status = out.get("http_status")
+        if status == 403:
+            return _todo(
+                f"`{svc}` returned 403 — the service exists but this caller is not "
+                "entitled, or per-user OAuth consent has not been completed. Open the "
+                "service in the AI Gateway UI and use Login, then re-run.",
+                service=svc, url=url, error=out["error"], plane="1 (authenticate)")
+        return _fail(f"tools/list failed against `{svc}`.", service=svc, url=url,
+                     error=out["error"], plane="1+2")
+    tools = out["tools"]
+    if not tools:
+        return _todo(f"`{svc}` is reachable but exposed 0 tools — tool selection may "
+                     "exclude everything, or consent is incomplete for this identity.",
+                     service=svc, url=url, plane="1+2")
+    read_only = [t["name"] for t in tools if t["read_only"]]
+    writes = [t["name"] for t in tools if t["read_only"] is False]
+    return _ok(f"`{svc}` exposes {len(tools)} tool(s): {len(read_only)} read-only, "
+               f"{len(writes)} write-capable.",
+               service=svc, url=url, tools=tools, read_only=read_only,
+               write_capable=writes, plane="1+2 (authenticate + authorize)",
+               note=("This service is already filtered to read-only tools, so there is no "
+                     "write tool here to deny — the policy step below denies a READ tool "
+                     "instead, which still proves enforcement."
+                     if not writes else
+                     "Write-capable tools are exposed — a service policy denying them is "
+                     "the highest-value control to demonstrate."))
+
+
+def t_mcp_grants() -> TestResult:
+    """Plane 2 — who is entitled to call the configured MCP Service.
+
+    The finding that matters: `system.ai` grants EXECUTE to *all account users* by default,
+    so a provided service is open to the whole account until scoped. Recommended posture is
+    deny-by-absence — grant inside a customer-owned catalog rather than revoking in
+    `system.ai`, where a schema-level revoke may not cascade.
+    """
+    svc = mcp.configured_service()
+    if not svc:
+        return _fail("No MCP service configured (`mcp.builtin_service`).")
+    out = mcp.service_grants(svc)
+    if not out["ok"]:
+        return _fail(f"Could not read grants on `{svc}`.", service=svc, error=out["error"])
+    assignments = out["assignments"]
+    broad = [a for a in assignments
+             if (a["principal"] or "").lower() in ("account users", "users")
+             and "EXECUTE" in a["privileges"]]
+    detail = {"service": svc, "assignments": assignments, "plane": "2 (authorize)",
+              "required_to_see": "USE CATALOG + USE SCHEMA",
+              "required_to_call": "EXECUTE"}
+    if broad:
+        return _todo(
+            f"`{svc}` grants EXECUTE to `{broad[0]['principal']}` — every account user can "
+            "call it. That is the default for `system.ai`, and it is the finding to show a "
+            "security team. Scope it to the pilot group before rollout.",
+            **detail,
+            recommendation="Prefer deny-by-absence: register the service in a "
+                           "customer-owned catalog and grant EXECUTE explicitly. A "
+                           "schema-level REVOKE inside system.ai may not cascade.")
+    return _ok(f"`{svc}` has {len(assignments)} scoped grant(s) — not open to all account "
+               "users.", **detail)
+
+
+def t_mcp_policy_target() -> TestResult:
+    """Plane 3 — confirm the policy target is a securable a policy can actually attach to.
+
+    The step that prevents the most common wasted hour: service policies attach ONLY to
+    MCP_SERVICE securables. Point one at a managed UC-native endpoint and there is nothing
+    to attach to, which the product surfaces confusingly.
+    """
+    svc = mcp.configured_service()
+    if not svc:
+        return _fail("No MCP service configured (`mcp.builtin_service`).")
+    inv = mcp.list_mcp_services()
+    if not inv["ok"]:
+        return _fail("Could not confirm the securable type.", error=inv["error"])
+    match = next((s for s in inv["services"] if s["name"] == svc), None)
+    if not match:
+        return _fail(
+            f"`{svc}` is not a registered MCP_SERVICE securable, so no service policy can "
+            "attach to it. Service policies require an MCP Service (provided `system.ai.*` "
+            "or an external one you register) — the managed /api/2.0/mcp/... endpoints are "
+            "not securables.",
+            configured=svc,
+            available=[s["name"] for s in inv["services"]],
+            plane="3 (behavior)")
+    return _ok(f"`{svc}` is an MCP_SERVICE securable — a service policy can attach to it.",
+               service=svc, securable_type=match["securable_type"],
+               owner=match["owner"], plane="3 (behavior)",
+               requires="EXECUTE on the policy function + MANAGE on the service",
+               note="Attachment is UI-only in the current Beta — there is no "
+                    "ALTER ... SET SERVICE POLICY DDL or control-API path yet.")
+
+
+def t_mcp_obo() -> TestResult:
+    """Plane 2 — prove on-behalf-of: the tool runs as the CALLER, not a shared account.
+
+    Calls a read tool that echoes the upstream identity, so the room sees a real name come
+    back rather than taking OBO on faith. This is the single most persuasive MCP demo: if
+    the caller cannot see something, neither can their agent.
+    """
+    svc = mcp.configured_service()
+    url = mcp.service_url(svc)
+    probe = ((get_config().get("mcp", {}) or {}).get("service_policy", {})
+             or {}).get("identity_probe_tool")
+    listed = mcp.list_tools(url)
+    if not listed["ok"]:
+        return _todo(f"Cannot reach `{svc}` to prove OBO — resolve the previous step first.",
+                     service=svc, error=listed["error"])
+    names = [t["name"] for t in listed["tools"]]
+    # Prefer a configured probe; otherwise any "who am I" style read tool.
+    candidates = [probe] if probe else []
+    candidates += [n for n in ("get_me", "get_my_user_profile", "whoami") if n in names]
+    tool = next((c for c in candidates if c and c in names), None)
+    if not tool:
+        return _todo(
+            "No identity-echo tool available on this service, so OBO cannot be shown "
+            "automatically. Set `mcp.service_policy.identity_probe_tool` to a read tool "
+            "that returns the calling user, or show OBO by having two people run the same "
+            "tool and comparing results.",
+            service=svc, available_tools=names[:20])
+    out = mcp.call_tool(url, tool)
+    if not out["ok"]:
+        return _fail(f"`{tool}` failed — cannot demonstrate OBO.", service=svc,
+                     tool=tool, error=out["error"])
+    text = json.dumps(out["result"])[:600]
+    return _ok(f"`{tool}` executed as the calling user — identity propagated to the "
+               "upstream provider (no shared service account).",
+               service=svc, tool=tool, plane="2 (authorize, on-behalf-of)",
+               upstream_identity_excerpt=text,
+               note="The response carries the CALLER's upstream identity. Two participants "
+                    "running this get two different answers, which is the proof: the agent "
+                    "inherits the human's permissions, nothing more.")
+
+
+def t_mcp_policy_enforcement() -> TestResult:
+    """Plane 3 — evaluate the policy function against synthetic events, then explain scope.
+
+    Policy LOGIC is verifiable here (the function is a UC SQL UDF we can call directly).
+    ENFORCEMENT requires the policy to be attached, which is UI-only in Beta — so this
+    reports logic plus the exact remaining manual step rather than implying end-to-end proof.
+    """
+    cfg = get_config()
+    cat, sch = _fq_schema()
+    pol = (cfg.get("mcp", {}) or {}).get("service_policy", {}) or {}
+    try:
+        fn = _sql_ident(pol.get("function_name", "mcp_read_only_policy"),
+                        "mcp.service_policy.function_name")
+    except ValueError as e:
+        return _fail(str(e))
+    fqn = f"{cat}.{sch}.{fn}"
+    deny_tool = (pol.get("deny_tools") or [None])[0]
+    allow_tool = pol.get("allow_probe_tool")
+    if not deny_tool or not allow_tool:
+        return _fail("Config needs mcp.service_policy.deny_tools and allow_probe_tool.")
+
+    def probe(tool: str) -> dict:
+        event = json.dumps({"type": "request",
+                            "context": {"tool": {"name": tool}}})
+        rows = fetchall(f"SELECT {fqn}(parse_json({_sql_str(event)})):result::STRING AS d, "
+                        f"{fqn}(parse_json({_sql_str(event)})):reason::STRING AS r")
+        row = rows[0] if rows else {}
+        return {"tool": tool, "decision": row.get("d") or "NO_RESULT",
+                "reason": row.get("r")}
+
+    try:
+        denied, allowed = probe(deny_tool), probe(allow_tool)
+    except Exception as e:
+        return _todo("Policy function does not exist yet — create it in the previous step.",
+                     function=fqn, error=str(e)[:400])
+
+    svc = mcp.configured_service()
+    detail = {
+        "function": fqn, "service": svc, "plane": "3 (behavior)",
+        "denied_probe": denied, "allowed_probe": allowed,
+        "deep_link": deep_links.mcp_service(svc),
+        "next": f"Attach `{fqn}` to `{svc}` in the AI Gateway UI (Policies tab), then call "
+                f"`{deny_tool}` from an agent and confirm the structured DENY error.",
+        "beta_limits": "SQL-only policies; UI-only attachment; applies to all account "
+                       "users; evaluation is fail-closed (an error during evaluation "
+                       "means DENY).",
+    }
+    if denied["decision"] == "DENY" and allowed["decision"] == "ALLOW":
+        return _todo(
+            f"Policy logic verified: `{deny_tool}` → DENY, `{allow_tool}` → ALLOW. "
+            "Enforcement is not proven until the policy is attached (UI-only in Beta).",
+            **detail)
+    return _fail(f"Policy returned the wrong decision: `{deny_tool}` → "
+                 f"{denied['decision']}, `{allow_tool}` → {allowed['decision']}.", **detail)
+
+
+def t_mcp_external_readiness() -> TestResult:
+    """Plane 1 — prerequisites for registering an EXTERNAL/custom MCP server.
+
+    Reports the HTTP connections that exist (external MCP is registered behind one) and the
+    registration sequence. Read-only: creating a connection needs customer-specific
+    credentials, so it stays a guided step.
+    """
+    w = get_workspace_client()
+    conns = []
+    try:
+        for c in w.connections.list():
+            ctype = str(getattr(c, "connection_type", "") or "")
+            if "HTTP" in ctype.upper():
+                conns.append({"name": c.name, "type": ctype})
+    except Exception as e:
+        return _fail("Could not list connections.", error=str(e)[:300])
+    inv = mcp.list_mcp_services()
+    external = [s["name"] for s in (inv.get("services") or []) if not s["provided"]]
+    steps = [
+        "1. Catalog → Connections → Create connection → HTTP. Server URL + auth "
+        "(bearer token, OAuth M2M/U2M, or Dynamic Client Registration).",
+        "2. Register the MCP Service against that connection (AI Gateway → MCPs → "
+        "Register MCP Server) and select which tools to expose.",
+        "3. Complete per-user OAuth consent on the service page (Login).",
+        "4. GRANT EXECUTE on the mcp_service to the pilot group. Do NOT grant "
+        "USE CONNECTION to end users — it bypasses tool selection and auditing.",
+        "5. Invoke at /ai-gateway/mcp-services/{catalog}.{schema}.{name}.",
+    ]
+    if external:
+        return _ok(f"{len(external)} external MCP service(s) already registered.",
+                   external_services=external, http_connections=conns,
+                   plane="1 (authenticate)", registration_steps=steps)
+    return _todo(
+        "No external MCP services registered yet — this is the step that unlocks service "
+        "policies for a customer not yet using Databricks-hosted MCP.",
+        http_connections=conns, registration_steps=steps, plane="1 (authenticate)",
+        gotcha="Self-hosted servers must be STATELESS (e.g. FastMCP stateless_http=True). "
+               "A stateful server behind the replicated gateway proxy can fail the first "
+               "tools/call with a session error even though initialize and tools/list "
+               "succeeded.")
+
+
+def t_mcp_telemetry() -> TestResult:
+    """Telemetry — MCP call records in the Gateway usage table.
+
+    Sits across the planes rather than in one. Managed UC-native endpoints write NO
+    MCP-specific telemetry; MCP Services write a usage row and an mcpCall audit row (no
+    payloads — MCP payload logging is not in Beta).
+    """
+    sql = """
+      SELECT service_name, requester,
+             COUNT(*) AS calls,
+             SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) AS errors,
+             ROUND(AVG(latency_ms)) AS avg_latency_ms
+      FROM system.ai_gateway.usage
+      WHERE event_time > current_timestamp() - INTERVAL 7 DAYS
+        AND service_type = 'MCP_SERVICE'
+      GROUP BY 1, 2 ORDER BY calls DESC LIMIT 20
+    """
+    try:
+        rows = fetchall(sql)
+    except Exception as e:
+        return _fail("MCP telemetry query failed — needs SELECT on system.ai_gateway.",
+                     error=str(e)[:500], sql=sql)
+    if not rows:
+        return _todo(
+            "No MCP_SERVICE calls in the last 7 days. Call a tool (previous steps), then "
+            "re-run — records can lag a few minutes.", sql=sql,
+            note="Managed UC-native endpoints (/api/2.0/mcp/...) write no MCP-specific "
+                 "telemetry at all, so only MCP Service traffic appears here.")
+    return _ok(f"{len(rows)} requester/service pair(s) with MCP calls in the last 7 days.",
+               rows=rows, sql=sql,
+               note="Identity, service, and tool are recorded; ARGUMENTS AND RESULTS ARE "
+                    "NOT — MCP payload logging is not in the current Beta. Say this "
+                    "plainly if a customer asks about full request/response capture.")
+
+
 # --------------------------------------------------------------------------- Accelerator-only tests
 def t_external_provider_routing() -> TestResult:
     """Report which serving endpoints look like external-model providers routed through the
@@ -729,6 +1077,16 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "lakewatch_readiness": t_lakewatch_readiness,
     "external_provider_routing": t_external_provider_routing,
     "pii_safety_readiness": t_pii_safety_readiness,
+    # MCP accelerator (three planes of MCP governance)
+    "mcp_inventory": t_mcp_inventory,
+    "mcp_managed_tools": t_mcp_managed_tools,
+    "mcp_service_tools": t_mcp_service_tools,
+    "mcp_grants": t_mcp_grants,
+    "mcp_policy_target": t_mcp_policy_target,
+    "mcp_obo": t_mcp_obo,
+    "mcp_policy_enforcement": t_mcp_policy_enforcement,
+    "mcp_external_readiness": t_mcp_external_readiness,
+    "mcp_telemetry": t_mcp_telemetry,
 }
 
 

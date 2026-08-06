@@ -24,38 +24,173 @@ overview:
 accelerators:
   - id: acc_mcp
     title: MCP Servers
-    tagline: On-behalf-of authentication to a managed (or external) MCP server.
+    tagline: Managed vs external MCP, UC permissions, on-behalf-of identity, and policies.
     steps:
-      - id: acc_mcp_discover
-        title: Discover the MCP tool surface
+      - id: acc_mcp_two_kinds
+        title: Two kinds of MCP — and why it decides what you can govern
         concept: |
-          An MCP server exposes tools to agents. Before governing it, see the live tool list —
-          the same `tools/list` discovery the core Choice step uses, here as the accelerator's
-          starting point for a specific managed or external MCP.
+          Two different things are both called "MCP" on Databricks. Conflating them is the
+          most common source of confusion here, and it determines which controls you get:
+
+          - **Managed (UC-native) endpoints** — `/api/2.0/mcp/functions|genie|sql|ai-search`.
+            These expose Unity Catalog objects as tools. Governed by **authentication** and
+            **UC grants**. They are *not* `MCP_SERVICE` securables, so
+            **service policies cannot attach to them.**
+          - **MCP Services** — `/ai-gateway/mcp-services/<catalog>.<schema>.<name>`. Real UC
+            securables: the Databricks-provided `system.ai.*` services plus any
+            **external/custom** server you register behind an HTTP connection. These get UC
+            grants **and** service policies (ALLOW / DENY / ASK).
+
+          Three planes run in sequence on every governed tool call:
+
+          1. **Authenticate** — the OAuth scope decides which endpoint *family* you reach
+             (`unity-catalog`, `genie`, `ai-search`, `sql`). It grants no per-object access.
+          2. **Authorize** — UC grants decide the object: `USE CATALOG` + `USE SCHEMA` to
+             **see** a tool, `EXECUTE` to **call** it. Holding EXECUTE without the two USE
+             grants is the most common silent failure.
+          3. **Behavior** — service policies inspect the request/response and return
+             ALLOW / DENY / ASK. **MCP Services only.**
+
+          Start by listing what is actually registered on this metastore.
         action:
-          label: List MCP tools
-          test: list_endpoints
-      - id: acc_mcp_policy
-        title: Create a contextual service policy
+          label: List MCP services (provided & external)
+          test: mcp_inventory
+
+      - id: acc_mcp_managed
+        title: Managed MCP — UC objects as tools
         concept: |
-          A service policy is a UC SQL function that inspects each tool call and returns
-          ALLOW / DENY — e.g. allow reads, deny writes — enforced before the tool runs.
+          The managed endpoint turns the UC functions in a schema into MCP tools. Note the
+          deny behavior: a caller without `USE CATALOG` + `USE SCHEMA` gets an **empty
+          list**, not an error — *deny by absence*, at object grain. That is elegant, and it
+          means an empty result is ambiguous, so read the outcome carefully.
+
+          Governance here is UC grants plus column masks / ABAC on the underlying data.
+          Worth stating plainly: masks are an **access** control, not a **safety** control —
+          they don't stop prompt injection, and they don't constrain what an agent does
+          downstream with a result it was entitled to read.
         action:
-          label: Create the policy function
-          test: create_mcp_policy
-        manual:
-          label: Attach the policy in the AI Gateway UI
-          deep_link: mcp_service
+          label: List tools from the managed functions endpoint
+          test: mcp_managed_tools
+
+      - id: acc_mcp_service_tools
+        title: MCP Service — the live tool surface
+        concept: |
+          Now the other kind. This is a real `tools/call`-capable service, and the tool list
+          comes back live over JSON-RPC.
+
+          One protocol detail worth knowing before you debug this with a customer:
+          **JSON-RPC errors ride inside HTTP 200** over Streamable HTTP. Never infer success
+          from the status code. `MCP-Protocol-Version` is also required on every request
+          after `initialize`.
+        action:
+          label: List tools on the configured MCP service
+          test: mcp_service_tools
+
+      - id: acc_mcp_grants
+        title: Who is allowed to call it (Plane 2)
+        concept: |
+          The permission question a security team will ask first. Check it before writing any
+          policy, because this is the control that decides *callability*.
+
+          The finding that usually lands: **`system.ai` grants `EXECUTE` to all account
+          users by default**, so a provided service is open to the whole account until you
+          scope it. Recommended posture is **deny-by-absence** — register in a
+          customer-owned catalog and grant explicitly, rather than revoking inside
+          `system.ai`, where a schema-level revoke may not cascade to individual objects.
+        action:
+          label: Show UC grants on the MCP service
+          test: mcp_grants
+
       - id: acc_mcp_obo
         title: Prove on-behalf-of identity
         concept: |
-          The headline of MCP governance: when an agent calls the tool, it acts as the
-          **calling user**, not a shared service account — so if a user can't see a record,
-          neither can the agent. Probe a denied (write) tool and an allowed (read) tool to
-          prove the policy fires under the caller's identity.
+          The headline of MCP governance: the tool runs as the **calling user**, not a shared
+          service account. If a user can't see a record, neither can their agent — and no
+          per-provider secrets are handed out.
+
+          This calls a read tool that echoes the upstream identity, so you see a real name
+          come back rather than taking OBO on trust. Have two participants run it and compare
+          — different answers is the proof.
+
+          The honest limit: nothing today expresses *"the analyst may, but her agent may
+          not."* The only way to separate them is to give the agent its own identity,
+          typically a service principal.
+        action:
+          label: Call a read tool and show the caller's identity
+          test: mcp_obo
+
+      - id: acc_mcp_policy_target
+        title: Confirm a policy can attach here (Plane 3)
+        concept: |
+          The check that saves a wasted hour. Service policies attach **only** to
+          `MCP_SERVICE` securables. Point one at a managed UC-native endpoint and there is
+          nothing to attach to — the product surfaces this confusingly, so verify first.
+
+          Attaching needs `EXECUTE` on the policy function and `MANAGE` on the service.
+        action:
+          label: Verify the securable type
+          test: mcp_policy_target
+
+      - id: acc_mcp_policy
+        title: Write and verify a contextual policy
+        concept: |
+          A service policy is a UC SQL function taking `event VARIANT` and returning
+          **ALLOW**, **DENY**, or **ASK** (ASK pauses for human approval via URL-mode
+          elicitation, cached an hour). It runs **ON CALL** against the request and
+          **ON RESULT** against the response, and evaluation is **fail-closed** — an error
+          during evaluation means DENY.
+
+          Two implementation details that cost real debugging time: the function is
+          `to_variant_object(...)` (not `to_variant`, which doesn't exist), and VARIANT paths
+          need casting — `event:context.tool.name::STRING`.
+
+          There are three built-ins (`system.ai.block_unsafe_content`, `block_jailbreak`,
+          `block_hallucination`). There is **no** `block_pii` built-in.
+        action:
+          label: Create the policy function
+          test: create_mcp_policy
         verify:
-          label: Test write (expect DENY) and read (expect ALLOW)
-          test: test_mcp_policy
+          label: Verify DENY / ALLOW logic
+          test: mcp_policy_enforcement
+        manual:
+          label: Attach the policy in the AI Gateway UI
+          deep_link: mcp_service
+
+      - id: acc_mcp_external
+        title: External & custom MCP — the activation path
+        concept: |
+          The step that matters most for a customer **not yet running MCP on Databricks**,
+          because registering an external server is what unlocks service policies for them.
+
+          A custom server your team hosts is not a separate category — it registers and is
+          governed exactly like any external MCP Service: HTTP connection → MCP Service
+          securable → `EXECUTE` grant → policy → invoke through the gateway.
+
+          Two things to get right: don't grant `USE CONNECTION` to end users (it bypasses
+          tool selection and auditing), and make a self-hosted server **stateless** — a
+          stateful server behind the replicated gateway proxy can fail the first
+          `tools/call` even though `initialize` and `tools/list` both succeeded.
+        action:
+          label: Check external-MCP readiness & show the steps
+          test: mcp_external_readiness
+
+      - id: acc_mcp_telemetry
+        title: What was actually recorded
+        concept: |
+          Close the loop on evidence, and be precise about what exists — this is where
+          over-promising is easiest.
+
+          MCP Service calls write a **usage row** (identity, service, tool, latency, cost)
+          and an **`mcpCall` audit row**. Managed UC-native endpoints write **no MCP-specific
+          telemetry at all**.
+
+          **Arguments and results are not captured** — MCP payload logging is not in the
+          current Beta. So "no payload logging" does not mean "no auditability": you have
+          identity and tool name, just not the contents. Say that plainly rather than
+          implying full request/response capture.
+        action:
+          label: Show MCP calls from the Gateway usage table
+          test: mcp_telemetry
 
   - id: acc_agent_registry
     title: Agent Registry

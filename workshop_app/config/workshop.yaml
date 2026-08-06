@@ -42,18 +42,35 @@ governed_endpoint:
         - social security number
         - credit card number
 
-# Managed / built-in MCP service to demonstrate contextual policies on (Control pillar).
+# MCP service the workshop governs (Control pillar + MCP accelerator).
+#
+# Must be an MCP_SERVICE securable — a Databricks-provided `system.ai.*` service or an
+# external one you registered. The managed UC-native endpoints (/api/2.0/mcp/functions/...)
+# are NOT securables and cannot carry a service policy.
+#
+# Run the accelerator's first step to see what is actually registered here: availability
+# differs per workspace (one workspace exposed 6 provided services and returned 403 on
+# system.ai.atlassian, which needs per-user OAuth consent first).
 mcp:
-  builtin_service: system.ai.atlassian
+  builtin_service: system.ai.github
   service_policy:
-    function_name: confluence_mcp_policy
-    policy_name: confluence-write-block
-    # Tool names that the policy should DENY (write actions); everything else ALLOW.
+    function_name: mcp_read_only_policy
+    policy_name: mcp-write-block
+    # Tool names the policy DENIES; everything else is ALLOWed.
+    #
+    # NOTE: the provided `system.ai.github` service is already filtered to READ-ONLY tools,
+    # so there is no write tool on it to deny. `get_file_contents` is therefore used as the
+    # deny target — denying a tool that genuinely exists still proves enforcement, and it is
+    # honest about what this service exposes. Point this at a real write tool
+    # (e.g. `push_files`, `create_issue`) on an external MCP that exposes one.
     deny_tools:
-      - create_confluence_page
-      - update_confluence_page
-      - reply_to_confluence_comment
-    allow_probe_tool: search_confluence_pages   # a read tool used to prove ALLOW works
+      - get_file_contents
+    # Reason returned to the caller in the structured DENY error. Keep it specific — this is
+    # what a developer sees when the policy fires.
+    deny_reason: "Blocked by workshop policy: this tool is not permitted for the pilot group."
+    allow_probe_tool: get_commit      # a read tool used to prove ALLOW still works
+    # Read tool that echoes the calling user, used to prove on-behalf-of identity.
+    identity_probe_tool: get_me
 
 # Cost pillar — routing ROI.
 #

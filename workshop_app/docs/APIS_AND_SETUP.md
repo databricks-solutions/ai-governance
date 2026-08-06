@@ -141,6 +141,82 @@ signal. Dropped deliberately (see §8).
 | MCP service | Built-in (`system.ai.*`) | e.g. `system.ai.atlassian`. Grant with `GRANT EXECUTE`. |
 | Lakebase instance | **The bundle** | `CU_1`. Progress only — the workshop runs without it. |
 
+### Managed MCP vs MCP Services — the distinction that decides your controls
+
+Two different things are both called "MCP". Which one you point at determines whether a
+service policy can exist at all. All rows verified live on `fevm-shm-skunkworks`, 2026-08-06.
+
+| | **Managed (UC-native) endpoints** | **MCP Services** |
+|---|---|---|
+| URL | `/api/2.0/mcp/{functions,genie,sql,ai-search}/…` | `/ai-gateway/mcp-services/<catalog>.<schema>.<name>` |
+| UC securable | **No** — raw endpoints | **Yes** — `MCP_SERVICE` |
+| Service policies (ALLOW/DENY/ASK) | **Cannot attach** | **Supported** |
+| Auth scope | per family: `unity-catalog`, `genie`, `ai-search`, `sql` | per connection |
+| MCP-specific telemetry | **None** | usage row + `mcpCall` audit row |
+| Examples | UC functions, Genie, SQL, Vector Search | `system.ai.*`, plus external/custom |
+
+**Three planes**, in sequence on every call:
+
+1. **Authenticate** — the OAuth scope picks the endpoint *family*. It grants no per-object
+   access. A PAT can't be scope-limited and needs `all-apis`, so scoped OAuth is the
+   least-privilege choice.
+2. **Authorize** — UC grants: `USE CATALOG` + `USE SCHEMA` to **see** a tool, `EXECUTE` to
+   **call** it. Holding `EXECUTE` without the two `USE` grants is the most common silent
+   failure.
+3. **Behavior** — service policies, ON CALL and ON RESULT, fail-closed. MCP Services only.
+
+Deny behavior differs by endpoint, which matters when you interpret an empty list:
+
+- **UC functions / AI Search** — ungranted objects are **absent** from `tools/list`
+  (deny-by-absence, object grain). An empty list is ambiguous: no functions, or no grant.
+- **Databricks SQL** — three generic tools are always listed; denial happens at invocation.
+- **Genie** — tools are pinned to the `space_id` in the URL; scoping is at configuration time.
+
+**Live control-plane calls** (used by `server/mcp.py`):
+
+```bash
+# Every MCP_SERVICE securable on the metastore
+databricks api get /api/2.1/unity-catalog/mcp-services
+
+# Who may call one (Plane 2)
+databricks api get /api/2.1/unity-catalog/permissions/mcp_service/system.ai.github
+```
+
+Verified findings worth knowing before a customer session:
+
+- The metastore exposed **6** provided services (`github`, `slack`, `gmail`,
+  `google_drive`, `google_calendar`, `microsoft_365`). `system.ai.atlassian` returned
+  **403** — the securable exists but needs per-user OAuth consent. Availability is
+  per-workspace; enumerate rather than assume.
+- **`system.ai.github` grants `EXECUTE` to `account users`** — open to the whole account by
+  default. Prefer deny-by-absence (grant in a customer-owned catalog) over revoking inside
+  `system.ai`, where a schema-level revoke may not cascade.
+- **`system.ai.github` is already filtered to read-only** — 26 tools, 0 write-capable. There
+  is no `push_files` to deny on it, so a "deny writes" demo needs an external MCP that
+  actually exposes a write tool.
+- **OBO is real and demonstrable**: `tools/call get_me` returned the *caller's* GitHub
+  identity. Two participants get two different answers — that's the proof.
+
+**Protocol gotchas** (all cost real debugging time):
+
+- **JSON-RPC errors arrive inside HTTP 200** over Streamable HTTP. Never infer success from
+  the status code — check for a `result` key.
+- `MCP-Protocol-Version` is required on every request after `initialize`.
+- Responses may be SSE, so `Accept` must allow `text/event-stream` and the body may need
+  unwrapping from `data:` lines.
+- Self-hosted external servers must be **stateless** — a stateful server behind the
+  replicated gateway proxy can fail the first `tools/call` even after `initialize` and
+  `tools/list` succeed.
+
+**External MCP registration** (the activation path for a customer not yet on Databricks MCP):
+HTTP connection → register the MCP Service → per-user OAuth consent → `GRANT EXECUTE` →
+invoke. Do **not** grant `USE CONNECTION` to end users; it bypasses tool selection and
+auditing.
+
+**MCP payload logging is not in Beta.** Identity, service, and tool name are recorded;
+arguments and results are not. Say that plainly — "no payload logging" is not "no
+auditability", but it isn't full capture either.
+
 ### Service-policy function contract
 
 ```sql
