@@ -40,8 +40,11 @@ principal** — see §5 on why that matters.
 | API | SDK call | Used by |
 |---|---|---|
 | Serving endpoints — list | `w.serving_endpoints.list()` | `list_endpoints`, `external_provider_routing` |
-| Serving endpoints — get | `w.serving_endpoints.get(name)` | `verify_governed_endpoint` |
-| Serving endpoints — query | `w.serving_endpoints.query(name, messages=[ChatMessage(...)], max_tokens=...)` | `test_guardrail`, all routing steps |
+| Serving endpoints — get | `w.serving_endpoints.get(name)` | `verify_governed_endpoint`, `endpoint_acl` |
+| Serving endpoints — query | `w.serving_endpoints.query(name, messages=[ChatMessage(...)], max_tokens=...)` | `test_guardrail` |
+| Serving endpoints — ACL | `w.serving_endpoints.get_permissions(endpoint_id)` | `endpoint_acl` |
+| Gateway chat completions | `w.api_client.do("POST", "/ai-gateway/mlflow/v1/chat/completions", ...)` | all routing steps (see §7) |
+| UC permissions | `w.api_client.do("GET", "/api/2.1/unity-catalog/permissions/{type}/{name}")` | `default_access`, `mcp_grants` |
 | SQL Statement Execution | `w.statement_execution.execute_statement(warehouse_id, statement, wait_timeout)` | every system-table query, the policy DDL |
 | Registered models — list | `w.registered_models.list(catalog_name, schema_name)` | `list_registered_assets` |
 | UC functions — list | `w.functions.list(catalog_name, schema_name)` | `list_registered_assets` (avoids a `system` grant) |
@@ -58,6 +61,15 @@ They surface as `action_required`, not as passes.
 `serving_endpoints.query` accepts many mutually exclusive payload shapes. For chat endpoints
 it must be `messages=[ChatMessage(role=..., content=...)]`. Passing `messages=None` is
 accepted by the SDK and sends **no prompt** — a silent no-op that looks like a pass.
+
+### Why the routing steps bypass the SDK
+
+`serving_endpoints.query()` is hard-wired to `POST /serving-endpoints/{name}/invocations` — the
+**legacy** contract — and it exposes no way to add headers, so it cannot carry
+`Databricks-Ai-Gateway-Request-Tags`. `server/routing.py` therefore calls
+`/ai-gateway/mlflow/v1/chat/completions` through `api_client.do()` instead. The Gateway path
+accepts a plain endpoint name in `model` (not just a service FQN), so this needed no config
+change. See §7 and `API_REFERENCE.md` §3.
 
 ---
 
@@ -323,6 +335,19 @@ Two honesty properties built in:
 - **Fails safe** — a classifier error routes to the frontier model, never silently down.
 - **Counterfactual is labelled** — frontier cost is priced on the *routed* response's token
   counts, so it is a close per-request estimate, not an exact figure.
+
+### Request tags on every routed call
+
+Each model call carries `Databricks-Ai-Gateway-Request-Tags` (project, cost_center,
+environment, use_case) so its tokens attribute to the workshop project in
+`system.ai_gateway.usage.request_tags`. That is what lets `cost_usage` show attribution the room
+just generated, rather than whatever traffic happened to exist beforehand.
+
+Two caveats to state out loud:
+- Request tags are **caller-supplied** — an attribution signal, never an enforcement boundary.
+  Budget filters must use server-side `endpoint_tags`, which the caller cannot change.
+- The usage table is **not real-time**. Rows can take minutes to appear, so `cost_usage` says so
+  rather than letting an empty result read as "tagging is broken."
 
 ---
 

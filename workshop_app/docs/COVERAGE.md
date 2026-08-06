@@ -1,6 +1,6 @@
 # Coverage: workshop vs. the POC DOC, Adoption, and Migration guides
 
-Gap-check of the 18 core workshop steps against three sources of truth:
+Gap-check of the 20 core workshop steps against three sources of truth:
 
 - **AI Governance POC DOC** — the four pillars the POC is measured on
   (**Cost / Usage / Access / Inventory**) and its three phases.
@@ -16,10 +16,10 @@ All three are marked IN PROGRESS (GA launch edition, 2026-08-04).
 | Phase | Duration | What happens |
 |---|---|---|
 | **Prereqs** | ~1 week | Entitlements, grants, previews, pilot users. See `PREREQUISITES.md`. |
-| **Workshop** | **4 hours** | Test and validate live, in their workspace. The 18 core steps. |
+| **Workshop** | **4 hours** | Test and validate live, in their workspace. The 20 core steps. |
 | **Follow-up (POC)** | 1–2 weeks | Close what didn't land; the app's exported outcomes drive it. |
 
-Everything below is judged against that budget. **4 hours is ~18 steps at ~12 minutes each
+Everything below is judged against that budget. **4 hours is ~20 steps at ~11 minutes each
 including discussion** — there is no room for a feature checklist, so every "not covered" is
 a deliberate call with a stated reason.
 
@@ -203,13 +203,13 @@ From the guides' risk tables — the ones that actually bite:
 
 ## 7. Verdict
 
-**18 core steps + 21 accelerator steps.** Coverage of the POC DOC's four pillars is complete
+**20 core steps + 21 accelerator steps.** Coverage of the POC DOC's four pillars is complete
 except two items that need accumulated traffic (monitoring drift, latency benchmark). Coverage
 of the Adoption Guide's target state is good; the one real gap was the *object model and client
 contract*, now `choice_model_services`.
 
-Fits the delivery shape: **~1 week prereqs → 4 hours live → 1–2 weeks follow-up.** 18 steps at
-~12 minutes each with discussion is a full 4 hours with a little air in it — enough to let a
+Fits the delivery shape: **~1 week prereqs → 4 hours live → 1–2 weeks follow-up.** 20 steps at
+~11 minutes each with discussion is a full 4 hours with a little air in it — enough to let a
 good question run without losing the last pillar.
 
 The omissions are right for that budget. Inventory is pre-work, migration is a multi-week
@@ -228,3 +228,18 @@ step named after it checked readiness for a product the room could not use — a
 telemetry it probed is already proven by `cost_usage` and `control_audit`. The check itself
 survives as `telemetry_readiness` in the Agent Registry accelerator, where telemetry is the
 point. Recovered ~10 minutes.
+
+**Since added**, from the enablement-doc gap analysis (`GAP_ANALYSIS_ENABLEMENT.md`), spending
+that recovered budget:
+
+- `choice_default_access` — what all account users can already reach. The enablement doc's
+  step 1, and the finding that lands hardest: `system.ai` grants `EXECUTE` to `account users`
+  by default, so every control downstream sits beside an open path rather than in front of it.
+- `control_endpoint_acl` — `CAN_QUERY` / `CAN_MANAGE` on the governed endpoint. The doc's
+  primary access-control mechanism, and `CAN_MANAGE` restriction is what prevents shadow
+  endpoints.
+
+Net: 20 steps in the same 4 hours. Request tags were the third item and cost no time — the
+routing steps now send `Databricks-Ai-Gateway-Request-Tags` on every call, and `cost_usage`
+splits request- from endpoint-tagged traffic so the trust boundary is visible rather than
+asserted.

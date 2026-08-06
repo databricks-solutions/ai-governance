@@ -21,6 +21,17 @@ These cannot be fixed on the day. Nothing else matters if these are missing.
 | 3 | **`SELECT` on `system.access`** for the app's service principal | Audit trail, secret-leak scan | Account or metastore admin |
 | 4 | **Service policies (Beta) enabled** — only if MCP policy steps are in scope | Attaching an ALLOW/DENY policy | Account admin |
 | 5 | **Managed MCP preview enabled** — only if MCP steps are in scope | `/api/2.0/mcp/...` endpoints | Account admin |
+| 6 | *Optional:* ability to **read grants on `system`** (MANAGE or metastore-admin) | `choice_default_access` reads them directly instead of asking an admin mid-session | Metastore admin |
+
+On item 6: reading grants needs ownership, `MANAGE`, or metastore-admin, which the app's service
+principal normally does **not** have on `system`. Without it the step reports "ask an admin" and
+gives the statement to run — the finding still lands, it just costs a minute in the room. If you
+can get it in advance, do; if not, have an admin ready to run:
+
+```sql
+SHOW GRANTS ON SCHEMA system.ai;   -- look for EXECUTE granted to `account users`
+SHOW GRANTS ON CATALOG system;     -- the grant is inherited from here
+```
 
 `deploy.sh` prints the exact GRANT statements with the real service principal filled in:
 
@@ -125,10 +136,11 @@ The workshop is 4 hours and deliberately does **not** try to prove every Gateway
 Resist adding boxes; the goal is a governed path that demonstrably works, not exhaustive
 coverage.
 
-**In scope — the 18 core steps:** one governed endpoint, model/tool/agent inventory, a
-policy that visibly denies something, a guardrail that blocks a prompt, a rate limit, spend
-visible in dollars, per-developer coding-agent attribution, a measured routing saving, cost
-attribution by tag, and an audit trail.
+**In scope — the 20 core steps:** the open-by-default posture on `system.ai`, one governed
+endpoint and who may call it, model/tool/agent inventory, a policy that visibly denies
+something, a guardrail that blocks a prompt, a rate limit, spend visible in dollars,
+per-developer coding-agent attribution, a measured routing saving, cost attribution by tag,
+and an audit trail.
 
 **Deferred to accelerators or follow-up:** exhaustive per-agent parity, enterprise-wide role
 design, whole-agent runtime guardrails, budget hard-blocking (still rolling out), MCP payload

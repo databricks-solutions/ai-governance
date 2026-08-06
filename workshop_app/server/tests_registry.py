@@ -87,6 +87,12 @@ API_INDEX = "https://docs.databricks.com/api/workspace/aigateway"
 # the app is doing to their workspace.
 API_DOCS: dict[str, dict[str, str]] = {
     "connection": {"api": "POST /api/2.0/sql/statements (SELECT 1)"},
+    "default_access": {
+        "api": "GET /api/2.1/unity-catalog/permissions/{catalog|schema}/{name}",
+        "note": "Read-only — reports the default grants, never revokes them."},
+    "endpoint_acl": {
+        "api": "GET /api/2.0/permissions/serving-endpoints/{endpoint_id}",
+        "note": "Takes the endpoint ID, not its name."},
     "workspace_context": {"api": "local config + GET /api/2.0/preview/scim/v2/Me"},
     "routing_panel": {"api": "none — reads config/workshop.yaml",
                       "note": "Prices are config, not a live API."},
@@ -204,6 +210,173 @@ def t_model_services() -> TestResult:
                migration_note="No in-place rename exists. Run the new service alongside the "
                               "old endpoint, validate on real traffic, move clients in "
                               "stages, then revoke the old path.")
+
+
+# Principals that mean "effectively everyone on the account". Matched case-insensitively
+# against the grant's principal. `account users` is the one that actually appears by default.
+_BROAD_PRINCIPALS = {"account users", "users", "all account users"}
+
+# Privileges that let a principal REACH a model through the securable, as opposed to merely
+# seeing that it exists. USE_SCHEMA/USE_CATALOG alone are traversal, not access.
+_REACH_PRIVILEGES = {"EXECUTE", "ALL_PRIVILEGES"}
+
+
+def _broad_grants(privilege_assignments: list[dict]) -> list[dict]:
+    """Assignments that give a reach privilege to an everyone-shaped principal."""
+    out = []
+    for a in privilege_assignments or []:
+        principal = (a.get("principal") or "").strip().lower()
+        privileges = {str(p).upper() for p in (a.get("privileges") or [])}
+        if principal in _BROAD_PRINCIPALS and (privileges & _REACH_PRIVILEGES):
+            out.append({"principal": a.get("principal"),
+                        "privileges": sorted(privileges)})
+    return out
+
+
+def t_default_access() -> TestResult:
+    """What can EVERYONE already reach before any governance is applied?
+
+    The first question a security team asks, and the one the workshop used to skip. Every
+    control downstream is theatre if the default path is wide open — so this runs early, in
+    Choice, and it is read-only.
+
+    Verified live on a reference workspace: `system.ai` grants EXECUTE, SELECT, READ_VOLUME
+    and USE_SCHEMA to `account users`, inherited from the `system` catalog. That is the
+    Databricks default, not a misconfiguration, and it means every account user can call
+    every provided model service until it is scoped.
+
+    Deliberately reports rather than remediates: revoking on `system` is a decision for the
+    platform owner, and an app should not silently narrow access on a customer's metastore.
+    """
+    w = get_workspace_client()
+    findings, errors = [], {}
+
+    for securable_type, name in (("catalog", "system"), ("schema", "system.ai")):
+        try:
+            resp = w.api_client.do(
+                "GET", f"/api/2.1/unity-catalog/permissions/{securable_type}/{name}")
+        except Exception as e:  # noqa: BLE001 — one unreadable securable shouldn't fail the step
+            errors[f"{securable_type}:{name}"] = str(e)[:300]
+            continue
+        assignments = (resp or {}).get("privilege_assignments", []) or []
+        findings.append({
+            "securable": f"{securable_type} {name}",
+            "broad_grants": _broad_grants(assignments),
+            "all_assignments": [
+                {"principal": a.get("principal"), "privileges": a.get("privileges")}
+                for a in assignments],
+        })
+
+    open_securables = [f for f in findings if f["broad_grants"]]
+    # Reading grants on a securable needs ownership, MANAGE, or metastore-admin. The app's
+    # service principal usually has none of those on `system`, so a permission error here is
+    # an expected outcome that must read as "ask an admin", not as a broken test.
+    denied = {k: v for k, v in errors.items()
+              if any(s in v.lower() for s in ("permission", "does not have", "denied",
+                                              "unauthorized", "403"))}
+    detail = {
+        "findings": findings,
+        "errors": errors or None,
+        "why_this_matters": (
+            "EXECUTE on system.ai lets any account user call any provided model service "
+            "directly, bypassing whatever governed service you stand up later."),
+        "recommended_actions": [
+            "REVOKE EXECUTE ON SCHEMA system.ai FROM `account users` (check the `system` "
+            "catalog too — the grant is inherited).",
+            "Register the models you approve as model services in a customer-owned catalog "
+            "and grant EXECUTE to named groups.",
+            "Remove CAN_QUERY from broad groups on Foundation Model API endpoints "
+            "(see the endpoint ACL check in Control).",
+        ],
+        "note": ("Read-only. Narrowing access on `system` is a platform-owner decision, so "
+                 "the workshop reports it rather than changing it."),
+    }
+    if not findings:
+        if denied:
+            return _todo(
+                "This app's identity cannot read grants on `system` — that needs MANAGE on the "
+                "securable or metastore-admin. Have an admin run "
+                "`SHOW GRANTS ON SCHEMA system.ai` and check for `EXECUTE` granted to "
+                "`account users`; it is the default and it is the finding that matters.",
+                **detail)
+        return _fail("Could not read grants on `system` / `system.ai`.", **detail)
+    if open_securables:
+        names = ", ".join(f["securable"] for f in open_securables)
+        return _todo(
+            f"Open by default: {names} grant(s) reach privileges to all account users — "
+            "every user on the account can call the provided models today. Scope this before "
+            "rollout; it is the first action on the lockdown list.",
+            **detail)
+    if denied:
+        # Partial read: report what was seen, but don't let it imply the rest is clean.
+        return _todo(
+            f"Read {len(findings)} of 2 securables and found no broad grant there, but "
+            f"{', '.join(denied)} could not be read (needs MANAGE or metastore-admin). Have an "
+            "admin confirm the rest before calling the default path scoped.",
+            **detail)
+    return _ok("No everyone-shaped principal holds EXECUTE on `system` or `system.ai` — the "
+               "default model path is already scoped.", **detail)
+
+
+def t_endpoint_acl() -> TestResult:
+    """Who can call the governed endpoint — the doc's primary access-control mechanism.
+
+    Endpoint ACLs (CAN_QUERY / CAN_VIEW / CAN_MANAGE) are the "who may use this model?"
+    control, and CAN_MANAGE restriction is what prevents shadow endpoints.
+
+    One API detail that costs a debugging cycle: get_permissions() takes the endpoint's
+    **id**, not its name — passing the name returns "is not a valid Inference Endpoint ID".
+    Provided foundation-model endpoints also have no id at all (they are not workspace
+    securables), so they cannot carry an ACL; that is why `system.ai` grants above are the
+    control for those, and this step says so instead of reporting a confusing failure.
+    """
+    name = get_config().get("governed_endpoint", {}).get("name")
+    w = get_workspace_client()
+    try:
+        ep = w.serving_endpoints.get(name)
+    except Exception as e:
+        return _todo(f"Endpoint `{name}` does not exist yet — create it, then re-run.",
+                     endpoint=name, error=str(e)[:300])
+    if not ep.id:
+        return _todo(
+            f"`{name}` has no endpoint id, so it carries no workspace ACL — it is a "
+            "provided foundation-model endpoint. Govern these with UC grants on the model "
+            "service instead (see 'What can everyone already reach?' in Choice).",
+            endpoint=name)
+    try:
+        perms = w.serving_endpoints.get_permissions(ep.id)
+    except Exception as e:
+        return _fail(f"Could not read the ACL on `{name}`.", endpoint=name, error=str(e)[:300])
+
+    acl = []
+    for a in (perms.access_control_list or []):
+        principal = a.user_name or a.group_name or a.service_principal_name
+        levels = sorted({str(p.permission_level).split(".")[-1]
+                         for p in (a.all_permissions or []) if p.permission_level})
+        acl.append({"principal": principal,
+                    "is_group": bool(a.group_name),
+                    "levels": levels})
+
+    broad_query = [e for e in acl
+                   if e["is_group"] and (e["principal"] or "").lower() in _BROAD_PRINCIPALS
+                   and any(l in ("CAN_QUERY", "CAN_MANAGE") for l in e["levels"])]
+    managers = [e for e in acl if "CAN_MANAGE" in e["levels"]]
+    detail = {
+        "endpoint": name,
+        "acl": acl,
+        "levels_available": ["CAN_VIEW", "CAN_QUERY", "CAN_MANAGE"],
+        "can_manage_holders": [e["principal"] for e in managers],
+        "note": ("CAN_MANAGE is the shadow-endpoint risk: it allows reconfiguring the model "
+                 "and removing the controls layered on it. Keep it with platform admins."),
+    }
+    if broad_query:
+        return _todo(
+            f"`{broad_query[0]['principal']}` holds "
+            f"{'/'.join(broad_query[0]['levels'])} on `{name}` — the governed endpoint is "
+            "open to everyone. Scope it to the pilot group.",
+            **detail)
+    return _ok(f"`{name}` ACL is scoped: {len(acl)} principal(s), "
+               f"{len(managers)} with CAN_MANAGE.", **detail)
 
 
 def t_routing_panel() -> TestResult:
@@ -547,15 +720,28 @@ def t_test_mcp_policy() -> TestResult:
 
 # --------------------------------------------------------------------------- Cost + Control (attribution, usage & observability)
 def t_apply_tags() -> TestResult:
-    """Report the tags to apply. Tagging is a guided step, so this is a to-do, not a pass."""
+    """Report the tags to apply. Tagging is a guided step, so this is a to-do, not a pass.
+
+    Also shows the REQUEST-tag side, which the workshop does exercise: the routing steps send
+    `Databricks-Ai-Gateway-Request-Tags` on every model call, so a customer can see both
+    columns (`endpoint_tags` vs `request_tags`) in the usage query and understand which one
+    is trustworthy for a budget filter.
+    """
     cfg = get_config()
     proj = cfg.get("project", {})
     name = cfg.get("governed_endpoint", {}).get("name")
     return _todo(
         f"Apply these tags to `{name}` in the workspace, then re-run the usage query.",
         endpoint=name,
-        tags=proj,
+        server_side_tags=proj,
+        request_tags_sent_by_this_app=routing.request_tags(),
+        request_tags_header=routing.REQUEST_TAGS_HEADER,
         deep_link=deep_links.serving_endpoint(name),
+        trust_boundary=(
+            "Server-side tags are set by the platform owner on the service and apply to every "
+            "request — the only kind safe to use as a budget or chargeback filter. Request "
+            "tags are supplied by the caller and can be omitted or forged, so they are for "
+            "attribution and analytics only."),
         note="Tag application is a guided step to avoid unattended writes on a customer "
              "endpoint; these tags drive the usage-by-project query in the next step.",
     )
@@ -570,8 +756,14 @@ def t_usage_by_project() -> TestResult:
     """
     proj = get_config().get("project", {}).get("name", "")
     p = _sql_str(proj)
+    # Break out WHICH tag matched rather than OR-ing them together. The distinction is the
+    # teaching point: request_tags rows are the ones this app produced by sending a header,
+    # endpoint_tags rows come from the server-side tags the platform owner set. A single
+    # combined count hides which mechanism is actually working.
     sql = f"""
       SELECT requester,
+             SUM(CASE WHEN request_tags['project'] = {p} THEN 1 ELSE 0 END) AS request_tagged,
+             SUM(CASE WHEN endpoint_tags['project'] = {p} THEN 1 ELSE 0 END) AS endpoint_tagged,
              COUNT(*) AS requests,
              SUM(total_tokens) AS tokens
       FROM system.ai_gateway.usage
@@ -579,16 +771,48 @@ def t_usage_by_project() -> TestResult:
         AND (request_tags['project'] = {p} OR endpoint_tags['project'] = {p})
       GROUP BY requester ORDER BY tokens DESC LIMIT 20
     """
+    # How far behind real time the table is. Reported on the empty result because otherwise an
+    # ingestion lag is indistinguishable from broken tagging — observed 13-21 minutes on a
+    # reference workspace, which is long enough for a room to start debugging a working control.
+    watermark_sql = ("SELECT max(event_time) AS latest_event, "
+                     "current_timestamp() AS now_ts FROM system.ai_gateway.usage")
     try:
         rows = fetchall(sql)
         if rows:
-            return _ok(f"Usage attributed to project `{proj}`: {len(rows)} requester(s).",
-                       rows=rows, sql=sql)
+            by_request = sum(int(r.get("request_tagged") or 0) for r in rows)
+            by_endpoint = sum(int(r.get("endpoint_tagged") or 0) for r in rows)
+            return _ok(
+                f"Usage attributed to project `{proj}`: {len(rows)} requester(s) — "
+                f"{by_request} request-tagged, {by_endpoint} endpoint-tagged.",
+                rows=rows, request_tagged_calls=by_request,
+                endpoint_tagged_calls=by_endpoint,
+                request_tags_header=routing.REQUEST_TAGS_HEADER,
+                interpretation=(
+                    "Request-tagged calls prove per-caller attribution works end to end. "
+                    "Endpoint-tagged calls are the ones a FinOps owner can trust as a budget "
+                    "filter, because the caller cannot change them."),
+                sql=sql)
         # No rows is a real (and common) outcome, not a pass: nothing is attributable yet.
+        # Report the table's watermark so "not ingested yet" is distinguishable from "broken".
+        freshness = {}
+        try:
+            wm = fetchall(watermark_sql)
+            if wm:
+                freshness = {"latest_event_in_table": str(wm[0].get("latest_event")),
+                             "queried_at": str(wm[0].get("now_ts"))}
+        except Exception as e:  # noqa: BLE001 — freshness is a diagnostic, not the test
+            freshness = {"error": str(e)[:200]}
         return _todo(
-            f"No usage tagged `project={proj}` in the last 7 days. Tag the endpoint "
-            "(previous step), send traffic through it, then re-run.",
-            rows=[], sql=sql)
+            f"No usage tagged `project={proj}` in the last 7 days. Run the Cost routing steps "
+            "(they send the request-tag header), tag the endpoint for the server-side side, "
+            "then re-run.",
+            rows=[],
+            table_freshness=freshness,
+            lag_note=("Compare `latest_event_in_table` with `queried_at` before concluding "
+                      "anything: system.ai_gateway.usage is not real-time (a 13-21 minute lag "
+                      "was observed on a reference workspace). If the gap covers when the "
+                      "routing steps ran, the rows simply have not landed yet."),
+            sql=sql)
     except Exception as e:
         return _fail("Usage query failed.", error=str(e)[:600], sql=sql)
 
@@ -1169,6 +1393,8 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "workspace_context": t_workspace_context,
     "list_endpoints": t_list_endpoints,
     "model_services": t_model_services,
+    "default_access": t_default_access,
+    "endpoint_acl": t_endpoint_acl,
     "rate_limits": t_rate_limits,
     "routing_panel": t_routing_panel,
     "routing_compare": t_routing_compare,

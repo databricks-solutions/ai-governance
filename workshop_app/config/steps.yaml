@@ -57,6 +57,26 @@ pillars:
           label: List serving endpoints
           test: list_endpoints
 
+      - id: choice_default_access
+        title: What can everyone already reach?
+        concept: |
+          Before adding a single control, look at the default. `system.ai` ships with
+          **`EXECUTE` granted to `account users`** — inherited from the `system` catalog — so
+          every user on the account can call every provided model service right now, without
+          going near anything you are about to build.
+
+          This is the Databricks default, not a misconfiguration. But it means a governed
+          endpoint with guardrails, rate limits, and budgets sits *beside* an open path rather
+          than in front of it. Locking down the default is the first action on the rollout
+          list, and it is the finding that lands hardest with a security team.
+
+          This step is **read-only** — it reports the grants and names the remediation.
+          Narrowing access on `system` is a platform-owner decision, so the workshop shows it
+          rather than changing it on your metastore.
+        action:
+          label: Show what all account users can reach
+          test: default_access
+
       - id: choice_model_services
         title: The governed object — and the one client change
         concept: |
@@ -217,6 +237,15 @@ pillars:
           per-request by the caller (`Databricks-Ai-Gateway-Request-Tags`) and are great for
           attribution and analytics, but they are **caller-controlled** — never use them as an
           enforcement boundary.
+
+          The request-tag half is already running: every model call in the routing steps above
+          was sent with that header, so those tokens attribute to this project. The next step
+          shows both columns side by side.
+
+          Worth knowing if you go to instrument your own client: the Databricks SDK's
+          `serving_endpoints.query()` cannot send this header at all — it targets the legacy
+          invocations path and takes no headers. Tagging means calling
+          `/ai-gateway/mlflow/v1/chat/completions` directly, which is what this app does.
         action:
           label: Apply project tags
           test: apply_tags
@@ -224,9 +253,19 @@ pillars:
       - id: cost_usage
         title: Usage & cost by project
         concept: |
-          With tags in place, `system.serving.endpoint_usage` and `system.billing.usage`
-          roll up tokens and DBU cost by project — the foundation of AI FinOps and the
-          visibility that makes AI spend predictable.
+          With tags in place, `system.ai_gateway.usage` rolls up tokens by project — the
+          foundation of AI FinOps and the visibility that makes AI spend predictable.
+
+          The result splits the count two ways on purpose: **request-tagged** calls (the ones
+          this app sent with the header) prove per-caller attribution works end to end, while
+          **endpoint-tagged** calls are the ones a FinOps owner can trust as a budget filter
+          because the caller cannot change them. Both, ideally.
+
+          **The table is not real-time, and this trips people up.** On a reference workspace the
+          latest recorded event stayed 13-21 minutes behind the wall clock. So an empty result right
+          after the routing steps means *not ingested yet*, not *tagging is broken* — check
+          `SELECT max(event_time) FROM system.ai_gateway.usage` before you start debugging a
+          control that is actually working.
         action:
           label: Query usage by project tag
           test: usage_by_project
@@ -247,6 +286,24 @@ pillars:
         verify:
           label: Check endpoint config
           test: verify_governed_endpoint
+
+      - id: control_endpoint_acl
+        title: Who is allowed to call it
+        concept: |
+          The access question, at endpoint grain: **`CAN_QUERY`**, `CAN_VIEW`, and
+          `CAN_MANAGE`. Two things to read carefully in the result:
+
+          - A broad group holding `CAN_QUERY` means the governed endpoint is open to everyone,
+            which undoes the scoping you set up in Choice.
+          - `CAN_MANAGE` is the **shadow-endpoint risk** — it lets someone reconfigure the
+            model or strip the guardrails off it. Keep it with platform admins only.
+
+          Note what this does *not* cover: provided foundation-model endpoints have no
+          workspace ACL at all. Those are governed by the UC grants on the model service — the
+          two controls are separate, and you need both.
+        action:
+          label: Show the endpoint ACL
+          test: endpoint_acl
 
       - id: control_guardrails
         title: Guardrails on a model service

@@ -30,9 +30,27 @@ import concurrent.futures
 import json
 import time
 
-from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
-
 from .config import get_config, get_workspace_client
+
+# Per-request cost attribution. The caller supplies a JSON object of string->string and it
+# lands in `request_tags` in system.ai_gateway.usage, which is how per-project chargeback
+# works without a server-side tag on every service.
+#
+# Why this module calls the gateway path directly instead of w.serving_endpoints.query():
+# the SDK's query() is hard-wired to the LEGACY /serving-endpoints/{name}/invocations path and
+# exposes no way to set headers, so it cannot carry the request-tag header at all. The gateway
+# path accepts a plain endpoint name in `model`, so no config change was needed.
+#
+# Request tags are CALLER-supplied: an attribution signal, never an enforcement boundary.
+# Server-side (endpoint/service) tags are the trustworthy ones for a budget filter.
+#
+# NOTE on verifying this: system.ai_gateway.usage lags real time by many minutes — on a
+# reference workspace max(event_time) stayed 13-21 minutes behind wall clock across a 20-minute
+# window. An empty result right after a call means "not ingested yet", NOT "the tag was
+# dropped". Always compare max(event_time) to current_timestamp() before concluding anything;
+# reading that lag as a dropped tag is an easy and expensive mistake.
+REQUEST_TAGS_HEADER = "Databricks-Ai-Gateway-Request-Tags"
+GATEWAY_CHAT_PATH = "/ai-gateway/mlflow/v1/chat/completions"
 
 # Fallback panel, used when config/workshop.yaml has no `cost.routing` block. Prices are
 # public list rates per million tokens; `unit` says how to convert. Endpoints are the
@@ -143,8 +161,24 @@ def _extract_text(content) -> str:
     return str(content) if content is not None else ""
 
 
+def request_tags() -> dict:
+    """The project tags this workshop attaches to every model call it makes.
+
+    Same values as the server-side tags in the Cost pillar, so a customer can compare the
+    two paths in `system.ai_gateway.usage` — `request_tags` (these) vs `endpoint_tags`.
+    """
+    proj = get_config().get("project", {}) or {}
+    keys = ("name", "cost_center", "environment", "use_case")
+    tags = {("project" if k == "name" else k): str(proj[k]) for k in keys if proj.get(k)}
+    return tags
+
+
 def query(model_key: str, prompt: str, max_tokens: int | None = None) -> dict:
     """Call one model and return the answer plus measured tokens, latency, and cost.
+
+    Calls the Gateway path (`/ai-gateway/mlflow/v1/chat/completions`) with an FQN or endpoint
+    name in `model`, rather than the SDK's `serving_endpoints.query()`, because query() targets
+    the legacy invocations path and cannot set the request-tag header.
 
     Never raises: an endpoint that is missing or throttled becomes an `error` field so a
     live workshop shows a clear message on one card instead of failing the whole step.
@@ -152,22 +186,29 @@ def query(model_key: str, prompt: str, max_tokens: int | None = None) -> dict:
     m = models()[model_key]
     max_tokens = max_tokens or DEFAULT_MAX_TOKENS
     w = get_workspace_client()
+    tags = request_tags()
     start = time.monotonic()
     base = {"model_key": model_key, "label": m["label"], "tier": m["tier"],
-            "endpoint": m["endpoint"]}
+            "endpoint": m["endpoint"], "request_tags": tags,
+            "gateway_path": GATEWAY_CHAT_PATH}
     try:
-        resp = w.serving_endpoints.query(
-            name=m["endpoint"],
-            messages=[ChatMessage(role=ChatMessageRole.USER, content=prompt)],
-            max_tokens=max_tokens,
+        resp = w.api_client.do(
+            "POST", GATEWAY_CHAT_PATH,
+            headers={"Content-Type": "application/json", "Accept": "application/json",
+                     REQUEST_TAGS_HEADER: json.dumps(tags)},
+            body={"model": m["endpoint"],
+                  "messages": [{"role": "user", "content": prompt}],
+                  "max_tokens": max_tokens},
         )
         duration = time.monotonic() - start
-        usage = resp.usage
-        in_tok = (usage.prompt_tokens or 0) if usage else 0
-        out_tok = (usage.completion_tokens or 0) if usage else 0
+        usage = (resp or {}).get("usage") or {}
+        in_tok = usage.get("prompt_tokens") or 0
+        out_tok = usage.get("completion_tokens") or 0
+        choices = (resp or {}).get("choices") or []
+        content = (choices[0].get("message") or {}).get("content") if choices else None
         return {
             **base,
-            "answer": _extract_text(resp.choices[0].message.content),
+            "answer": _extract_text(content),
             "input_tokens": in_tok,
             "output_tokens": out_tok,
             "duration_s": round(duration, 2),
@@ -293,6 +334,13 @@ def panel() -> dict:
     return {
         "models": out,
         "dbu_to_usd": dbu_to_usd(),
+        "request_tags": request_tags(),
+        "request_tags_header": REQUEST_TAGS_HEADER,
+        "attribution_note": (
+            f"Every model call below is sent through {GATEWAY_CHAT_PATH} with the "
+            f"{REQUEST_TAGS_HEADER} header, so its tokens attribute to this project in "
+            "system.ai_gateway.usage.request_tags. Request tags are caller-supplied — use "
+            "them for attribution, never as an enforcement boundary."),
         "classifier_model": M[CLASSIFIER_KEY]["label"],
         "routing_map": {str(k): M[v]["label"] for k, v in COMPLEXITY_TO_MODEL.items()},
         "complexity_defs": {str(k): v for k, v in COMPLEXITY_DEFS.items()},

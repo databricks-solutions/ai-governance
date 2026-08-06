@@ -1,6 +1,6 @@
 # Gap analysis: workshop vs. the Unity AI Gateway Enablement doc
 
-Feature-by-feature check of the 18 core steps + 21 accelerator steps against
+Feature-by-feature check of the core workshop steps + 21 accelerator steps against
 *Unity AI Gateway Enablement* (July 2026), which is a **customer-enablement** document —
 i.e. what one specific customer needs to stand this up, not what the product can do.
 
@@ -15,12 +15,18 @@ Buckets, as requested:
 - **MUST HAVE — ACCELERATOR X** — needed, but belongs in a named accelerator.
 - **NICE TO HAVE** — for the customer fork, not the general workshop.
 
+> **Status (2026-08-06): all three BASE items are implemented and verified live.** The core
+> workshop is now **20 steps** (choice 5 / cost 8 / control 7), still inside 4 hours — the two
+> new steps spend the budget recovered by cutting `control_lakewatch`, and request tags cost no
+> extra time. Accelerator and fork items below remain proposals. Implementation notes are
+> inline under each item; the surprises are in §"What testing changed".
+
 ---
 
 ## MUST HAVE — BASE WORKSHOP
 
 ### 1. Lock down the default: `system.ai` is open to all account users
-**Gap. This is the doc's step 1 and we don't do it.**
+**Gap → ✅ IMPLEMENTED as `choice_default_access` (test `default_access`).**
 
 The doc's baseline is *"block broad model-serving access first"* — restrict `USE_SCHEMA` /
 `EXECUTE` on `system.ai`, and remove `CAN_QUERY` from broad groups on Foundation Model API
@@ -32,12 +38,25 @@ show, and every other control is theatre if the default path is wide open. Curre
 customer could finish the workshop with a beautifully governed endpoint *and* an unrestricted
 `system.ai`.
 
-**Proposal:** one step in Choice — "What can everyone already reach?" — listing broad grants
-on `system.ai` (models and MCP services) and naming the lockdown as the first rollout action.
-~8 min. Read-only.
+**Implemented:** `choice_default_access`, "What can everyone already reach?", reads
+`GET /api/2.1/unity-catalog/permissions/{catalog|schema}/{name}` for both `system` and
+`system.ai` and reports any everyone-shaped principal holding `EXECUTE`/`ALL_PRIVILEGES`.
+Read-only by design — narrowing `system` is a platform-owner decision, so the step reports the
+grants and names the remediation rather than revoking on a customer metastore.
+
+Live result on the reference workspace (`fevm-shm-skunkworks`, 2026-08-06):
+
+```
+catalog system   -> account users: BROWSE, EXECUTE, READ_VOLUME, SELECT, USE_CATALOG, USE_SCHEMA
+schema system.ai -> account users: EXECUTE, READ_VOLUME, SELECT, USE_SCHEMA
+```
+
+Both securables are checked, not just `system.ai`, because the `effective-permissions` variant
+shows the grant is **inherited from the `system` catalog** — revoking on the schema alone does
+not close the path, which is exactly the kind of detail that makes a remediation fail silently.
 
 ### 2. Model access control — `CAN_QUERY` on an endpoint
-**Gap.**
+**Gap → ✅ IMPLEMENTED as `control_endpoint_acl` (test `endpoint_acl`).**
 
 We prove UC grants on *MCP services* (`mcp_grants`) and we register model services
 (`choice_model_services`), but we never show endpoint-level ACLs (`CAN_QUERY` / `CAN_VIEW` /
@@ -46,11 +65,28 @@ We prove UC grants on *MCP services* (`mcp_grants`) and we register model servic
 Why base: "who can call this model?" is the first Access question. `CAN_MANAGE` restriction is
 also what prevents shadow endpoints, which is the doc's stated pitfall.
 
-**Proposal:** extend `verify_governed_endpoint` to report the endpoint's ACL, flagging any
-broad group with `CAN_QUERY` and anyone beyond platform-admins with `CAN_MANAGE`. No new step.
+**Implemented** as its own step rather than an extension of `verify_governed_endpoint`, because
+testing showed it carries a second lesson worth its own card (below). It flags broad groups
+holding `CAN_QUERY` and reports every `CAN_MANAGE` holder as the shadow-endpoint risk.
+
+Two API behaviors found by testing, both now handled:
+
+- `get_permissions()` takes the endpoint **id**, not its name — the name returns
+  `'<name>' is not a valid Inference Endpoint ID`. The step resolves the id with a `get()`
+  first.
+- **Provided foundation-model endpoints have `id = None`** and carry no workspace ACL at all;
+  they are not workspace securables. So `endpoint_acl` and `default_access` are not
+  substitutes — FMAPI endpoints are governed *only* by the UC grants in item 1, and a customer
+  who checks endpoint ACLs alone will believe they are covered when they are not. The step says
+  this explicitly instead of returning a confusing failure.
+
+Verified live on both branches: a custom endpoint returned a real 3-principal ACL
+(`CAN_QUERY` service principal, 2 × `CAN_MANAGE`), and `databricks-claude-sonnet-4-5` returned
+the no-ACL explanation.
 
 ### 3. Request tags vs service tags
-**Partial → tighten.**
+**Partial → ✅ IMPLEMENTED. The workshop now sends the header, and the fix was bigger than
+expected.**
 
 `cost_tags` covers server-side tags and now explains the distinction in the concept, but we
 never *send* a request tag. The doc's exact header is
@@ -59,8 +95,47 @@ never *send* a request tag. The doc's exact header is
 Why base: the doc lists "request tags not standardized" as a day-one pitfall, and it's cheap —
 one header on a routing call we already make.
 
-**Proposal:** send the header on the routing steps and show it landing in
-`request_tags`. Extends existing steps.
+**Implemented**, and it required changing *how the workshop calls models at all*: the SDK's
+`serving_endpoints.query()` targets the legacy invocations path and exposes no way to set
+headers, so it cannot carry the tag. `server/routing.py` now calls
+`/ai-gateway/mlflow/v1/chat/completions` directly.
+
+Changes: `routing.query()` sends `Databricks-Ai-Gateway-Request-Tags` on every model call
+(project, cost_center, environment, use_case); `cost_tags` shows both tag mechanisms and states
+the trust boundary; `cost_usage` splits the count into **request-tagged** vs **endpoint-tagged**
+instead of OR-ing them, so the room can see which mechanism is actually working.
+
+---
+
+## What testing changed
+
+Three things only surfaced by running this against a live workspace, each of which changed the
+implementation rather than just confirming it:
+
+**1. The SDK cannot send the header at all.** `serving_endpoints.query()` is hard-wired to the
+legacy `/serving-endpoints/{name}/invocations` path and takes no `headers` argument, so "send
+the header" was not a one-line change: the routing module had to move to
+`/ai-gateway/mlflow/v1/chat/completions` (which accepts a plain endpoint name in `model`, so no
+config change was needed).
+
+**1b. A retraction worth recording, because it is the trap here.** I first concluded that the
+legacy path *accepts the header and silently drops the tag*, on the evidence that a tagged
+legacy call produced no usage row. That was wrong: `system.ai_gateway.usage` lags real time by
+minutes — `max(event_time)` was **20:03** when the wall clock was **20:16** — and my *gateway*
+call was missing from the table too. I was reading ingestion lag as a dropped tag.
+
+Whether the legacy path records a usage row is **unconfirmed**; the lag outran the verification
+window. It does not affect the workshop (every routed call goes through the Gateway path), but
+do not assert it to a customer without re-testing. The real lesson is the one now written into
+`cost_usage`: **check `max(event_time)` before concluding tagging is broken**, or a room will
+spend twenty minutes debugging a working control.
+
+**2. Endpoint ACLs need the id, and FMAPI endpoints have none.** See item 2. The second half
+matters most: checking endpoint ACLs alone gives false confidence, because the endpoints most
+likely to be wide open are precisely the ones with no ACL to check.
+
+**3. The `system.ai` grant is inherited from the `system` catalog.** Revoking on the schema
+alone leaves the path open, so `default_access` checks both securables.
 
 ---
 
@@ -166,13 +241,15 @@ client contract · audit trail · UC grants on MCP services.
 
 ## Recommended changes, ranked
 
-**Do now (base workshop, ~15 min net):**
-1. `system.ai` broad-grant check — new Choice step (~8 min)
-2. Endpoint ACL reporting — extend `verify_governed_endpoint` (0 min)
-3. Request-tag header on the routing steps (0 min)
+**Done (base workshop) — 2026-08-06:**
+1. ✅ `system.ai` broad-grant check — new Choice step `choice_default_access` (~8 min)
+2. ✅ Endpoint ACL — new Control step `control_endpoint_acl` (~6 min; promoted from an
+   extension because the FMAPI-has-no-ACL lesson needed its own card)
+3. ✅ Request-tag header on every routing call, plus a split request/endpoint count in
+   `cost_usage` (0 min)
 
-To stay inside 4 hours, item 1 lands within the recovered budget from cutting
-`control_lakewatch`; items 2–3 extend existing steps.
+Core is **20 steps**, still inside 4 hours: items 1–2 spend the budget recovered by cutting
+`control_lakewatch`, and item 3 costs no time.
 
 **Do next (accelerators, no core time):**
 4. `ucode` walkthrough + the 429 demo → Coding Agents

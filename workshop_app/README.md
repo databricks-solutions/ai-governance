@@ -142,9 +142,13 @@ GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;  -
 be avoidable (see `docs/APIS_AND_SETUP.md`).
 
 **If the grants aren't ready, the workshop still runs.** The model panel, full routing ROI,
-endpoint discovery, asset inventory, rate limits, guardrail tests, and MCP policy
-create/verify all use the serving and UC APIs and need no `system` access. Only the telemetry
-steps do, and they report "action needed" rather than failing.
+endpoint discovery, asset inventory, rate limits, guardrail tests, the `system.ai` default-access
+check, the endpoint ACL check, and MCP policy create/verify all use the serving and UC APIs and
+need no `system` *data* access. Only the telemetry steps do, and they report "action needed"
+rather than failing.
+
+(`default_access` reads grants **on** the `system` catalog through the UC permissions API, which
+is a metadata read — it does not need `SELECT` on any `system` schema.)
 
 | Grant | Unlocks | Skippable? |
 |---|---|---|
@@ -212,8 +216,9 @@ the Salesforce account id first):
 
 - **Add a step:** add an entry under a pillar in `config/steps.yaml`. If it has a `test`, add a
   matching function to `server/tests_registry.py` and register it in `REGISTRY`.
-- **Routing agent (Cost):** the `routing_cost` test is a placeholder that names the frontier
-  vs cost-efficient endpoints; replace it with a real routing agent that reports live token cost
-  per model.
+- **Routing agent (Cost):** `server/routing.py` runs a real custom router (cheap classifier →
+  cheapest sufficient model) and reports live token cost per model. Retarget the three tiers
+  with `cost.routing.endpoints` in `config/workshop.yaml`, and set `dbu_to_usd` to the
+  negotiated rate — until then the dollars are list-price illustrative.
 - **Point at a different workspace:** edit `config/workshop.yaml` (or a `workshop.local.yaml`
   override) — no code changes.
