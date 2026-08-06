@@ -261,6 +261,10 @@ pillars:
           **endpoint-tagged** calls are the ones a FinOps owner can trust as a budget filter
           because the caller cannot change them. Both, ideally.
 
+          If you see request-tagged traffic and **zero** endpoint-tagged, that is the finding,
+          not a bug: attribution is working, but only in the form a caller can switch off. Fix
+          it by tagging the service itself, not by trusting the header.
+
           **The table is not real-time, and this trips people up.** On a reference workspace the
           latest recorded event stayed 13-21 minutes behind the wall clock. So an empty result right
           after the routing steps means *not ingested yet*, not *tagging is broken* — check

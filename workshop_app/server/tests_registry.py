@@ -760,8 +760,13 @@ def t_usage_by_project() -> TestResult:
     # teaching point: request_tags rows are the ones this app produced by sending a header,
     # endpoint_tags rows come from the server-side tags the platform owner set. A single
     # combined count hides which mechanism is actually working.
+    # COALESCE(service_name, endpoint_name) is required, not defensive: a Gateway call that
+    # names a plain ENDPOINT (which is what the routing steps do) lands with service_name NULL
+    # and endpoint_name set. Grouping on service_name alone shows the workshop's own traffic as
+    # an unnamed bucket. Verified live.
     sql = f"""
       SELECT requester,
+             COALESCE(service_name, endpoint_name) AS target,
              SUM(CASE WHEN request_tags['project'] = {p} THEN 1 ELSE 0 END) AS request_tagged,
              SUM(CASE WHEN endpoint_tags['project'] = {p} THEN 1 ELSE 0 END) AS endpoint_tagged,
              COUNT(*) AS requests,
@@ -769,7 +774,7 @@ def t_usage_by_project() -> TestResult:
       FROM system.ai_gateway.usage
       WHERE event_time > current_timestamp() - INTERVAL 7 DAYS
         AND (request_tags['project'] = {p} OR endpoint_tags['project'] = {p})
-      GROUP BY requester ORDER BY tokens DESC LIMIT 20
+      GROUP BY 1, 2 ORDER BY tokens DESC LIMIT 20
     """
     # How far behind real time the table is. Reported on the empty result because otherwise an
     # ingestion lag is indistinguishable from broken tagging — observed 13-21 minutes on a
@@ -781,8 +786,11 @@ def t_usage_by_project() -> TestResult:
         if rows:
             by_request = sum(int(r.get("request_tagged") or 0) for r in rows)
             by_endpoint = sum(int(r.get("endpoint_tagged") or 0) for r in rows)
+            # Rows are requester x target pairs now, so count distinct requesters explicitly.
+            people = len({r.get("requester") for r in rows})
             return _ok(
-                f"Usage attributed to project `{proj}`: {len(rows)} requester(s) — "
+                f"Usage attributed to project `{proj}`: {people} requester(s) across "
+                f"{len(rows)} requester/target pair(s) — "
                 f"{by_request} request-tagged, {by_endpoint} endpoint-tagged.",
                 rows=rows, request_tagged_calls=by_request,
                 endpoint_tagged_calls=by_endpoint,

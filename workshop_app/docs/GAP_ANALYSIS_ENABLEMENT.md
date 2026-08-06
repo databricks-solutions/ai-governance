@@ -118,17 +118,33 @@ the header" was not a one-line change: the routing module had to move to
 `/ai-gateway/mlflow/v1/chat/completions` (which accepts a plain endpoint name in `model`, so no
 config change was needed).
 
-**1b. A retraction worth recording, because it is the trap here.** I first concluded that the
-legacy path *accepts the header and silently drops the tag*, on the evidence that a tagged
-legacy call produced no usage row. That was wrong: `system.ai_gateway.usage` lags real time by
-minutes — `max(event_time)` was **20:03** when the wall clock was **20:16** — and my *gateway*
-call was missing from the table too. I was reading ingestion lag as a dropped tag.
+**1b. Tags confirmed landing — after a ~19 minute wait.** All six tagged routing calls appeared
+in `system.ai_gateway.usage` with the full map intact, and `usage_by_project` now returns:
 
-Whether the legacy path records a usage row is **unconfirmed**; the lag outran the verification
-window. It does not affect the workshop (every routed call goes through the Gateway path), but
-do not assert it to a customer without re-testing. The real lesson is the one now written into
-`cost_usage`: **check `max(event_time)` before concluding tagging is broken**, or a room will
-spend twenty minutes debugging a working control.
+```
+1 requester across 3 requester/target pair(s) — 6 request-tagged, 0 endpoint-tagged
+```
+
+The `0 endpoint-tagged` is correct and is the teaching contrast: no governed endpoint exists on
+that workspace, so nothing carries server-side tags. Caller-supplied attribution works;
+trustworthy attribution does not exist yet.
+
+**A retraction worth recording, because it is the trap here.** I first concluded the legacy path
+*accepts the header and silently drops the tag*, on the evidence that a tagged legacy call
+produced no usage row. That was wrong: the table lags badly — `max(event_time)` was **20:03**
+when the wall clock was **20:16**, still 20:03 at **20:25** — and my *gateway* call was missing
+too. I was reading ingestion lag as a dropped tag. Hence the freshness diagnostic in
+`usage_by_project`: **check `max(event_time)` before concluding tagging is broken**, or a room
+spends twenty minutes debugging a working control.
+
+Whether the legacy path records a row is still **unconfirmed** (its A/B markers fell outside the
+ingested window). Doesn't affect the workshop; don't assert it to a customer either way.
+
+**1c. `service_name` is NULL for endpoint-addressed Gateway calls.** The landed rows carry
+`endpoint_name` with `service_name` NULL, because the routing steps name a plain endpoint rather
+than a service FQN. So `COALESCE(service_name, endpoint_name)` is needed even for Gateway
+traffic — not just for legacy rows, which is how the migration guide frames it. `usage_by_project`
+groups on the COALESCE; without it the workshop's own traffic shows up as an unnamed bucket.
 
 **2. Endpoint ACLs need the id, and FMAPI endpoints have none.** See item 2. The second half
 matters most: checking endpoint ACLs alone gives false confidence, because the endpoints most

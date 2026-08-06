@@ -85,18 +85,32 @@ legacy *contract*, and nothing errors to tell them.
 - Tags are **caller-supplied**: an attribution signal, never an enforcement boundary. Use
   server-side endpoint/service tags (`endpoint_tags`) for budget filters.
 
-**Verifying it landed — read this before concluding anything.** `system.ai_gateway.usage` lags
-real time by minutes: on the reference workspace `max(event_time)` sat at **20:03** while the
-wall clock was **20:16**, and was still at 20:03 at **20:25** — a 13-21 minute gap that did not
-close during a 20-minute watch. Tagged calls therefore return nothing on an
-immediate query, which looks exactly like the tag being dropped. Always check the watermark
-(`SELECT max(event_time) FROM system.ai_gateway.usage`) before drawing a conclusion; I read this
-lag as a dropped tag on the first pass and had to retract it.
+**Confirmed landing.** Six tagged calls from the routing steps appeared in
+`system.ai_gateway.usage` with the full tag map intact:
 
-Whether the legacy invocations path records a usage row at all is **unconfirmed** — the
-ingestion lag outran the verification window. It does not affect the workshop, which sends
-every routed call through the Gateway path, but do not assert either way to a customer without
-re-testing.
+```
+endpoint_name = databricks-meta-llama-3-1-8b-instruct, service_name = NULL
+request_tags  = {"project":"ai_governance_workshop","cost_center":"platform",
+                 "environment":"workshop","use_case":"governance_enablement"}
+```
+
+Note `service_name` is **NULL** and `endpoint_name` is populated: a Gateway call that names a
+plain *endpoint* rather than a service FQN is recorded as an endpoint row. So
+`COALESCE(service_name, endpoint_name)` is needed even for traffic that went through
+`/ai-gateway/mlflow/v1` — it is not only a legacy-row concern.
+
+**Read this before concluding a tag was dropped.** The table lags badly. On the reference
+workspace `max(event_time)` sat at **20:03** while the wall clock was **20:16**, was *still* at
+20:03 at **20:25**, and only reached 20:19 around 20:31 — roughly a **19-minute** lag, and it
+does not advance smoothly. An immediate query after a tagged call returns nothing, which looks
+exactly like the tag being dropped; I made that mistake on the first pass and had to retract it.
+Always compare `max(event_time)` to `current_timestamp()` first — `usage_by_project` reports both
+on an empty result for this reason.
+
+Whether the **legacy** invocations path records a usage row is still **unconfirmed** — the A/B
+markers for that test fell outside the window that had ingested by the time the check matched.
+It does not affect the workshop, which sends every routed call through the Gateway path, but do
+not assert it either way to a customer without re-testing.
 
 Provider-native paths (not used by the app, documented for the accelerator):
 `/ai-gateway/openai/v1`, `/ai-gateway/anthropic`, `/ai-gateway/gemini`,
