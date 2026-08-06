@@ -21,12 +21,20 @@ bundle:
 # `type` is deliberately omitted — it is only for whl/jar. An artifact with just `build`,
 # `path`, and `files` is a plain local build step.
 #
-# Requires npm at deploy time. On a Databricks-managed laptop the public npm registry is
-# blocked (see frontend/.npmrc.example), so configure the internal mirror first.
+# Does NOT require npm on every deploy: build.sh skips the build when dist/ is already newer
+# than every source file, so a dist built elsewhere (or by CI) deploys with no network access.
+# npm is only needed when dist is genuinely stale. On a Databricks-managed laptop the public
+# registry is blocked — see frontend/.npmrc.example for the internal mirror.
 artifacts:
   frontend:
     path: ./frontend
-    build: npm ci && npm run build
+    # Delegated to a script because `bundle deploy` runs this unconditionally and with no
+    # timeout: a bare `npm install` on a machine with the public registry blocked retries
+    # until it hangs, so the deploy never finishes. build.sh skips the build when dist/ is
+    # already newer than every source file, and fails loudly (never silently) when dist is
+    # stale and cannot be rebuilt. It also uses `npm install`, not `npm ci`, because this
+    # project has no committed lockfile and `npm ci` requires one.
+    build: ./build.sh
     files:
       # Declaring the entry point makes the CLI fail if the build produced nothing, instead
       # of deploying an empty dist. Vite content-hashes the asset filenames, so only
