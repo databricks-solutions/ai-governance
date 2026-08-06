@@ -74,10 +74,10 @@ _DDL = """
 CREATE SCHEMA IF NOT EXISTS workshop;
 SET search_path TO workshop;
 
--- One row per (account, step). The whole workshop is tracked against one Salesforce
--- account id, so progress and the outcomes export flow straight into the sales app.
+-- One row per (account, step). The whole workshop is tracked against one Account ID, so
+-- progress and the outcomes export flow straight into the sales app.
 CREATE TABLE IF NOT EXISTS step_progress (
-    customer_sfid TEXT       NOT NULL,      -- Salesforce account id
+    customer_sfid TEXT       NOT NULL,      -- Account ID (Salesforce account id in practice)
     step_id      TEXT        NOT NULL,
     pillar_id    TEXT        NOT NULL,
     -- action_required: the step ran but proved nothing yet (a guided UI step, or a

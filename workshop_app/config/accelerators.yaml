@@ -51,7 +51,9 @@ accelerators:
           3. **Behavior** — service policies inspect the request/response and return
              ALLOW / DENY / ASK. **MCP Services only.**
 
-          Start by listing what is actually registered on this metastore.
+          The diagram below is the whole model on one page — keep it open while you work
+          through the rest of the accelerator. Then list what is actually registered here.
+        visual: mcp_planes
         action:
           label: List MCP services (provided & external)
           test: mcp_inventory

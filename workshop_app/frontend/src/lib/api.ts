@@ -12,6 +12,8 @@ export interface Step {
   id: string;
   title: string;
   concept?: string;
+  /** Key of a diagram to render under the concept — see VISUALS in StepCard. */
+  visual?: string;
   action?: StepAction;
   verify?: StepAction;
   manual?: StepManual;

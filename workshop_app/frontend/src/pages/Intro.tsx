@@ -62,7 +62,7 @@ export default function Intro({
       <PageHeader title={intro.title}>
         <div className="mt-6">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Salesforce account id</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Account ID</span>
             <input
               value={sfid}
               onChange={(e) => setSfid(e.target.value)}
@@ -71,8 +71,8 @@ export default function Intro({
             />
           </label>
           <p className="mt-2 max-w-xl text-xs text-muted">
-            The whole workshop is tracked against this account. Progress and the outcomes export are keyed to it,
-            so results flow straight into the internal sales app. {!sfid && <span className="text-lava">Set it before running steps.</span>}
+            The whole workshop is tracked against this account, and progress and the outcomes export are keyed
+            to it. {!sfid && <span className="text-lava">Set it before running steps.</span>}
           </p>
         </div>
       </PageHeader>

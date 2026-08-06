@@ -1,10 +1,18 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle } from "lucide-react";
 import { api, type Step, type TestResult, type ProgressMap } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 import { cn } from "@/lib/cn";
+import McpDiagram from "@/components/McpDiagram";
 
 type Saved = ProgressMap[string] | null;
+
+// Diagrams a step can opt into with `visual: <key>` in config/steps.yaml or
+// config/accelerators.yaml. Keeping the registry here means content stays in YAML while the
+// rendering stays typed — an unknown key renders nothing rather than breaking the page.
+const VISUALS: Record<string, ReactNode> = {
+  mcp_planes: <McpDiagram />,
+};
 
 // Color-coded kind badges — same taxonomy as the l200 demo (concept/try-it/manual/verify).
 const BADGES = {
@@ -97,6 +105,10 @@ export default function StepCard({
           <p className="whitespace-pre-line text-sm leading-relaxed text-muted">{step.concept.trim()}</p>
         </div>
       )}
+
+      {/* Optional diagram, named by `visual:` in the step config. Some concepts are
+          structural and a paragraph cannot carry them. */}
+      {step.visual && <div className="mb-4">{VISUALS[step.visual] ?? null}</div>}
 
       {/* Actions row: manual deep-link, Try-It, Verify */}
       <div className="flex flex-wrap items-center gap-2">

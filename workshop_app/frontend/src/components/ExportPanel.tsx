@@ -3,8 +3,8 @@ import { api } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 
 // Export the workshop outcomes: a Markdown report (per-step complete/incomplete) and an
-// outcomes.json the internal sales app ingests. Everything is keyed to the Salesforce id
-// set for this account at the top of the workshop.
+// outcomes.json the internal sales app ingests. Everything is keyed to the Account ID set
+// at the top of the workshop.
 export default function ExportPanel() {
   const { sfid } = useAccount();
 
@@ -28,11 +28,11 @@ export default function ExportPanel() {
       </div>
       <p className="mb-4 text-sm leading-relaxed text-muted">
         Generate the leave-behind report and the outcomes file the internal sales app loads to
-        track this account's workshop and next steps. Everything is keyed to the Salesforce id
+        track this account's workshop and next steps. Everything is keyed to the Account ID
         set at the top of the workshop.
       </p>
       {!sfid.trim() ? (
-        <p className="text-sm text-lava">Set a Salesforce id at the top of the Introduction to enable export.</p>
+        <p className="text-sm text-lava">Set an Account ID at the top of the Introduction to enable export.</p>
       ) : (
         <div className="flex flex-wrap gap-3">
           <button

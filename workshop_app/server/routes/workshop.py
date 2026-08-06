@@ -163,7 +163,10 @@ def _save_progress(customer_sfid, step_id, pillar_id, status, result, updated_by
 
 # --------------------------------------------------------------------------- Export
 def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
-    """Assemble the workshop outcomes: every step with its status, keyed to a Salesforce id.
+    """Assemble the workshop outcomes: every step with its status, keyed to the Account ID.
+
+    The wire field stays `customer_sfid` — it is the contract the internal sales app ingests,
+    so renaming it would break that consumer. Only the user-visible label changed.
 
     This is the contract the internal sales app ingests (schema_version). It merges the
     workshop definition (so every step appears, even untouched ones) with saved progress.
@@ -232,7 +235,7 @@ def export_report(customer_sfid: str, customer_name: str | None = None):
         "# AI Governance Workshop — Outcomes Report",
         "",
         f"**Account:** {o['customer_name'] or o['customer_sfid']}  ",
-        f"**Salesforce id:** {o['customer_sfid']}  ",
+        f"**Account ID:** {o['customer_sfid']}  ",
         f"**Generated:** {o['generated_at']}  ",
         f"**Progress:** {o['summary']['done']}/{o['summary']['total']} steps complete "
         f"({o['summary']['pct']}%)",
