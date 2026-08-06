@@ -117,13 +117,27 @@ Also set `catalog.name`/`catalog.schema` in `config/workshop.yaml` to the same v
 the app will write to a different schema than the bundle created.
 </details>
 
+> **Building the frontend on a Databricks laptop.** Public package registries
+> (`registry.npmjs.org`, `registry.yarnpkg.com`, `pypi.org`, and many mirrors) are pinned to
+> `127.0.0.1` in `/etc/hosts` by managed endpoint policy, so a default `npm install` fails
+> instantly with `ECONNREFUSED` — the DNS lookup succeeds, which makes it look like a network
+> fault rather than a policy. Use the internal mirror, which is what CI uses:
+>
+> ```bash
+> cd frontend
+> cp .npmrc.example .npmrc     # then paste a JFrog access token into it
+> npm install && npm run build
+> ```
+>
+> Get the token from Artifactory → Edit Profile → Generate an Identity Token. `.npmrc` is
+> gitignored because it holds that secret. Don't edit `/etc/hosts` to work around this.
+>
 > **No lockfile yet.** `frontend/package-lock.json` is intentionally absent — the one
 > generated here was missing `resolved`/`integrity` for nearly every package, so `npm ci`
-> produced an unusable `node_modules`. Run a real `npm install` in `frontend/` on a machine
-> with npm registry access and commit the result, then `npm ci` (and reproducible builds)
-> work. Until then `deploy.sh` falls back to `npm install`, and only builds when
-> `frontend/dist` is actually stale — so a deploy from a prebuilt `dist` needs no registry
-> access at all.
+> produced an unusable `node_modules`. Once a real `npm install` succeeds via the mirror
+> above, commit the lockfile it writes and `npm ci` (with reproducible builds) starts working.
+> Until then `deploy.sh` falls back to `npm install`, and only builds when `frontend/dist` is
+> actually stale — so a deploy from a prebuilt `dist` (`-B`) needs no registry access at all.
 
 ### The one manual step: two `system` grants (account admin)
 
