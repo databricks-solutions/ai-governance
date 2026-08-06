@@ -12,8 +12,36 @@ and control**. Each step has a concept, a live "Try It" test against the workspa
 
 ## How long does it take?
 
-The core workshop is a half-day. Each optional **accelerator** is a ~4-hour add-on focused
-on one customer need — run the one that matches their priority, not all five.
+Three phases, and the middle one is the only day in a room:
+
+| Phase | Duration | What happens |
+|---|---|---|
+| **Prerequisites** | ~1 week | Entitlements, grants, previews, pilot users — mostly waiting on admins |
+| **Workshop** | **4 hours** | Test and validate live in your own workspace |
+| **Follow-up** | 1–2 weeks | Close what didn't land on the day |
+
+Each optional **accelerator** is a ~4-hour add-on on one customer need — run the one that
+matches your priority, not all five.
+
+## Why isn't <capability> in the workshop?
+
+Four hours is about 19 steps including discussion, so the workshop proves a **governed path
+works** rather than covering every Gateway feature. Some things are deliberately left out:
+taking inventory of your current estate (pre-work over your own endpoints and spend), the
+full migration sequence (run in parallel over weeks — there is no in-place rename), network
+configuration like PrivateLink and egress policies (account-level infrastructure), and
+passthrough mode (an escape hatch that loses cost tracking, rate limits, and policies).
+
+None of that is lost — it's in the detailed field guides for adopting Unity AI Gateway fresh,
+or migrating from a previous Databricks or external gateway:
+
+- **Unity AI Gateway Adoption Guide** — target state, object model, Unity Catalog layout,
+  telemetry, budgets, network.
+- **Unity AI Gateway Migration Guide** — the phase-by-phase sequence off legacy Model Serving
+  or a third-party gateway (LiteLLM, Portkey, Kong, APIM), plus production-readiness and
+  rollback checklists.
+
+Ask your Databricks team for both.
 
 ## Do I need admin access to the workspace?
 
@@ -31,8 +59,13 @@ them before the day so the room isn't blocked.
 
 ## How is my progress tracked?
 
-Progress is stored per account (by Salesforce id) in a Lakebase table on the deployment. You
-can pause and resume; nothing is lost between sessions.
+Progress is stored per account (by the **Account ID** set on the Introduction page) in a
+Lakebase table on the deployment. You can pause and resume; nothing is lost between sessions.
+
+A step can end in one of three states, and the distinction is deliberate: **done** (proved),
+**action needed** (the step ran, but nothing is proven yet — a guided UI action, or a
+telemetry query with no data yet), and **failed**. "Action needed" is never counted as
+complete, so the progress bar and the exported report stay honest.
 
 ## What are the "Try It" and "Verify" actions actually doing?
 
@@ -57,9 +90,16 @@ with a deep link to the exact place in the workspace to complete them.
 
 ## What do I get at the end?
 
-Export the outcomes from the Introduction page: a per-step **report** (the customer
-leave-behind) and an **outcomes.json** that the internal Databricks sales app ingests to track
-the account and its next steps.
+Export the outcomes from the Introduction page:
+
+- a per-step **report** (`.md`) — every step with its status and notes, grouped by pillar,
+  with the incomplete items listed as next steps. This is the leave-behind.
+- an **outcomes.json** — the same data machine-readable, which the internal Databricks sales
+  app ingests to track the account and drive follow-up.
+
+Both include the accelerators, and both are keyed to the Account ID. The incomplete items are
+the follow-up list: they become the 1–2 weeks of work after the workshop, and they are the
+reason the app distinguishes "action needed" from "done".
 
 ## Where do I report a bug or request a feature?
 

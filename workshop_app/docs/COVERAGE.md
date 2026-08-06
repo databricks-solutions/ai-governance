@@ -1,16 +1,32 @@
-# Coverage: workshop vs. the Adoption & Migration guides
+# Coverage: workshop vs. the POC DOC, Adoption, and Migration guides
 
-Gap-check of the 19 core workshop steps against the two GA-launch guides (both marked
-IN PROGRESS, 2026-08-04):
+Gap-check of the 19 core workshop steps against three sources of truth:
 
-- **Adoption Guide** — the target-state model: model services, provider services, service
-  policies, MCP, UC layout, telemetry, budgets, network.
+- **AI Governance POC DOC** — the four pillars the POC is measured on
+  (**Cost / Usage / Access / Inventory**) and its three phases.
+- **Adoption Guide** — target state: model services, provider services, service policies,
+  MCP, UC layout, telemetry, budgets, network.
 - **Migration Guide** — the 10-phase sequence from legacy Model Serving AI Gateway to Unity
   AI Gateway.
 
-The explicit goal is **balance**: prove the Gateway works without turning a 4-hour session
-into a feature checklist. Every "not covered" below is a deliberate call with a stated reason,
-not an oversight.
+All three are marked IN PROGRESS (GA launch edition, 2026-08-04).
+
+## The delivery shape this has to fit
+
+| Phase | Duration | What happens |
+|---|---|---|
+| **Prereqs** | ~1 week | Entitlements, grants, previews, pilot users. See `PREREQUISITES.md`. |
+| **Workshop** | **4 hours** | Test and validate live, in their workspace. The 19 core steps. |
+| **Follow-up (POC)** | 1–2 weeks | Close what didn't land; the app's exported outcomes drive it. |
+
+Everything below is judged against that budget. **4 hours is ~19 steps at ~10 minutes each
+including discussion** — there is no room for a feature checklist, so every "not covered" is
+a deliberate call with a stated reason.
+
+**No migration thread.** Migration is a sequence a customer runs over weeks with their own
+inventory; it is not a hands-on exercise. The workshop covers the *one thing* a migration
+turns on — the client contract (`choice_model_services`) — and the sequence itself is left to
+the field guides.
 
 ---
 
@@ -33,6 +49,28 @@ Two rules carry more weight than the rest:
 2. **A 200 is not acceptance.** Compare latency, tokens, cost, and output quality.
 
 ---
+
+## 1b. The POC DOC's four pillars, mapped to our steps
+
+The POC DOC measures on **Cost / Usage / Access / Inventory**. Our app is organized on
+**Choice / Cost / Control** (the FY27 messaging pillars). They aren't in conflict — ours is
+the customer-facing narrative, theirs is the internal scorecard — but the mapping should be
+explicit so an SA can report against the POC DOC without re-deriving it.
+
+| POC DOC pillar | Its primary measure | Our steps |
+|---|---|---|
+| **Cost** | Budget alerts wired; cost-per-team SQL returns a table | `cost_budgets`, `cost_rate_limits`, `cost_tags`, `cost_usage`, `cost_spend_by_model`, + the routing ROI trio |
+| **Usage** | Discovery dashboard + monitoring live | `cost_usage`, `control_coding_agents`, `control_traces`, `control_lakewatch` |
+| **Access** | RBAC + ABAC + identity-aware invocation enforced at the Gateway | `control_mcp_policy`, `control_guardrails`, `mcp_grants`, `mcp_obo` (accelerator) |
+| **Inventory** | Every endpoint, agent, MCP server registered and owned in UC | `choice_list_endpoints`, `choice_model_services`, `choice_agent_registry`, `mcp_inventory` |
+
+Two POC DOC items we do **not** cover, deliberately:
+
+- **Lakehouse Monitoring profile on the payload table** (drift on input length, refusal rate,
+  latency) — needs days of accumulated traffic to show anything. A workshop-day version would
+  render an empty chart. Follow-up.
+- **P50/P99 latency proof that the Gateway adds ~5–10ms** — a benchmark, not a governance
+  control, and it needs sustained load. Better as a pre-supplied number than a live test.
 
 ## 2. Coverage table
 
@@ -58,7 +96,9 @@ Two rules carry more weight than the rest:
 | UC foundation (metastore, bindings, groups) | Prerequisites doc | ⚠️ Prereq, not a step |
 | Inventory the current estate | — | ❌ **Deliberate** — see §5 |
 | Network / PrivateLink / NCC egress | — | ❌ **Deliberate** — see §5 |
-| Production-readiness & rollback checklists | POC doc §6 | ✅ As follow-up |
+| Production-readiness & rollback checklists | — | ❌ **Deliberate** — Migration Guide §§8, 12, 13 |
+| Lakehouse Monitoring on the payload table | — | ❌ **Deliberate** — needs days of traffic |
+| Gateway latency benchmark (P50/P99) | — | ❌ **Deliberate** — a benchmark, not a control |
 
 ---
 
@@ -95,26 +135,50 @@ customers. Correct place for it is the accelerator, where a provider is actually
 downstream, but they're not demonstrable in-app — they're prerequisites. They live in
 `PREREQUISITES.md` §1–2, which is where a blocker with days of lead time belongs.
 
+**The POC leave-behind itself.** No longer a doc in this repo. The workshop app *generates*
+it: `GET /api/export/report` (Markdown, per-step complete/incomplete) and
+`GET /api/export/outcomes` (JSON, `schema_version` 1) — both keyed to the Account ID and both
+including the accelerators. Writing a static template alongside a generator that already
+produces the real thing was duplication, and the static version drifted immediately.
+The Confluence page for part 04 documents what those exports contain.
+
 ---
 
-## 5. Deliberately not covered
+## 5. Deliberately not covered — and where it lives instead
 
-**Inventory the current estate.** The guides' first phase, and the right first phase — but
-it's a discovery exercise over the customer's own endpoints, ACLs, clients, and spend. That's
-pre-work or a follow-up, not something a 4-hour hands-on session should spend time on. It
-belongs in the pre-workshop questionnaire.
+Everything in this section is covered by the two field guides. Point customers there rather
+than expanding the workshop:
 
-**Network: PrivateLink, NCC, egress policies.** Genuinely important and genuinely out of
-scope. Front-end PrivateLink is GA; serverless PrivateLink is Enterprise-only Public Preview.
-Both require account-level infrastructure changes that can't be made live in a workshop, and
-the network team usually isn't in the room. Tracked as a follow-up.
+> **These are the detailed field guides for adopting Unity AI Gateway fresh, or migrating
+> from a previous Databricks or external gateway.**
+>
+> - [Unity AI Gateway **Adoption Guide**](https://docs.google.com/document/d/1Pbe3c5rj2xoOPve-bK6kdjmAJx8Yaz3tAQPQk7F7KaM/edit) — target state, object model, UC layout, telemetry, budgets, network.
+> - [Unity AI Gateway **Migration Guide**](https://docs.google.com/document/d/1N656ptJw-PG2rYTKY6d74cY0LYDl7oKnNUjbYwBSVaU/edit) — the 10-phase sequence off legacy Model Serving or a third-party gateway.
+
+**Inventory the current estate.** The guides' first phase, and the right first phase — but a
+discovery exercise over the customer's own endpoints, ACLs, clients, and spend. Pre-work, not
+workshop time. → Pre-workshop questionnaire; Migration Guide §1.
+
+**The migration sequence itself.** No in-place rename exists, so migration is run-in-parallel
+over weeks: validate, move clients in stages, revoke later. Not a 4-hour exercise. The
+workshop covers only the pivot point — the client contract — in `choice_model_services`.
+→ Migration Guide §§2–10.
+
+**Network: PrivateLink, NCC, egress policies.** Front-end PrivateLink is GA; serverless
+PrivateLink is Enterprise-only Public Preview. Both need account-level infrastructure changes
+that can't be made live, and the network team usually isn't in the room.
+→ Adoption Guide §9; follow-up item.
+
+**Model provider services.** The object for centralizing external-provider credentials.
+Requires real provider credentials to be meaningful, so it sits in the External Providers
+accelerator. → Adoption Guide §3.
 
 **Passthrough mode.** An escape hatch that *loses* token/cost tracking, token rate limits,
-model access control, and service policies. Demonstrating it would teach the wrong lesson. It
-belongs in the watch-outs conversation, not a hands-on step.
+model access control, and service policies. Demonstrating it would teach the wrong lesson.
+→ Adoption Guide §3 watch-outs.
 
-**The full production-readiness checklist.** ~40 items across five categories. It's a
-leave-behind artifact, not a live exercise — POC doc §6.
+**The production-readiness and rollback checklists.** ~40 items across five categories, plus
+rollback criteria. Leave-behind artifacts, not live exercises. → Migration Guide §§8, 12, 13.
 
 ---
 
@@ -139,11 +203,23 @@ From the guides' risk tables — the ones that actually bite:
 
 ## 7. Verdict
 
-**19 core steps, one added.** Coverage of what the guides call the target state is good; the
-gap was the *object model and client contract*, now `choice_model_services`.
+**19 core steps + 21 accelerator steps.** Coverage of the POC DOC's four pillars is complete
+except two items that need accumulated traffic (monitoring drift, latency benchmark). Coverage
+of the Adoption Guide's target state is good; the one real gap was the *object model and client
+contract*, now `choice_model_services`.
 
-The remaining omissions are appropriate for a 4-hour hands-on session: inventory is pre-work,
-network is account-level infrastructure, passthrough is an anti-pattern, and the readiness
-checklist is a leave-behind. Adding them would trade the thing that makes this workshop
-work — a governed path the customer's own team stood up and watched fire — for breadth nobody
-can absorb in half a day.
+Fits the delivery shape: **~1 week prereqs → 4 hours live → 1–2 weeks follow-up.** 19 steps at
+~10 minutes each with discussion is a full 4 hours with no slack, which is the correct amount
+of pressure — it forces every step to earn its place.
+
+The omissions are right for that budget. Inventory is pre-work, migration is a multi-week
+sequence, network is account-level infrastructure, passthrough is an anti-pattern, and the
+readiness checklists are leave-behinds. All of it is covered by the Adoption and Migration
+guides, so nothing is lost — it just isn't workshop time. Adding it back would trade the thing
+that makes this work (a governed path the customer's own team stood up and watched fire) for
+breadth nobody absorbs in half a day.
+
+**If you need to cut further**, the honest order to drop from the core is:
+`control_lakewatch` (readiness check, not a control) → `control_traces` (manual link only) →
+`cost_routing_compare` (the ROI story survives on `cost_routing_roi` alone). That recovers
+~30 minutes.
