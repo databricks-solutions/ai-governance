@@ -6,14 +6,18 @@
 # to override locally without touching this file.
 
 workspace:
-  # Left blank on purpose: the deploy target comes from the --profile passed to
-  # `databricks bundle deploy`. Set warehouse_id to a SQL warehouse the app can use.
-  warehouse_id: "505ec857e6b4ea23"
+  # Left blank on purpose. When deployed as a bundle the app reads the warehouse from the
+  # DATABRICKS_WAREHOUSE_ID env var, which app.yaml binds to the bundle's sql-warehouse
+  # resource — so `--var="warehouse_id=..."` is the single source of truth and you do not
+  # need to set this. Set it only for LOCAL development, where there is no app resource.
+  warehouse_id: ""
 
-# Unity Catalog location for governance artifacts (inference tables, audit views,
-# the workshop's own progress schema mirror).
+# Unity Catalog location for governance artifacts (the MCP policy function, inference
+# tables, audit views). REQUIRED — the bundle creates this schema in this catalog, and the
+# catalog must already exist. Pass the catalog at deploy time with
+# `--var="catalog=<your-catalog>"` so the bundle and the app agree.
 catalog:
-  name: shm_skunkworks_catalog
+  name: ""                        # e.g. main — must match the bundle's `catalog` variable
   schema: ai_governance_workshop
 
 # Foundation Model endpoints the workshop references (Choice pillar).
@@ -50,6 +54,28 @@ mcp:
       - update_confluence_page
       - reply_to_confluence_comment
     allow_probe_tool: search_confluence_pages   # a read tool used to prove ALLOW works
+
+# Cost pillar — routing ROI.
+#
+# The workshop frames three ways to cut token spend:
+#   a) Smart routing — Databricks-managed model selection. Beta; nothing to configure here.
+#   b) Omnigent      — partner routing layer above the agent harnesses.
+#   c) Custom router — a cheap classifier picks the cheapest sufficient model. This is the
+#                      one the app actually runs, because it is the one you can stand up
+#                      today and measure.
+cost:
+  routing:
+    # Your negotiated $/DBU. The default is LIST PRICE — until you change it, dollar
+    # figures are illustrative (token counts are always real).
+    dbu_to_usd: 0.070
+    # Retarget the three tiers to endpoints that exist on this workspace.
+    endpoints:
+      frontier: databricks-claude-sonnet-4-5
+      mid: databricks-meta-llama-3-3-70b-instruct
+      cheap: databricks-meta-llama-3-1-8b-instruct
+    # The prompt the routing steps send. Replace with a representative customer prompt —
+    # the ROI number only means something on work they actually run.
+    sample_prompt: "Summarize the key cost drivers of running large language models in production."
 
 # Project tags for cost attribution (Cost pillar).
 project:

@@ -36,6 +36,19 @@ def resolve(kind: str) -> str:
     if kind == "system_audit":
         return system_audit()
     if kind == "account_budgets":
-        # Account console budgets live at the account level, not the workspace host.
-        return "https://accounts.cloud.databricks.com/usage/budgets"
+        return account_budgets()
     return _host()
+
+
+def account_budgets() -> str:
+    """Account-console budgets URL, which differs per cloud.
+
+    Budgets live at the account level, not on the workspace host, and the console domain is
+    cloud-specific — a hardcoded AWS URL sends Azure and GCP customers nowhere.
+    """
+    host = _host()
+    if "azuredatabricks.net" in host:
+        return "https://accounts.azuredatabricks.net/usage/budgets"
+    if "gcp.databricks.com" in host:
+        return "https://accounts.gcp.databricks.com/usage/budgets"
+    return "https://accounts.cloud.databricks.com/usage/budgets"

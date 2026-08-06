@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
-from .. import deep_links
+from .. import deep_links, routing
 from ..config import get_accelerators, get_steps
 from ..db import pool
 from ..tests_registry import run_test
@@ -54,6 +54,31 @@ def faq():
             return f.read()
     except FileNotFoundError:
         return "# FAQ\n\nFAQ.md not found."
+
+
+# --------------------------------------------------------------------------- Cost routing
+# The Cost pillar steps drive these through /api/test, but they are exposed directly too so
+# a deliverer can try the customer's own prompts without touching the guidebook flow.
+@router.get("/routing/panel")
+def routing_panel():
+    """Model panel, prices, and the routing policy."""
+    return routing.panel()
+
+
+class RoutingPrompt(BaseModel):
+    prompt: str
+
+
+@router.post("/routing/compare")
+def routing_compare(body: RoutingPrompt):
+    """One prompt against every model — cost, latency, and answers side by side."""
+    return routing.compare(body.prompt)
+
+
+@router.post("/routing/route")
+def routing_route(body: RoutingPrompt):
+    """Classify, dispatch to the cheapest sufficient model, and price the counterfactual."""
+    return routing.route(body.prompt)
 
 
 class RunTest(BaseModel):
@@ -195,7 +220,7 @@ def export_report(customer_sfid: str, customer_name: str | None = None):
         raise HTTPException(400, "customer_sfid is required")
     o = _build_outcomes(customer_sfid, customer_name)
     lines = [
-        f"# AI Governance Workshop — Outcomes Report",
+        "# AI Governance Workshop — Outcomes Report",
         "",
         f"**Account:** {o['customer_name'] or o['customer_sfid']}  ",
         f"**Salesforce id:** {o['customer_sfid']}  ",

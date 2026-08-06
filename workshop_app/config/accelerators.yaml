@@ -136,6 +136,9 @@ accelerators:
         manual:
           label: Add an external-model endpoint in the workspace
           deep_link: serving_endpoint
+        verify:
+          label: Find external-provider routes on this workspace
+          test: external_provider_routing
       - id: acc_ext_migrate
         title: Migrate one shadow workload as proof
         concept: |

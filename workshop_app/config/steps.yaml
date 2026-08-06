@@ -72,28 +72,105 @@ pillars:
     title: Cost
     tagline: Intelligent cost controls — visibility, budgets, attribution, and routing.
     steps:
-      - id: cost_routing
-        title: Routing & cost impact
+      - id: cost_model_panel
+        title: Three ways to route — and what each costs
         concept: |
-          The same prompt sent to different models has very different cost and latency. A
-          **routing agent** can choose the cheapest model that meets quality — this step shows
-          the cost delta between a frontier model and a cost-efficient one for the same task.
-          Intelligent routing is how you optimize cost, latency, and quality at once.
+          Most AI spend is a model-choice problem: teams send every request to a frontier
+          model because it is the safe default. There are three ways to fix that, and they
+          differ mainly in who owns the routing policy:
 
-          _A fuller routing-agent example will be added here._
+          - **Smart routing (Databricks-managed)** — the Gateway classifies each request and
+            picks a suitable model for you. No policy to write. *Beta* — confirm availability
+            on this account before planning around it.
+          - **Omnigent (partner layer)** — an agent meta-harness above Claude Code, Codex,
+            Cursor, and custom agents, with routing and policy above the harness. Governed
+            through the same Gateway.
+          - **Custom router (yours)** — a cheap classifier scores each request and dispatches
+            to the cheapest model that clears your bar. You own the rubric.
+
+          The router changes; the control plane does not. This workshop runs the **custom
+          router**, because it is the option you can stand up today and measure. Start with
+          the price panel so the arithmetic is visible before any prompt is sent.
         action:
-          label: Compare model cost
-          test: routing_cost
+          label: Show the model panel & routing policy
+          test: routing_panel
+
+      - id: cost_routing_compare
+        title: Same prompt, three price points
+        concept: |
+          Send one prompt to all three models and measure real tokens, latency, and cost.
+          Expect a **10-20x spread** between the cheapest and most expensive answer.
+
+          Read the answers, not just the prices. Savings only count if quality holds — and
+          sometimes the cheap model is simply wrong, which is exactly the finding that makes
+          a routing rubric worth writing rather than assuming.
+        action:
+          label: Compare cost across models
+          test: routing_compare
+
+      - id: cost_routing_roi
+        title: Measure the routing saving
+        concept: |
+          Now run the router end to end: classify, dispatch to the cheapest sufficient model,
+          and compare against what always-frontier would have cost for the same tokens. The
+          classifier is itself a model call, so **its cost counts as overhead** — that is why
+          an easy prompt saves ~90% while a genuinely hard one saves nothing at all.
+
+          Two honesty notes worth saying out loud in the room:
+          - The router **fails safe**: if the classifier errors, the request goes to the
+            frontier model. A router that silently downgrades on failure trades correctness
+            for cost.
+          - The frontier comparison prices the *routed* response's token counts, so it is a
+            close estimate of the per-request delta, not an exact figure.
+
+          To turn this into a business case, apply the per-request delta to the request mix
+          in your own Gateway logs — the next two steps show that spend.
+        action:
+          label: Route a prompt & show the saving
+          test: routing_roi
+
+      - id: cost_spend_by_model
+        title: Where the money actually goes
+        concept: |
+          `system.ai_gateway.external_model_spend` reports **estimated USD directly** (no
+          price-list join needed) for external-provider traffic through the Gateway. Break it
+          down by model to see which models dominate spend — that is where a routing policy
+          has leverage, and it grounds the ROI estimate in this account's real mix.
+        action:
+          label: Show 30-day spend by model
+          test: gateway_spend_by_model
+
+      - id: cost_rate_limits
+        title: Rate limits — the hard control
+        concept: |
+          Two different controls are easy to conflate. **Rate limits** cap *throughput*: an
+          exceeded limit returns HTTP 429 immediately, and they are **GA**. **Budgets** cap
+          *spend*, and today they reliably **alert** — hard "block usage" is still rolling
+          out. So rate limits are the control you can promise a security team will hold.
+
+          They apply per service, per user, and per group, in queries/minute (QPM) and
+          tokens/minute (TPM), with the most restrictive limit winning. This reads back what
+          is enforced on the governed endpoint; set limits in the AI Gateway UI so the
+          workshop never changes throughput on a live customer endpoint.
+        action:
+          label: Show enforced rate limits
+          test: rate_limits
+        manual:
+          label: Set a rate limit on the endpoint
+          deep_link: serving_endpoint
 
       - id: cost_budgets
-        title: Budgets & hard spend caps
+        title: Budgets & spend thresholds
         concept: |
-          Rate limits cap throughput; **budgets** cap spend. Budget alerts fire when a
-          project/team/user crosses a monthly threshold (GA), and hard spend caps block traffic
-          at the cap (roadmap). Budgets are scoped by the same project tags applied below and
-          configured in the account console.
+          Budgets are scoped to the account and configured in the account console, with
+          shared and per-user thresholds. **Alerts are GA; hard blocking is rolling out** —
+          confirm on this account before telling a FinOps owner that spend is hard-capped.
+
+          Enforcement is based on near-real-time estimates, so thresholds are approximate in
+          both directions. Pair budgets with the rate limit above: the budget tells you when
+          spend is drifting, the rate limit is what actually stops it.
         action:
-          label: Check current spend vs budget (by project)
+          label: Show 30-day spend the budget governs
           test: budget_status
         manual:
           label: Create a budget in the account console

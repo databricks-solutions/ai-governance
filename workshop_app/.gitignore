@@ -6,6 +6,8 @@ __pycache__/
 
 # Node
 node_modules/
+# frontend/dist IS committed so the app deploys without Node — rebuild it after
+# editing frontend/src (npm ci && npm run build).
 
 # Local config override
 config/workshop.local.yaml

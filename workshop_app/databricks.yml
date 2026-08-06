@@ -11,18 +11,23 @@ bundle:
   name: ai-governance-workshop
 
 # config/*.yaml must be synced with the app source (customer-edited config lives here).
+# frontend/src is excluded because only the built frontend/dist is served. node_modules and
+# __pycache__ are already covered by .gitignore, which sync honors.
 sync:
-  include:
-    - "config/*.yaml"
   exclude:
-    - "**/node_modules"
-    - "**/__pycache__"
     - "frontend/src"
 
 variables:
+  # No `default:` on purpose — a bundle command with no warehouse fails immediately with
+  # "no value assigned to required variable warehouse_id" instead of deploying an app whose
+  # warehouse id is the empty string and failing later, in front of the customer.
   warehouse_id:
-    description: "SQL warehouse id the app uses (mirror of config workspace.warehouse_id)."
-    default: ""
+    description: "SQL warehouse id the app uses. Required: --var=\"warehouse_id=<id>\"."
+  catalog:
+    description: "Existing UC catalog to create the workshop schema in. Must match config/workshop.yaml catalog.name."
+  schema:
+    description: "UC schema for workshop artifacts (policy function, inference tables)."
+    default: ai_governance_workshop
   lakebase_instance:
     description: "Lakebase instance name that backs workshop progress."
     default: ai-governance-workshop
@@ -32,6 +37,14 @@ resources:
     workshop_lakebase:
       name: ${var.lakebase_instance}
       capacity: CU_1
+
+  # The app writes the MCP service-policy function here and reads inference tables from
+  # here. Without this the schema never exists and those steps fail on a fresh workspace.
+  schemas:
+    workshop_schema:
+      catalog_name: ${var.catalog}
+      name: ${var.schema}
+      comment: "AI Governance Workshop artifacts (service policies, inference tables)."
 
   apps:
     ai_governance_workshop_app:
@@ -45,13 +58,19 @@ resources:
             permission: CAN_USE
         - name: database
           database:
-            instance_name: ${var.lakebase_instance}
+            # Reference the resource (not var.lakebase_instance) so Terraform orders the
+            # instance before the app. A plain string creates no dependency edge, which is
+            # why the app could previously start before Lakebase was AVAILABLE.
+            instance_name: ${resources.database_instances.workshop_lakebase.name}
             database_name: databricks_postgres
             permission: CAN_CONNECT_AND_CREATE
 
 targets:
   dev:
-    mode: development
+    # `mode: development` is deliberately NOT used. It prefixes `schemas` names
+    # (dev_<user>_<name>) while leaving apps and database_instances literal, which would
+    # point the app at a schema the bundle did not create. Names stay literal here so the
+    # bundle, config/workshop.yaml, and the running app all agree.
     default: true
   prod:
     mode: production

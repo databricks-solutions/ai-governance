@@ -63,39 +63,92 @@ the exported outcomes, so anything you run shows up in the internal sales app.
 
 ## Deploy on a customer workspace
 
-Prereqs: Databricks CLI ≥ 0.297 authenticated to the workspace, a SQL warehouse, and Node
-(to build the frontend locally — `node_modules` is never uploaded, but `frontend/dist` is).
+Prereqs: Databricks CLI ≥ 0.297 authenticated to the workspace, a SQL warehouse, and an
+existing Unity Catalog catalog. `frontend/dist` is committed, so Node is only needed if you
+change anything under `frontend/src`.
 
-> **You must supply a SQL warehouse id on every `bundle` command.** The bundle has no
-> default warehouse (it's customer-deployable and can't assume one exists), so both
-> `bundle deploy` and `bundle run` require `--var="warehouse_id=<sql-warehouse-id>"`.
-> Omitting it fails with `Invalid SQL warehouse resource sql-warehouse: ID  is invalid.`
+> **`warehouse_id` and `catalog` are required on every `bundle` command.** Neither has a
+> default — a customer-deployable bundle can't assume a warehouse or catalog exists. Omit
+> either and the command fails immediately with
+> `no value assigned to required variable ...`, which is deliberate: the alternative is a
+> deploy that succeeds and then fails every governance step in front of the customer.
 
 ```bash
 # 1. Edit config/workshop.yaml — set at minimum:
-#      workspace.warehouse_id, catalog.name/schema, and the endpoint/mcp/project names.
+#      catalog.name (same value you pass as --var="catalog=..."), and the
+#      endpoint / mcp / project names. Leave workspace.warehouse_id blank: the deployed app
+#      reads the warehouse from the bundle resource (see app.yaml).
 
-# 2. Build the frontend
-cd frontend && npm install && npm run build && cd ..
+# 2. Deploy — creates the Lakebase instance, the UC schema, and the app
+databricks bundle deploy -t dev -p <profile> \
+  --var="warehouse_id=<sql-warehouse-id>" \
+  --var="catalog=<existing-uc-catalog>"
 
-# 3. Deploy the bundle (creates the Lakebase instance + the app) — warehouse id is required
-databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<sql-warehouse-id>"
+# 3. Grant the app's service principal what it needs (see below) — REQUIRED
 
-# 4. Start the app — warehouse id is required here too
-databricks bundle run ai_governance_workshop_app -t dev -p <profile> --var="warehouse_id=<sql-warehouse-id>"
+# 4. Start the app
+databricks bundle run ai_governance_workshop_app -t dev -p <profile> \
+  --var="warehouse_id=<sql-warehouse-id>" \
+  --var="catalog=<existing-uc-catalog>"
 ```
 
 App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.com`.
-If the first deploy fails with "database instance ... does not exist", the Lakebase instance
-is still provisioning — wait until it's `AVAILABLE` and re-run the deploy.
+
+Confirm the deploy is healthy before the workshop starts — `GET /api/health` returns
+`{"status":"ok"}`, or `{"status":"misconfigured", "config_problems":[...]}` naming exactly
+what is unset.
+
+### Grant the app's service principal (required)
+
+The bundle grants the app **only** `CAN_USE` on the warehouse and `CAN_CONNECT_AND_CREATE`
+on the Lakebase instance. Every Unity Catalog and system-table grant is manual, and without
+them the policy-function step and all usage/cost queries fail. Get the app's service
+principal id from `databricks apps get ai-governance-workshop`, then:
+
+```sql
+-- Workshop artifacts (the MCP service-policy function lives here)
+GRANT USE CATALOG ON CATALOG <catalog> TO `<app-sp-client-id>`;
+GRANT USE SCHEMA, CREATE FUNCTION, EXECUTE, SELECT, MODIFY
+  ON SCHEMA <catalog>.<schema> TO `<app-sp-client-id>`;
+
+-- Telemetry the Cost and Control pillars read
+GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.serving    TO `<app-sp-client-id>`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.billing    TO `<app-sp-client-id>`;
+```
+
+Granting on `system` schemas needs a metastore or account admin — line that up before the
+workshop rather than during it. See `docs/APIS_AND_SETUP.md` for the full dependency list.
+
+### Known deployment caveats
+
+- **Lakebase provisioning** — the app depends on the instance resource, so Terraform orders
+  them, but a first deploy can still outrun a cold `CU_1` instance. The app no longer dies
+  if Lakebase is unreachable: it starts without progress tracking and logs a warning, so the
+  guidebook and every Try-It step still work.
+- **Attendee access** — the bundle adds no `permissions:` block, so by default only the
+  deployer can open the app. Grant `CAN_USE` to the workshop group before the session.
+- **One deploy per workspace** — the app and Lakebase instance use literal names, so two
+  people deploying to the same workspace collide. Override `--var="lakebase_instance=..."`
+  and the app `name:` if that matters.
 
 ### Local development
 
 ```bash
-# Backend (uses your CLI profile; set a warehouse in config or DATABRICKS_WAREHOUSE_ID)
-DATABRICKS_PROFILE=<profile> uv run uvicorn app:app --reload --port 8000
+# Backend — local dev has no app resource, so set a warehouse explicitly
+DATABRICKS_PROFILE=<profile> DATABRICKS_WAREHOUSE_ID=<id> \
+  uv run uvicorn app:app --reload --port 8000
 # Frontend (proxies /api to :8000)
-cd frontend && npm run dev
+cd frontend && npm ci && npm run dev
+```
+
+After changing anything in `frontend/src`, rebuild and commit `frontend/dist` — it is
+committed so the app deploys without Node:
+
+```bash
+cd frontend && npm ci && npm run build
 ```
 
 ## Progress tracking (Lakebase)

@@ -51,7 +51,43 @@ def get_oauth_token() -> str:
 
 
 def get_warehouse_id() -> str:
-    wid = os.environ.get("DATABRICKS_WAREHOUSE_ID") or get_config().get("workspace", {}).get("warehouse_id")
+    """The SQL warehouse the app runs statements against.
+
+    DATABRICKS_WAREHOUSE_ID wins: app.yaml binds it to the bundle's `sql-warehouse`
+    resource, so the value passed to `bundle deploy --var="warehouse_id=..."` is
+    authoritative. config/workshop.yaml is the local-development fallback.
+    """
+    wid = (os.environ.get("DATABRICKS_WAREHOUSE_ID")
+           or get_config().get("workspace", {}).get("warehouse_id"))
     if not wid:
-        raise RuntimeError("No SQL warehouse configured (workspace.warehouse_id or DATABRICKS_WAREHOUSE_ID).")
+        raise RuntimeError(
+            "No SQL warehouse configured. Deployed: pass "
+            '--var="warehouse_id=<id>" to `bundle deploy`. Local: set '
+            "workspace.warehouse_id in config/workshop.yaml or DATABRICKS_WAREHOUSE_ID."
+        )
     return wid
+
+
+def config_problems() -> list[str]:
+    """Config values that must be set before the workshop will work.
+
+    Checked at startup and exposed on /api/health so a misconfigured deploy is caught
+    before a room full of people starts clicking Try It, rather than surfacing as a
+    confusing per-step SQL error.
+    """
+    cfg = get_config()
+    problems = []
+    cat = cfg.get("catalog", {}) or {}
+    if not cat.get("name"):
+        problems.append(
+            "catalog.name is empty in config/workshop.yaml — set it to a catalog that "
+            "exists on this workspace (and pass the same value as the bundle's `catalog` "
+            "variable so the schema is created in the right place)."
+        )
+    if not cat.get("schema"):
+        problems.append("catalog.schema is empty in config/workshop.yaml.")
+    try:
+        get_warehouse_id()
+    except RuntimeError as e:
+        problems.append(str(e))
+    return problems
