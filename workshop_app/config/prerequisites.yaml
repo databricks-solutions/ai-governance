@@ -1,0 +1,183 @@
+# Workshop prerequisites — the checklist to send the customer BEFORE the session.
+#
+# Config-driven for the same reason steps.yaml is: an SE can edit the checklist for a
+# customer without touching code. Rendered on the Walkthrough page and exported as a PDF
+# with real checkboxes (GET /api/export/prerequisites.pdf).
+#
+# Groups are ordered by LEAD TIME, not importance — the items that stall a workshop are the
+# ones needing an account admin, and those take days. Keep it that way.
+#
+# Fields:
+#   id        stable key (used as the PDF checkbox anchor)
+#   item      what must be true (short — it is a checkbox label)
+#   why       what breaks without it. Say the consequence, not the category.
+#   who       who can actually do it
+#   optional  true if only needed for a specific scope; say which in `why`
+#
+# Kept in sync with docs/PREREQUISITES.md, which carries the long-form detail.
+
+lead_time_note: >-
+  Send groups 1 and 2 to the customer at least one week out. Group 5 is the day-before check.
+  The one-line test that everything landed: GET /api/health on the deployed app returns
+  {"status":"ok","config_problems":[]}. If it names a problem, that is your blocker list.
+
+groups:
+  - id: account_admin
+    title: Account admin
+    lead_time: Days — start here
+    intro: >-
+      These cannot be fixed on the day. Nothing else matters if they are missing.
+    items:
+      - id: uaig_enabled
+        item: Unity AI Gateway enabled on the account and the workshop workspace
+        why: Nothing in the workshop works without it.
+        who: Account admin
+      - id: grant_ai_gateway
+        item: "USE CATALOG on `system` + USE SCHEMA, SELECT on `system.ai_gateway` for the app's service principal"
+        why: >-
+          Without it 6 steps cannot read telemetry: spend by model, budget status,
+          usage by project, per-developer coding-agent attribution, MCP telemetry, and
+          telemetry readiness. They report "action needed" rather than failing, so the
+          workshop still runs — but you lose every number that proves cost visibility.
+        who: Account or metastore admin
+      - id: grant_access
+        item: "USE SCHEMA, SELECT on `system.access` for the app's service principal"
+        why: >-
+          Without it the audit trail and secret-leak scan cannot run (2 steps), so you
+          cannot show who called what or that leaked keys are detectable — usually the
+          security team's main question.
+        who: Account or metastore admin
+      - id: service_policies
+        item: Service policies (Beta) enabled
+        why: Needed to attach an ALLOW/DENY policy. Only if the MCP policy steps are in scope.
+        who: Account admin
+        optional: true
+      - id: managed_mcp
+        item: Managed MCP preview enabled
+        why: Enables the /api/2.0/mcp/... endpoints. Only if MCP steps are in scope.
+        who: Account admin
+        optional: true
+      - id: read_system_grants
+        item: Ability to read grants on `system` (MANAGE or metastore-admin)
+        why: >-
+          Lets the "What can everyone already reach?" step read the default grants directly
+          instead of asking an admin mid-session. Without it the step still reports the
+          finding and prints the SHOW GRANTS statement to run — it just costs a minute.
+        who: Metastore admin
+        optional: true
+
+  - id: platform
+    title: Platform & metastore
+    lead_time: Hours
+    items:
+      - id: catalog
+        item: An existing Unity Catalog catalog for the workshop
+        why: >-
+          The bundle creates the schema, not the catalog. Passed as `-c` to deploy.sh.
+        who: Metastore admin
+      - id: warehouse
+        item: A running SQL warehouse
+        why: Every system-table query runs through it. Passed as `-w`. Serverless starts fastest.
+        who: Workspace admin
+      - id: deployer_privs
+        item: "Deployer can create Apps, has USE CATALOG + CREATE SCHEMA on the catalog, CAN_USE on the warehouse"
+        why: The bundle deploy fails partway without these, leaving a half-created app.
+        who: Workspace admin
+      - id: external_storage
+        item: An external-storage catalog
+        why: >-
+          Inference tables cannot be created in a default-storage catalog. Only if the
+          guardrail/PII payload-logging steps are in scope.
+        who: Metastore admin
+        optional: true
+      - id: workshop_group
+        item: A group for attendee app access
+        why: Passed as `-g`; attendees get CAN_USE on the app. Defaults to `users`.
+        who: Workspace admin
+
+  - id: identity_network
+    title: Identity, network & agents
+    lead_time: Hours to days
+    items:
+      - id: pilot_users
+        item: Pilot users from the customer IdP
+        why: >-
+          Per-user attribution and on-behalf-of identity are only meaningful with real
+          identities. Shared logins make the OBO demo prove nothing.
+        who: Identity admin
+      - id: egress
+        item: Egress allowlisted to the provider
+        why: >-
+          The serving layer must reach the provider. Only if external providers or external
+          MCP are in scope.
+        who: Network admin
+        optional: true
+      - id: coding_agent
+        item: Coding agent chosen and installable
+        why: >-
+          Claude Code, Cursor, or Codex. `ucode` is the fastest path
+          (uv tool install git+https://github.com/databricks/ucode, needs Python 3.12+).
+          If laptops are locked down the coding-agent steps become a demo, not hands-on —
+          worth knowing in advance.
+        who: Customer team
+
+  - id: decisions
+    title: Content decisions
+    lead_time: Minutes — but make them beforehand
+    intro: >-
+      Small, and they materially change how well the workshop lands.
+    items:
+      - id: sample_prompt
+        item: A representative prompt for the routing ROI step
+        why: >-
+          `cost.routing.sample_prompt`. The savings number only persuades if it is their kind
+          of work — a generic prompt produces a number nobody believes.
+        who: Workshop lead
+      - id: dbu_rate
+        item: Negotiated $/DBU rate
+        why: >-
+          `cost.routing.dbu_to_usd`. Until set, dollar figures are list-price illustrative.
+          Token counts are always real.
+        who: Account team
+      - id: accelerator
+        item: Which accelerator (if any)
+        why: Pick the one matching their priority. Do not run all five — there is not time.
+        who: Workshop lead
+        optional: true
+      - id: mcp_service
+        item: Which MCP service to govern
+        why: >-
+          `mcp.builtin_service`. Availability differs per workspace. Note system.ai.github is
+          already read-only (no write tool to deny), and system.ai.atlassian needs per-user
+          OAuth consent first.
+        who: Workshop lead
+        optional: true
+      - id: budget_owner
+        item: Who owns the AI budget
+        why: Determines whether the FinOps owner needs to be in the room.
+        who: Account team
+
+  - id: day_before
+    title: Day-before check
+    lead_time: 10 minutes
+    intro: >-
+      Run in order. Each has an unambiguous pass condition.
+    items:
+      - id: deploy_run
+        item: "Run deploy.sh (idempotent) and confirm the app reports RUNNING"
+        why: Catches a broken bundle, a missing schema, or a stale frontend build.
+        who: Workshop lead
+      - id: health_ok
+        item: 'GET /api/health returns {"status":"ok","config_problems":[]}'
+        why: Names any unset config before the room does.
+        who: Workshop lead
+      - id: account_id_set
+        item: Walkthrough page loads and an Account ID is set
+        why: Progress and the outcomes export are keyed to it. Nothing is saved without it.
+        who: Workshop lead
+      - id: smoke_steps
+        item: Run one step per pillar as a smoke test
+        why: >-
+          Proves warehouse, UC, and gateway access in that workspace before an audience is
+          watching. Connect (choice), the model panel (cost), endpoint ACL (control).
+        who: Workshop lead

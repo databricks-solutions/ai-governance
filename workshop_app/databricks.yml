@@ -24,7 +24,7 @@ bundle:
 # Does NOT require npm on every deploy: build.sh skips the build when dist/ is already newer
 # than every source file, so a dist built elsewhere (or by CI) deploys with no network access.
 # npm is only needed when dist is genuinely stale. On a Databricks-managed laptop the public
-# registry is blocked — see frontend/.npmrc.example for the internal mirror.
+# registry is blocked by the Jamf JAMF-DNS-v1 control — use the Databricks npm proxy (README).
 artifacts:
   frontend:
     path: ./frontend
@@ -32,8 +32,7 @@ artifacts:
     # timeout: a bare `npm install` on a machine with the public registry blocked retries
     # until it hangs, so the deploy never finishes. build.sh skips the build when dist/ is
     # already newer than every source file, and fails loudly (never silently) when dist is
-    # stale and cannot be rebuilt. It also uses `npm install`, not `npm ci`, because this
-    # project has no committed lockfile and `npm ci` requires one.
+    # stale and cannot be rebuilt. It uses `npm ci` (reproducible, lockfile-exact).
     build: ./build.sh
     files:
       # Declaring the entry point makes the CLI fail if the build produced nothing, instead

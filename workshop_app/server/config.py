@@ -52,6 +52,12 @@ def get_accelerators() -> dict:
         return yaml.safe_load(f)
 
 
+@lru_cache(maxsize=1)
+def get_prerequisites() -> dict:
+    with open(_CONFIG_DIR / "prerequisites.yaml") as f:
+        return yaml.safe_load(f)
+
+
 def get_workspace_client() -> WorkspaceClient:
     if IS_DATABRICKS_APP:
         return WorkspaceClient()

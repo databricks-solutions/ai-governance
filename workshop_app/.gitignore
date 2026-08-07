@@ -15,9 +15,9 @@ frontend/dist/
 # Local config override
 config/workshop.local.yaml
 
-# npm registry credentials. Public registries are blocked by managed policy, so building
-# here needs a JFrog token in frontend/.npmrc — that file holds a secret and must never be
-# committed. See frontend/.npmrc.example for the template.
+# Local npm config, if anyone sets one per-project. The sanctioned registry is the
+# unauthenticated Databricks proxy (see README), so no token belongs here — but ignore it
+# anyway so a credential can never be committed by accident.
 frontend/.npmrc
 
 # Databricks

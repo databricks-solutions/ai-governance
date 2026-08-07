@@ -6,7 +6,7 @@
 #
 #   1. `bundle deploy` runs the build UNCONDITIONALLY and with no timeout. On a machine where
 #      the public npm registry is blocked — the default on a Databricks-managed laptop, see
-#      .npmrc.example — a bare `npm install` retries until it hangs, so `bundle deploy` never
+#      README — a bare `npm ci` retries until it hangs, so `bundle deploy` never
 #      completes. That is worse than the problem the build step was added to solve.
 #   2. So: if dist/ is already newer than every source file, this is a no-op. A prebuilt dist
 #      deploys with no network access at all, which is what makes the bundle usable offline
@@ -42,23 +42,23 @@ else
   echo "frontend: no dist/ yet — building."
 fi
 
-if ! npm install --no-audit --no-fund; then
+if ! npm ci --no-audit --no-fund; then
   cat >&2 <<'MSG'
 
-frontend: npm install FAILED, and dist/ is stale or missing.
+frontend: npm ci FAILED, and dist/ is stale or missing.
 
 The deploy is stopping here on purpose: shipping a stale dist means the app serves an old UI
 (or a blank page) with no error, which is much harder to debug than this message.
 
-If the public npm registry is blocked on this machine (the default on a Databricks-managed
-laptop), configure the internal mirror first:
+On a Databricks-managed laptop the public npm registry is blocked at /etc/hosts by the Jamf
+JAMF-DNS-v1 supply-chain control. Do NOT edit /etc/hosts — point npm at the Databricks proxy
+instead (no auth required):
 
-    cd frontend
-    cp .npmrc.example .npmrc      # then paste a JFrog identity token into it
-    npm install && npm run build
+    npm config set registry https://npm-proxy.cloud.databricks.com/
 
-Then re-run the deploy. To ship a dist you have already built elsewhere, copy it into
-frontend/dist/ — this script then detects it as current and skips the build.
+Then re-run the deploy. See go/registry-access, or #npm-registry-access if a package is
+blocked. To ship a dist built elsewhere, copy it into frontend/dist/ — this script then
+detects it as current and skips the build.
 MSG
   exit 1
 fi

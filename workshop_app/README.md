@@ -95,7 +95,7 @@ App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.
 <summary>Manual equivalent, if you can't run the script</summary>
 
 ```bash
-cd frontend && npm ci && npm run build && cd ..
+cd frontend && npm ci && npm run build && cd ..   # or just: databricks bundle deploy (builds for you)
 
 # warehouse_id and catalog are required — no defaults, so a missing one fails immediately
 # rather than deploying an app that fails every governance step in front of the customer.
@@ -118,26 +118,31 @@ the app will write to a different schema than the bundle created.
 </details>
 
 > **Building the frontend on a Databricks laptop.** Public package registries
-> (`registry.npmjs.org`, `registry.yarnpkg.com`, `pypi.org`, and many mirrors) are pinned to
-> `127.0.0.1` in `/etc/hosts` by managed endpoint policy, so a default `npm install` fails
-> instantly with `ECONNREFUSED` — the DNS lookup succeeds, which makes it look like a network
-> fault rather than a policy. Use the internal mirror, which is what CI uses:
+> (`registry.npmjs.org`, `registry.yarnpkg.com`, `pypi.org`) are pinned to `127.0.0.1` in
+> `/etc/hosts` by the Jamf-managed `JAMF-DNS-v1` control, so a default `npm install` fails with
+> `ECONNREFUSED`. This is deliberate supply-chain protection, not a broken laptop: the
+> Databricks proxy quarantines newly published packages (~7 days) and blocks known-malicious
+> ones. **Do not edit `/etc/hosts`** — Jamf restores it, and it is a policy violation.
+>
+> Point npm at the Databricks proxy instead. **No token or auth is required:**
 >
 > ```bash
-> cd frontend
-> cp .npmrc.example .npmrc     # then paste a JFrog access token into it
-> npm install && npm run build
+> npm config set registry https://npm-proxy.cloud.databricks.com/
+> cd frontend && npm install && npm run build
 > ```
 >
-> Get the token from Artifactory → Edit Profile → Generate an Identity Token. `.npmrc` is
-> gitignored because it holds that secret. Don't edit `/etc/hosts` to work around this.
+> For Python, the equivalent is
+> `pip config set global.index-url https://pypi-proxy.cloud.databricks.com/simple`
+> (or `UV_INDEX_URL=...` for uv). Full guide: **go/registry-access**. If a package is blocked
+> as risky, ask in `#npm-registry-access` or `#public-registry-access` rather than working
+> around the control.
 >
-> **No lockfile yet.** `frontend/package-lock.json` is intentionally absent — the one
-> generated here was missing `resolved`/`integrity` for nearly every package, so `npm ci`
-> produced an unusable `node_modules`. Once a real `npm install` succeeds via the mirror
-> above, commit the lockfile it writes and `npm ci` (with reproducible builds) starts working.
-> Until then `deploy.sh` falls back to `npm install`, and only builds when `frontend/dist` is
-> actually stale — so a deploy from a prebuilt `dist` (`-B`) needs no registry access at all.
+> **Lockfile.** `frontend/package-lock.json` is committed and complete (86 packages, all with
+> `resolved` + `integrity`), so `npm ci` gives reproducible builds. The `resolved` URLs point at
+> `registry.npmjs.org` **on purpose**, not at the internal proxy: this is a public repo and a
+> customer must be able to `npm ci` it. Integrity hashes are registry-independent, so the
+> Databricks proxy serves the same lockfile transparently — verified by a clean
+> `rm -rf node_modules && npm ci` through the proxy.
 
 ### The one manual step: two `system` grants (account admin)
 
