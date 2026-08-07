@@ -176,7 +176,7 @@ ok "app URL: ${APP_URL:-<unknown>}"
 # --------------------------------------------------------------------- system grants
 step "Remaining manual step: two system-schema grants (account admin)"
 cat <<SQL
-    Run these as an account or metastore admin. Without them the seven telemetry steps
+    Run these as an account or metastore admin. Without them the 8 telemetry steps
     report "action needed" — every other step, including the routing ROI, still works.
 
     GRANT USE CATALOG ON CATALOG system TO \`$APP_SP\`;
@@ -196,7 +196,7 @@ done
 if [[ ${HEALTH:-} == RUNNING ]]; then
   ok "app is RUNNING"
   echo
-  echo "    Open $APP_URL and confirm the Introduction page loads."
+  echo "    Open $APP_URL and confirm the Walkthrough page loads."
   echo "    If a step reports a config problem, GET /api/health names exactly what is unset."
 else
   warn "app is not RUNNING yet (state: ${HEALTH:-unknown})."
