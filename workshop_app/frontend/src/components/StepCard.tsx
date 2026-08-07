@@ -4,6 +4,8 @@ import { api, type Step, type TestResult, type ProgressMap } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 import { cn } from "@/lib/cn";
 import McpDiagram from "@/components/McpDiagram";
+import Markdown from "@/components/Markdown";
+import ResultDetail from "@/components/ResultDetail";
 
 type Saved = ProgressMap[string] | null;
 
@@ -102,7 +104,7 @@ export default function StepCard({
           <div className="mb-1.5">
             <Badge kind="concept" />
           </div>
-          <p className="whitespace-pre-line text-sm leading-relaxed text-muted">{step.concept.trim()}</p>
+          <Markdown text={step.concept.trim()} compact />
         </div>
       )}
 
@@ -186,9 +188,7 @@ export default function StepCard({
             </div>
           )}
           {result.detail && Object.keys(result.detail).length > 0 && (
-            <pre className="mt-3 max-h-64 overflow-auto rounded-lg bg-navy/[0.03] p-3 text-xs leading-relaxed text-navy/80">
-              {JSON.stringify(result.detail, null, 2)}
-            </pre>
+            <ResultDetail detail={result.detail} />
           )}
         </div>
       )}

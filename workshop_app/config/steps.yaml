@@ -14,31 +14,35 @@
 intro:
   title: What this workshop accomplishes
   body: |
-    By the end of this half-day you will have stood up a **governed AI control plane** on
-    your own workspace and proven it works — not on slides, live. You'll work through three
-    pillars:
+    In four hours you will stand up a governed AI control plane on your own workspace and
+    watch each control fire. Every test runs against this workspace — nothing is simulated.
 
-    - **Choice** — an open, multi-AI ecosystem: put any model, tool, or agent behind one
-      governed control plane, and register them as first-class Unity Catalog assets.
-    - **Cost** — intelligent cost controls: see the cost impact of routing between models,
-      set budgets and hard spend caps, and attribute every AI dollar to a team.
-    - **Control** — agent-aware data + AI governance: rate limits, guardrails, and contextual
-      MCP policies that block the right requests, plus end-to-end observability of every call.
+    Three pillars:
 
-    Each step explains the concept, gives you a **Try It** action that exercises the control
-    against this workspace, and a **Verify** step that proves it fired. Your progress is saved
-    so you can pause and resume.
+    - **Choice** — put any model, tool, or agent behind one control plane, addressed as a
+      Unity Catalog securable instead of a workspace endpoint name.
+    - **Cost** — measure what routing between models actually saves, set budgets and rate
+      limits, and attribute every request to a team.
+    - **Control** — rate limits, guardrails, and MCP service policies that deny the right
+      calls, plus the telemetry that proves they did.
+
+    Each step has three parts: the concept, a **Try It** that exercises the control here, and
+    a **Verify** that proves it fired. Results show the API called and the SQL run, so you can
+    see exactly what the app does to your workspace. Progress is saved per Account ID.
+
+    **Start with Prerequisites** if you have not already — two `system` grants need an account
+    admin, and they gate 8 of the 20 steps.
 
 pillars:
   - id: choice
     title: Choice
-    tagline: Open, multi-AI ecosystem — any model, tool, or agent behind one control plane.
+    tagline: Any model, tool, or agent behind one control plane, addressed as a UC securable.
     steps:
       - id: choice_connect
         title: Connect to the workspace
         concept: |
-          The workshop app runs as a governed Databricks App. First we confirm it can reach
-          your SQL warehouse and read the workshop config — everything downstream depends on it.
+          This app runs as a Databricks App with its own service principal. Confirm it can reach
+          your SQL warehouse and read its config — every later step depends on both.
         action:
           label: Test connection
           test: connection
@@ -49,10 +53,9 @@ pillars:
       - id: choice_list_endpoints
         title: Discover the model surface
         concept: |
-          You can't govern what you can't see. This lists the serving endpoints available on
-          the workspace — foundation models, external models, and any custom endpoints — the
-          raw material of **choice**. An open ecosystem means adopting any of them without
-          rebuilding governance for each.
+          Lists every serving endpoint on this workspace: foundation models, external models,
+          and custom ones. This is the inventory you are about to govern — and the baseline for
+          the next step, which shows how much of it is already reachable by everyone.
         action:
           label: List serving endpoints
           test: list_endpoints
@@ -60,19 +63,19 @@ pillars:
       - id: choice_default_access
         title: What can everyone already reach?
         concept: |
-          Before adding a single control, look at the default. `system.ai` ships with
-          **`EXECUTE` granted to `account users`** — inherited from the `system` catalog — so
-          every user on the account can call every provided model service right now, without
-          going near anything you are about to build.
+          Check the default before adding controls. `system.ai` grants **`EXECUTE` to
+          `account users`**, inherited from the `system` catalog. Every user on the account can
+          call every provided model service right now.
 
-          This is the Databricks default, not a misconfiguration. But it means a governed
-          endpoint with guardrails, rate limits, and budgets sits *beside* an open path rather
-          than in front of it. Locking down the default is the first action on the rollout
-          list, and it is the finding that lands hardest with a security team.
+          This is the shipped default, not a misconfiguration. It does mean a governed endpoint
+          with guardrails and budgets sits *beside* an open path rather than in front of it, so
+          locking it down is the first rollout action.
 
-          This step is **read-only** — it reports the grants and names the remediation.
-          Narrowing access on `system` is a platform-owner decision, so the workshop shows it
-          rather than changing it on your metastore.
+          Note the inheritance: revoking on `system.ai` alone does not close the path, because
+          the grant comes from the parent catalog. This step checks both.
+
+          **Read-only.** It reports the grants and the remediation. Narrowing `system` is the
+          platform owner's call, so the app does not change it.
         action:
           label: Show what all account users can reach
           test: default_access
@@ -80,14 +83,13 @@ pillars:
       - id: choice_model_services
         title: The governed object — and the one client change
         concept: |
-          The step that makes the rest of the workshop coherent. Previously, controls hung off
-          a **workspace serving endpoint**: the endpoint name *was* the application contract,
-          and access was a workspace ACL. Now they hang off a **model service** — a Unity
-          Catalog securable with a fully-qualified name.
+          Controls used to hang off a **workspace serving endpoint**: the endpoint name was the
+          application contract and access was a workspace ACL. They now hang off a **model
+          service** — a Unity Catalog securable with a fully-qualified name.
 
-          Why that matters: the runtime can change behind a stable contract. Swap the model,
-          add a fallback, split traffic — the application keeps calling the same FQN, and
-          permissions are UC grants that work across every workspace on the metastore.
+          That decouples runtime from contract. Swap the model, add a fallback, or split traffic
+          and the application keeps calling the same FQN. Permissions become UC grants, which
+          apply across every workspace on the metastore.
 
           The client change is exactly two things, and they must move **together**:
 
@@ -108,24 +110,24 @@ pillars:
       - id: choice_agent_registry
         title: Register agents & tools in Unity Catalog
         concept: |
-          Choice isn't just models — it's **agents, MCP servers, and skills**, all registered
-          as first-class Unity Catalog assets so they're discoverable, owned, and governed like
-          any table. This lists the agents and UC functions (tools) already registered, the
-          inventory a governance team can actually see and control.
+          Models are not the only governed object. Agents, MCP servers, and tools register as
+          Unity Catalog assets too, which gives them an owner and a permission model instead of
+          living in someone's notebook. Lists the registered models and UC functions in the
+          workshop schema.
         action:
           label: List registered agents & tools
           test: list_registered_assets
 
   - id: cost
     title: Cost
-    tagline: Intelligent cost controls — visibility, budgets, attribution, and routing.
+    tagline: Measure routing savings, cap spend and throughput, attribute every request.
     steps:
       - id: cost_model_panel
         title: Three ways to route — and what each costs
         concept: |
-          Most AI spend is a model-choice problem: teams send every request to a frontier
-          model because it is the safe default. There are three ways to fix that, and they
-          differ mainly in who owns the routing policy:
+          Most AI spend is a model-choice problem: every request goes to a frontier model
+          because that is the safe default. Three ways to fix it, differing mainly in who owns
+          the routing policy:
 
           - **Smart routing (Databricks-managed)** — the Gateway classifies each request and
             picks a suitable model for you. No policy to write. *Beta* — confirm availability
@@ -137,8 +139,8 @@ pillars:
             to the cheapest model that clears your bar. You own the rubric.
 
           The router changes; the control plane does not. This workshop runs the **custom
-          router**, because it is the option you can stand up today and measure. Start with
-          the price panel so the arithmetic is visible before any prompt is sent.
+          router** — the one you can build today and measure. Start with the price panel so the
+          arithmetic is on screen before any prompt is sent.
         action:
           label: Show the model panel & routing policy
           test: routing_panel
@@ -146,12 +148,12 @@ pillars:
       - id: cost_routing_compare
         title: Same prompt, three price points
         concept: |
-          Send one prompt to all three models and measure real tokens, latency, and cost.
-          Expect a **10-20x spread** between the cheapest and most expensive answer.
+          One prompt, all three models, measured tokens and latency and cost. Expect a
+          **10-25x spread** between cheapest and most expensive.
 
-          Read the answers, not just the prices. Savings only count if quality holds — and
-          sometimes the cheap model is simply wrong, which is exactly the finding that makes
-          a routing rubric worth writing rather than assuming.
+          Read the answers, not just the prices. Savings only count if quality holds, and the
+          cheap model is sometimes just wrong — which is the argument for writing a routing
+          rubric instead of assuming one.
         action:
           label: Compare cost across models
           test: routing_compare
@@ -191,10 +193,11 @@ pillars:
       - id: cost_rate_limits
         title: Rate limits — the hard control
         concept: |
-          Two different controls are easy to conflate. **Rate limits** cap *throughput*: an
-          exceeded limit returns HTTP 429 immediately, and they are **GA**. **Budgets** cap
-          *spend*, and today they reliably **alert** — hard "block usage" is still rolling
-          out. So rate limits are the control you can promise a security team will hold.
+          Two controls, easy to conflate. **Rate limits** cap *throughput* — exceed one and you
+          get HTTP 429 immediately. They are GA. **Budgets** cap *spend*, and today they
+          reliably **alert**; hard blocking is still rolling out.
+
+          So rate limits are the one you can commit to holding.
 
           They apply per service, per user, and per group, in queries/minute (QPM) and
           tokens/minute (TPM), with the most restrictive limit winning. This reads back what
@@ -276,13 +279,13 @@ pillars:
 
   - id: control
     title: Control
-    tagline: Agent-aware data + AI governance — policies, guardrails, identity, and observability.
+    tagline: Policies, guardrails, identity propagation, and the telemetry that proves them.
     steps:
       - id: control_governed_endpoint
         title: Create a governed endpoint
         concept: |
-          A **governed endpoint** puts a control layer in front of a model: a fallback for
-          resilience, an inference table that logs every payload, usage tracking, and an
+          A governed endpoint puts a control layer in front of a model: a fallback for
+          resilience, an inference table logging every payload, usage tracking, and the
           attachment point for guardrails and rate limits.
         action:
           label: Create / verify governed endpoint
@@ -313,8 +316,11 @@ pillars:
         title: Guardrails on a model service
         concept: |
           Guardrails screen inputs and outputs for PII, unsafe content, and blocked keywords.
-          PII and safety filters are configured in the AI Gateway UI (no full CRUD API yet);
-          the keyword blocklist is a UC SQL function you attach as a policy.
+          Configure PII and safety filters in the AI Gateway UI — there is no full CRUD API yet.
+          The keyword blocklist is a UC SQL function you attach as a policy.
+
+          A **blocked** request is the pass condition here. If the prompt gets answered, the
+          guardrail is not attached.
         manual:
           label: Open the endpoint's Guardrails tab
           deep_link: serving_endpoint
@@ -329,8 +335,12 @@ pillars:
         title: Contextual policy for an MCP service
         concept: |
           MCP services expose tools to agents. A **service policy** is a UC SQL function that
-          inspects each tool call and returns ALLOW / DENY — e.g. allow reads, deny writes.
-          Identity propagates: the agent acts as the calling user, not a shared account.
+          inspects each tool call and returns ALLOW or DENY — allow reads, deny writes.
+          Identity propagates: the tool runs as the calling user, not a shared service account.
+
+          Two details that cost debugging time: the function is `to_variant_object(...)` (there
+          is no `to_variant`), and VARIANT paths need casting —
+          `event:context.tool.name::STRING`.
         action:
           label: Create the policy function
           test: create_mcp_policy
@@ -344,11 +354,12 @@ pillars:
       - id: control_coding_agents
         title: Govern coding-agent traffic
         concept: |
-          Developers adopt Cursor, Claude Code, Codex, and Genie Code faster than platform teams
-          can govern them. Routing that traffic through the gateway gives you **per-developer
-          attribution, one policy set, and secret-leak detection** — turning a blind spot into a
-          governed, measured surface. This checks for coding-agent usage attributable in the
-          gateway logs.
+          Developers adopt Cursor, Claude Code, and Codex faster than platform teams can govern
+          them. Route that traffic through the Gateway and you get per-developer attribution,
+          one policy set, and secret-leak detection.
+
+          Coding agents identify themselves in `user_agent`, so this works with no tagging
+          required — which is why it is usually the fastest governance win to demonstrate.
         action:
           label: Check coding-agent usage & attribution
           test: coding_agent_usage
@@ -356,9 +367,9 @@ pillars:
       - id: control_audit
         title: Audit & secret-leak detection
         concept: |
-          Governing what agents *do* means seeing it. `system.access.audit` records who called
-          what and whether policy fired. This scans recent denied calls and looks for
-          secret-shaped strings (API keys) in arguments.
+          `system.access.audit` records who called what and whether a policy fired. This scans
+          recent denied and failed calls, and looks for secret-shaped strings (`sk-`, `AKIA`,
+          `ghp_`) in the arguments.
         action:
           label: Query denied calls & scan for secrets
           test: audit_scan
@@ -366,9 +377,9 @@ pillars:
       - id: control_traces
         title: Traces in a table
         concept: |
-          MLflow traces capture agent execution — tool calls, model responses, latencies.
-          Joined to the audit log by identity and time, they give end-to-end observability of
-          agent behavior for investigation and optimization.
+          MLflow traces capture agent execution: tool calls, model responses, latencies. Join
+          them to the audit log on identity and time and you can reconstruct what an agent did,
+          not just what it was allowed to do.
         manual:
           label: Open the MLflow experiment
           deep_link: experiment

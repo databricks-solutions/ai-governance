@@ -2,44 +2,12 @@ import { Layers, Lock, DollarSign, ArrowRight, Rocket } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
 import ExportPanel from "@/components/ExportPanel";
+import Markdown from "@/components/Markdown";
 import type { Pillar, ProgressMap } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 import { cn } from "@/lib/cn";
 
 const ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
-
-// Minimal, safe markdown: paragraphs, **bold**, and - bullets.
-function Markdown({ text }: { text: string }) {
-  const blocks = text.trim().split(/\n\n+/);
-  return (
-    <div className="space-y-3 text-[15px] leading-relaxed text-muted">
-      {blocks.map((b, i) => {
-        const lines = b.split("\n");
-        if (lines.every((l) => l.trim().startsWith("- "))) {
-          return (
-            <ul key={i} className="ml-1 space-y-1.5">
-              {lines.map((l, k) => (
-                <li key={k} className="flex gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-lava" />
-                  <span dangerouslySetInnerHTML={{ __html: inline(l.replace(/^- /, "")) }} />
-                </li>
-              ))}
-            </ul>
-          );
-        }
-        return <p key={i} dangerouslySetInnerHTML={{ __html: inline(b) }} />;
-      })}
-    </div>
-  );
-}
-
-function inline(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/\*\*(.+?)\*\*/g, "<strong class='text-navy'>$1</strong>")
-    .replace(/`(.+?)`/g, "<code class='rounded bg-navy/5 px-1 py-0.5 text-[13px] text-navy'>$1</code>");
-}
 
 export default function Intro({
   intro,

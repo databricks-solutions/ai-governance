@@ -6,20 +6,20 @@
 overview:
   title: How to use the accelerators
   body: |
-    The core workshop proves the governed control plane across **choice · cost · control**.
-    The accelerators are optional **~4-hour add-ons**, each focused on one customer need —
-    run the one (or two) that matches what the customer is trying to unblock, not all five.
+    The core workshop proves the control plane across choice, cost, and control. Accelerators
+    are optional ~4-hour add-ons, each on one problem. Run the one or two that match what the
+    customer is trying to unblock — not all five. There is not time, and breadth does not
+    persuade anyone.
 
-    Each accelerator is a self-contained page with the same **concept → Try It → Verify**
-    flow as the core steps: a short setup, a live test against this workspace, and a check
-    that proves it works. Progress is tracked in Lakebase alongside the core steps and is
-    included in the exported outcomes, so an accelerator you run shows up in the sales app.
+    Same **concept → Try It → Verify** flow as the core steps, tracked in the same progress
+    store, and included in the exported outcomes.
 
-    **How to run one:**
-    - Pick the accelerator that matches the customer's priority (below).
-    - Confirm its prerequisites (noted on the page) are in place on the workspace.
-    - Work through the steps top to bottom with the customer, capturing notes as you go.
-    - Export outcomes at the end (Walkthrough → Export) — the accelerator steps are included.
+    **To run one:**
+
+    1. Pick the accelerator matching the customer's priority.
+    2. Check its prerequisites are in place on the workspace — they are noted on the page.
+    3. Work top to bottom, capturing notes as you go.
+    4. Export outcomes at the end (Walkthrough → Export).
 
 accelerators:
   - id: acc_mcp

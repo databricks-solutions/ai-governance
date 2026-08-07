@@ -58,7 +58,6 @@ function Shell() {
         <nav className="flex flex-col gap-1">
           <NavItem active={route === "intro"} onClick={() => setRoute("intro")} icon={Home} label="Walkthrough" />
           <NavItem active={route === "prereqs"} onClick={() => setRoute("prereqs")} icon={ListChecks} label="Prerequisites" />
-          <NavItem active={route === "faq"} onClick={() => setRoute("faq")} icon={HelpCircle} label="FAQ" />
           {workshop?.pillars.map((p) => {
             const { done, total } = groupProgress(p.steps);
             const Icon = PILLAR_ICONS[p.id] ?? Layers;
@@ -96,6 +95,10 @@ function Shell() {
               })}
             </>
           )}
+
+          <div className="mt-4 border-t border-white/10 pt-3">
+            <NavItem active={route === "faq"} onClick={() => setRoute("faq")} icon={HelpCircle} label="FAQ" />
+          </div>
         </nav>
 
         <div className="mt-auto text-xs text-white/40">
