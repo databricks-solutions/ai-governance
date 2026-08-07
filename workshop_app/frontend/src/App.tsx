@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle } from "lucide-react";
+import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle, ListChecks } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AccountProvider, useAccount } from "@/lib/account";
 import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
 import Faq from "@/pages/Faq";
+import Prerequisites from "@/pages/Prerequisites";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
 
@@ -55,7 +56,8 @@ function Shell() {
         </button>
 
         <nav className="flex flex-col gap-1">
-          <NavItem active={route === "intro"} onClick={() => setRoute("intro")} icon={Home} label="Introduction" />
+          <NavItem active={route === "intro"} onClick={() => setRoute("intro")} icon={Home} label="Walkthrough" />
+          <NavItem active={route === "prereqs"} onClick={() => setRoute("prereqs")} icon={ListChecks} label="Prerequisites" />
           <NavItem active={route === "faq"} onClick={() => setRoute("faq")} icon={HelpCircle} label="FAQ" />
           {workshop?.pillars.map((p) => {
             const { done, total } = groupProgress(p.steps);
@@ -102,7 +104,7 @@ function Shell() {
             className="mb-3 block w-full rounded-lg bg-white/5 px-3 py-2 text-left hover:bg-white/10"
           >
             <div className="text-[10px] uppercase tracking-wide text-white/40">Active account</div>
-            <div className="truncate text-sm font-semibold text-white/90">{sfid || "Set on Introduction →"}</div>
+            <div className="truncate text-sm font-semibold text-white/90">{sfid || "Set on Walkthrough →"}</div>
           </button>
           <div className="flex flex-col gap-1.5">
             <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-white/80">
@@ -127,6 +129,7 @@ function Shell() {
           </div>
         )}
         {route === "faq" && <Faq />}
+        {route === "prereqs" && <Prerequisites />}
         {workshop && route === "intro" && (
           <Intro
             intro={workshop.intro}

@@ -19,7 +19,7 @@ overview:
     - Pick the accelerator that matches the customer's priority (below).
     - Confirm its prerequisites (noted on the page) are in place on the workspace.
     - Work through the steps top to bottom with the customer, capturing notes as you go.
-    - Export outcomes at the end (Introduction → Export) — the accelerator steps are included.
+    - Export outcomes at the end (Walkthrough → Export) — the accelerator steps are included.
 
 accelerators:
   - id: acc_mcp

@@ -17,8 +17,8 @@ These cannot be fixed on the day. Nothing else matters if these are missing.
 | # | Item | Why it's needed | Who |
 |---|---|---|---|
 | 1 | **Unity AI Gateway enabled** on the account and the workshop workspace | Nothing in the workshop works without it | Account admin |
-| 2 | **`SELECT` on `system.ai_gateway`** for the app's service principal | Spend by model, per-developer attribution, MCP telemetry | Account or metastore admin |
-| 3 | **`SELECT` on `system.access`** for the app's service principal | Audit trail, secret-leak scan | Account or metastore admin |
+| 2 | **`USE CATALOG` on `system` + `USE SCHEMA, SELECT` on `system.ai_gateway`** for the app's service principal | **6 steps** read this: spend by model, budget status, usage by project, coding-agent attribution, MCP telemetry, telemetry readiness | Account or metastore admin |
+| 3 | **`USE SCHEMA, SELECT` on `system.access`** for the app's service principal | **2 steps**: the audit trail and the secret-leak scan | Account or metastore admin |
 | 4 | **Service policies (Beta) enabled** — only if MCP policy steps are in scope | Attaching an ALLOW/DENY policy | Account admin |
 | 5 | **Managed MCP preview enabled** — only if MCP steps are in scope | `/api/2.0/mcp/...` endpoints | Account admin |
 | 6 | *Optional:* ability to **read grants on `system`** (MANAGE or metastore-admin) | `choice_default_access` reads them directly instead of asking an admin mid-session | Metastore admin |
@@ -45,10 +45,29 @@ GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;
 `system.serving`, and `system.information_schema` were each removed once they proved
 avoidable, precisely to keep this ask small.
 
+### Why these grants, exactly
+
+The Gateway records what it did in **system tables**, and the app reads them over the SQL
+warehouse as its own service principal. Nothing else can answer "what did this cost?" or "who
+called that?" — the control APIs report *configuration*, not *behaviour*. So without these two
+grants the workshop can still prove a control **exists**; it cannot prove it **fired**.
+
+Precisely which steps need which grant (8 of the 20 core steps):
+
+| Grant | Steps that need it |
+|---|---|
+| `system.ai_gateway` | `cost_spend_by_model` · `cost_budgets` · `cost_usage` · `control_coding_agents` · `mcp_telemetry` (accelerator) · `telemetry_readiness` (accelerator) |
+| `system.access` | `control_audit` · `pii_safety_readiness` (accelerator) |
+
+`USE CATALOG ON CATALOG system` is needed as well: `USE SCHEMA` alone does not grant traversal
+to the parent catalog, so the query fails before reaching the table.
+
 **If the grants don't land in time, run the workshop anyway.** The routing ROI, endpoint
-discovery, asset inventory, rate limits, guardrail tests, and MCP policy create/verify all
-use the serving and Unity Catalog APIs and need **no `system` access**. The telemetry steps
-will report "action needed" instead of passing. That is a visible, honest gap — not a failure.
+discovery, the `system.ai` default-access check, endpoint ACLs, asset inventory, rate limits,
+guardrail tests, and MCP policy create/verify all use the serving and Unity Catalog APIs and
+need **no `system` data access**. The telemetry steps report "action needed" instead of
+passing. That is a visible, honest gap — not a failure. What you lose is every *number*: the
+dollar figures, the attribution, and the audit evidence.
 
 ---
 
@@ -117,7 +136,7 @@ curl -s -H "Authorization: Bearer $(databricks auth token -p <profile> | jq -r .
 
 Then, in the app itself:
 
-- [ ] Introduction page loads; set an **Account ID**
+- [ ] Walkthrough page loads; set an **Account ID**
 - [ ] **Choice → Test connection** passes
 - [ ] **Cost → Show the model panel** lists three models that exist on this workspace
 - [ ] **Cost → Route a prompt** returns a real saving (this is the ROI moment — never

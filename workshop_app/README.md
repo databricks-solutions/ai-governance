@@ -58,7 +58,7 @@ concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
   judge, red-team dataset.
 
 Run the one that matches the customer's priority (the accelerator overview and links live on
-the in-app **Introduction** page). Accelerator progress is tracked in Lakebase and included in
+the in-app **Walkthrough** page). Accelerator progress is tracked in Lakebase and included in
 the exported outcomes, so anything you run shows up in the internal sales app.
 
 ## Deploy on a customer workspace
@@ -216,7 +216,7 @@ cd frontend && npm ci && npm run build
 Progress is stored in the bundle's Lakebase instance, schema `workshop`, table `step_progress`:
 one row per `(customer_sfid, step_id)` with `status` (not_started / in_progress / done / failed),
 the last Try-It/Verify `last_result` (JSON), and timestamps. The whole workshop is keyed to the
-Salesforce account id set on the Introduction page, so progress and the outcomes export flow
+Account ID set on the Walkthrough page, so progress and the outcomes export flow
 straight into the internal sales app. (Deployments from before this change auto-migrate the
 legacy `run_id` column to `customer_sfid` on startup.)
 

@@ -59,7 +59,7 @@ them before the day so the room isn't blocked.
 
 ## How is my progress tracked?
 
-Progress is stored per account (by the **Account ID** set on the Introduction page) in a
+Progress is stored per account (by the **Account ID** set on the Walkthrough page) in a
 Lakebase table on the deployment. You can pause and resume; nothing is lost between sessions.
 
 A step can end in one of three states, and the distinction is deliberate: **done** (proved),
@@ -90,7 +90,7 @@ with a deep link to the exact place in the workspace to complete them.
 
 ## What do I get at the end?
 
-Export the outcomes from the Introduction page:
+Export the outcomes from the Walkthrough page:
 
 - a per-step **report** (`.md`) — every step with its status and notes, grouped by pillar,
   with the incomplete items listed as next steps. This is the leave-behind.

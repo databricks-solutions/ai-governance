@@ -151,10 +151,85 @@ export default function Intro({
         )}
 
         <section>
+          <Eyebrow>What the app needs from your workspace</Eyebrow>
+          <GrantsExplainer go={go} />
+        </section>
+
+        <section>
           <Eyebrow>Wrap up</Eyebrow>
           <ExportPanel />
         </section>
       </div>
     </>
+  );
+}
+
+// Why the app needs two `system` grants, stated where a platform team will actually read it.
+// The distinction that matters: control APIs report CONFIGURATION, system tables report
+// BEHAVIOUR. Without these grants the workshop proves a control exists but never that it fired.
+function GrantsExplainer({ go }: { go: (route: string) => void }) {
+  return (
+    <div className="rounded-2xl border border-navy/10 bg-white p-6">
+      <h3 className="font-semibold text-navy">Two Unity Catalog grants, and what they buy</h3>
+      <p className="mt-2 text-sm leading-relaxed text-muted">
+        This app reads Gateway telemetry from <strong>system tables</strong> as its own service
+        principal. That is the only place the platform records what actually happened — the
+        control APIs report <em>configuration</em>, not <em>behaviour</em>. So without these two
+        grants the workshop can still prove a control <strong>exists</strong>; it cannot prove
+        it <strong>fired</strong>, and you lose every dollar figure and every attribution.
+      </p>
+      <div className="mt-4 overflow-hidden rounded-xl border border-navy/10">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-oat text-xs uppercase tracking-wide text-muted">
+            <tr>
+              <th className="px-4 py-2 font-semibold">Grant</th>
+              <th className="px-4 py-2 font-semibold">Unlocks</th>
+            </tr>
+          </thead>
+          <tbody className="text-muted">
+            <tr className="border-t border-navy/[0.07]">
+              <td className="px-4 py-2.5 align-top">
+                <code className="rounded bg-navy/5 px-1.5 py-0.5 text-[12px] text-navy">system.ai_gateway</code>
+              </td>
+              <td className="px-4 py-2.5">
+                <span className="font-semibold text-navy">6 steps</span> — spend by model, budget
+                status, usage by project, coding-agent attribution, MCP telemetry, telemetry readiness
+              </td>
+            </tr>
+            <tr className="border-t border-navy/[0.07]">
+              <td className="px-4 py-2.5 align-top">
+                <code className="rounded bg-navy/5 px-1.5 py-0.5 text-[12px] text-navy">system.access</code>
+              </td>
+              <td className="px-4 py-2.5">
+                <span className="font-semibold text-navy">2 steps</span> — the audit trail and the
+                secret-leak scan
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <pre className="mt-4 overflow-x-auto rounded-xl bg-navy/[0.03] p-3.5 text-[11.5px] leading-relaxed text-navy/80">{`GRANT USE CATALOG ON CATALOG system TO \`<app-service-principal>\`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO \`<app-service-principal>\`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO \`<app-service-principal>\`;`}</pre>
+      <p className="mt-3 text-xs leading-relaxed text-muted">
+        <code className="rounded bg-navy/5 px-1 py-0.5">USE CATALOG</code> on{" "}
+        <code className="rounded bg-navy/5 px-1 py-0.5">system</code> is required too —{" "}
+        <code className="rounded bg-navy/5 px-1 py-0.5">USE SCHEMA</code> alone does not grant
+        traversal to the parent catalog, so the query fails before it reaches the table.{" "}
+        <code className="rounded bg-navy/5 px-1 py-0.5">deploy.sh</code> prints these with the real
+        principal filled in. Needs an account or metastore admin, so{" "}
+        <button onClick={() => go("prereqs")} className="font-semibold text-navy underline decoration-lava decoration-2 underline-offset-2 hover:text-lava">
+          start it early
+        </button>
+        .
+      </p>
+      <p className="mt-3 text-xs leading-relaxed text-muted">
+        <strong className="text-navy">If the grants are not ready, run the workshop anyway.</strong>{" "}
+        Everything else — the routing ROI, the default-access check, endpoint ACLs, rate limits,
+        guardrails, and MCP policies — uses the serving and Unity Catalog APIs and needs no{" "}
+        <code className="rounded bg-navy/5 px-1 py-0.5">system</code> data access. The telemetry
+        steps report <em>action needed</em> rather than failing.
+      </p>
+    </div>
   );
 }

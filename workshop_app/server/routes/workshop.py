@@ -3,11 +3,11 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel
 
-from .. import deep_links, routing
-from ..config import get_accelerators, get_steps
+from .. import deep_links, pdf, routing
+from ..config import get_accelerators, get_prerequisites, get_steps
 from ..db import pool
 from ..tests_registry import run_test
 
@@ -42,6 +42,17 @@ def accelerators_content():
     acc = get_accelerators()
     groups = [_resolve_group(a) for a in acc.get("accelerators", [])]
     return {"overview": acc.get("overview", {}), "accelerators": groups}
+
+
+@router.get("/prerequisites")
+def prerequisites_content():
+    """The pre-workshop checklist, plus whether the PDF export can be generated.
+
+    `pdf_available` lets the UI hide (rather than offer and then fail) the PDF button if
+    reportlab is missing from the deployed image.
+    """
+    ok, reason = pdf.available()
+    return {**get_prerequisites(), "pdf_available": ok, "pdf_unavailable_reason": reason}
 
 
 @router.get("/faq", response_class=PlainTextResponse)
@@ -266,3 +277,54 @@ def export_report(customer_sfid: str, customer_name: str | None = None):
             lines.append(f"- {n['title']} ({n['pillar_id']}) — {n['status']}")
         lines.append("")
     return "\n".join(lines)
+
+
+def _pdf_response(body: bytes, filename: str) -> Response:
+    """Return a PDF as a download.
+
+    `attachment` (not `inline`) on purpose: these are documents that get saved and emailed,
+    so the browser should write a file with our chosen name rather than open a viewer tab.
+    """
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _require_pdf() -> None:
+    ok, reason = pdf.available()
+    if not ok:
+        # 503, not 500: the request was valid and the same request will work once the
+        # dependency is installed. The Markdown exports remain available meanwhile.
+        raise HTTPException(
+            503,
+            "PDF generation is unavailable on this deployment (reportlab failed to import: "
+            f"{reason}). Use the Markdown/JSON export instead.",
+        )
+
+
+@router.get("/export/prerequisites.pdf")
+def export_prerequisites_pdf(customer_name: str | None = None):
+    """The prerequisites checklist as a printable PDF with tickable checkboxes.
+
+    Needs no customer_sfid: this is pre-workshop material that exists before any progress
+    does, which is exactly why it is on the Walkthrough page rather than behind the export
+    panel.
+    """
+    _require_pdf()
+    return _pdf_response(
+        pdf.prerequisites_pdf(get_prerequisites(), customer_name),
+        "ai-governance-workshop-prerequisites.pdf",
+    )
+
+
+@router.get("/export/report.pdf")
+def export_report_pdf(customer_sfid: str, customer_name: str | None = None):
+    """The outcomes report as a PDF — the leave-behind that replaced the POC DOC."""
+    if not customer_sfid:
+        raise HTTPException(400, "customer_sfid is required")
+    _require_pdf()
+    o = _build_outcomes(customer_sfid, customer_name)
+    safe = "".join(c if c.isalnum() or c in "-_" else "-" for c in customer_sfid)[:40]
+    return _pdf_response(pdf.report_pdf(o), f"ai-governance-outcomes-{safe}.pdf")
