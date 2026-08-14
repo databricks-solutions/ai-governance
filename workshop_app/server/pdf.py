@@ -245,8 +245,6 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
                                      bulletIndent=2, spaceBefore=3),
         "acc_h": ParagraphStyle("bacch", parent=base, fontName="Helvetica-Bold", fontSize=10.5,
                                 leading=13, textColor=HexColor(NAVY), spaceAfter=3),
-        "persona_line": ParagraphStyle("bpl", parent=base, fontName="Helvetica-Bold", fontSize=10,
-                                       leading=16, textColor=HexColor(NAVY)),
         "note": ParagraphStyle("bn", parent=base, fontName="Helvetica-Oblique", fontSize=7.8,
                                leading=10.5, textColor=HexColor(MUTED), spaceBefore=12),
         "meta": ParagraphStyle("bm", parent=base, fontName="Helvetica-Bold", fontSize=9,
@@ -308,16 +306,28 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
         pt.setStyle(TableStyle(style))
         story.append(pt)
 
-    # Personas — a simple list of role names on one wrapped line (middot-separated).
+    # Personas — two columns: bold role, muted why-they're-here.
     personas = b.get("personas", [])
     if personas:
         story.append(Paragraph("Who it's for", st["h2"]))
         if b.get("personas_intro"):
             story.append(Paragraph(_md_inline(b["personas_intro"]), st["lead"]))
             story.append(Spacer(1, 2))
-        # Support both the simple string form and the older {role: ...} dict form.
-        names = [p if isinstance(p, str) else (p.get("role") or "") for p in personas]
-        story.append(Paragraph("  ·  ".join(_esc(n) for n in names if n), st["persona_line"]))
+        # Support both the {role, value} dict form and a bare-string role.
+        rows = []
+        for p in personas:
+            role = p if isinstance(p, str) else (p.get("role") or "")
+            value = "" if isinstance(p, str) else (p.get("value") or "")
+            rows.append([Paragraph(_md_inline(role), st["role"]),
+                         Paragraph(_md_inline(value), st["role_val"])])
+        pers = Table(rows, colWidths=[2.3 * inch, avail_w - 2.3 * inch])
+        pers.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.4, HexColor(RULE)),
+        ]))
+        story.append(pers)
 
     # Accelerators, closing the page in a tinted band: an intro line + one bullet each.
     acc = b.get("accelerators", {}) or {}

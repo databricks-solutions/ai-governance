@@ -40,15 +40,21 @@ pillars:
       audit trail and telemetry that prove they fired. The evidence a security and risk team
       asks for before they say yes.
 
-# Who should be in the room — a simple list of roles.
+# Who should be in the room — role plus a short line on why they're there.
 personas_intro: "Built for the team that owns AI in production. Ideal attendees:"
 personas:
-  - Platform Admins
-  - Technical Champions
-  - Business Champions
-  - AI/ML Engineers
-  - Security, Risk & Compliance
-  - Data & AI Leadership
+  - role: Platform Admins
+    value: Own the control plane, model serving, and Unity Catalog — the people who set it up and run it.
+  - role: Technical Champions
+    value: Deploy the workshop app and drive governed-AI adoption across the platform team.
+  - role: Business Champions
+    value: Own the AI budget and the case for governed AI — here for spend, budgets, and attribution.
+  - role: AI/ML Engineers
+    value: Build the agents and apps that consume governed models, tools, and MCP servers.
+  - role: Security, Risk & Compliance
+    value: Need guardrails, policy enforcement, and an audit trail before AI reaches production.
+  - role: Data & AI Leadership
+    value: Sponsor governed adoption that speeds teams up rather than slowing them down.
 
 # The blurb that closes the page: an intro line, then one bullet per accelerator.
 accelerators:
