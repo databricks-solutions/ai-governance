@@ -1,16 +1,17 @@
 # AI Governance Workshop — one-page brochure.
 #
-# The leave-ahead PDF an account team sends to book the session: what it covers, how long it
-# runs, who should be in the room, and the optional accelerators. Config-driven like the rest
-# of the app so an SE can tailor it per customer without touching code. Rendered by
-# server/pdf.py (brochure_pdf) and downloaded from GET /api/export/brochure.pdf.
+# The invite artifact an account team (or a customer) hands to people to bring them to the
+# workshop: what it covers, how long it runs, who should attend, and the optional accelerators.
+# Config-driven like the rest of the app so an SE can tailor it without touching code. Rendered
+# by server/pdf.py (brochure_pdf) and downloaded from GET /api/export/brochure.pdf (the
+# "Download one-pager" callout on the Walkthrough page).
 #
 # Keep it to ONE page — it is a hand-out, not a spec.
 
 title: AI Governance Workshop
-subtitle: Stand up a governed AI control plane on your own workspace — and watch every control fire.
+subtitle: Work with Databricks to stand up Unity AI Gateway in your workshop and see it live.
 duration: 4-hour hands-on workshop
-format: Live in your own Databricks workspace — nothing is simulated.
+format: Live in your own Databricks workspace
 
 # The one-line frame that sits under the title band.
 lead: >-
@@ -39,30 +40,23 @@ pillars:
       audit trail and telemetry that prove they fired. The evidence a security and risk team
       asks for before they say yes.
 
-# Who should be in the room. Mapped to the pillars so an SE can trim to the customer's org.
+# Who should be in the room — a simple list of roles.
 personas_intro: "Built for the team that owns AI in production. Ideal attendees:"
 personas:
-  - role: Data & AI Platform / ML Platform engineering
-    value: Owns the control plane, model serving, and Unity Catalog — the people who build and run it.
-  - role: AI / ML engineers & agent developers
-    value: Ship the agents and apps that consume governed models, tools, and MCP servers.
-  - role: FinOps / cloud cost owners
-    value: Own AI spend and budgets — here to see attribution, routing ROI, and hard spend caps.
-  - role: Security, risk & compliance
-    value: Need guardrails, policy enforcement, and an audit trail before AI reaches production.
-  - role: Data & AI leadership (CDO / CTO / VP)
-    value: Sponsor governed adoption that speeds teams up rather than slowing them down.
+  - Platform Admins
+  - Technical Champions
+  - Business Champions
+  - AI/ML Engineers
+  - Security, Risk & Compliance
+  - Data & AI Leadership
 
-# The blurb that closes the page.
+# The blurb that closes the page: an intro line, then one bullet per accelerator.
 accelerators:
   title: Go deeper with accelerators
-  body: >-
-    Beyond the core session, five optional ~4-hour accelerators each take on one need in depth —
-    run the one that matches your priority: MCP Servers (on-behalf-of identity and policies),
-    Agent Registry, Coding Agents (per-developer attribution and secret detection), External
-    Providers (route Bedrock/OpenAI/Anthropic through the Gateway), and Policies & Guardrails
-    (safety filters and a custom PII-leakage judge).
-
-footer_note: >-
-  Delivered by Databricks. Ask your account team to schedule, and share the prerequisites
-  checklist with your platform admins about a week ahead.
+  intro: "There are also five optional ~4-hour accelerators to explore concepts deeper:"
+  items:
+    - "**MCP Servers** — on-behalf-of identity, UC permissions, and service policies"
+    - "**Agent Registry** — register, version, and own a representative agent"
+    - "**Coding Agents** — govern dev-agent traffic with per-developer attribution and secret detection"
+    - "**External Providers** — route Bedrock, OpenAI, and Anthropic through the Gateway"
+    - "**Policies & Guardrails** — safety filters and a custom PII-leakage judge"
