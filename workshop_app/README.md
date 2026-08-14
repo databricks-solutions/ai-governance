@@ -4,7 +4,8 @@ A customer-facing, guided workshop app for standing up a **governed AI control p
 Databricks workspace and proving it works live. It's organized around three pillars —
 **Choice · Cost · Control** — and every step has a **concept**, a **Try It** action that
 exercises the control against the connected workspace, and a **Verify** step that proves it
-fired. Progress is tracked per team in Lakebase so a room can pause and resume.
+fired. Progress is tracked per team in a JSON file on a Unity Catalog volume, so a room can
+pause and resume with no database to provision.
 
 React + FastAPI Databricks App, deployed from one Asset Bundle, driven entirely by a single
 config file so it runs on any customer workspace.
@@ -19,12 +20,11 @@ workshop_app/
   server/             FastAPI backend
     tests_registry.py ← the executable governance tests (ported from l200_demo)
     workspace_sql.py  ← SQL against the workspace warehouse (system tables, inference tables)
-    db.py             ← Lakebase progress store
+    store.py          ← progress store: one JSON file on a UC volume (in-memory + write-through)
     deep_links.py     ← links into the workspace UI for manual steps
     routes/workshop.py
   frontend/           React + Vite + Tailwind (Databricks design system)
-  databricks.yml      Asset Bundle: app + Lakebase instance
-  app.yaml            App runtime config
+  databricks.yml      Asset Bundle: app (command + env) + UC schema + progress volume + grants
 ```
 
 ## What each pillar covers
@@ -58,64 +58,47 @@ concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
   judge, red-team dataset.
 
 Run the one that matches the customer's priority (the accelerator overview and links live on
-the in-app **Walkthrough** page). Accelerator progress is tracked in Lakebase and included in
-the exported outcomes, so anything you run shows up in the internal sales app.
+the in-app **Walkthrough** page). Accelerator progress is tracked in the same volume-backed
+store and included in the exported outcomes, so anything you run shows up in the internal
+sales app.
 
 ## Deploy on a customer workspace
 
-**Prereqs:** Databricks CLI authenticated to the workspace, a SQL warehouse, an existing
-Unity Catalog catalog, and Node (to build the frontend).
+It's a plain Databricks Asset Bundle — **no shell script**. Two standard commands:
 
 ```bash
-./deploy.sh -p <cli-profile> -w <warehouse-id> -c <uc-catalog>
+# 1. Deploy: builds the frontend, creates the schema + progress volume, creates the app, and
+#    grants the app's service principal on the schema/volume — all in one pass.
+databricks bundle deploy -t dev -p <profile> \
+  --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
+
+# 2. Start (or restart) the app. Databricks requires a separate run to start app compute —
+#    a deploy alone does not start it.
+databricks bundle run ai_governance_workshop_app -t dev -p <profile>
 ```
 
-That's the whole deploy. The script is idempotent — re-run it any time — and it:
+**Prereqs:** Databricks CLI authenticated to the workspace, a running SQL warehouse, an
+existing Unity Catalog catalog, and Node (the bundle builds the frontend for you on deploy).
 
-1. checks the profile authenticates and that the warehouse **and catalog actually exist**,
-   failing early with the command to list them rather than mid-deploy
-2. builds the frontend
-3. pins `catalog`/`schema` into `config/workshop.local.yaml` so the app and the bundle can
-   never disagree
-4. deploys the bundle — Lakebase instance, UC schema, the app
-5. reads back the app's service principal and re-deploys so the **UC grants attach
-   automatically**
-6. prints the two `system` GRANT statements for your account admin
-7. starts the app and polls until it reports healthy
+`warehouse_id` and `catalog` are **required** (no defaults), so a missing one fails immediately
+rather than deploying an app that fails every step in front of the customer. Optional overrides:
+`--var="workshop_group=<group>"` (who gets `CAN_USE` on the app; default `users`),
+`--var="schema=<name>"`, `--var="progress_volume=<name>"`. Both commands are idempotent —
+re-run them any time.
 
-Add `-g <group>` to grant a specific group `CAN_USE` on the app (default: `users`), and
-`-s <schema>` to change the schema name.
-
-Only one thing is left for a human: the two `system` grants below. Everything else is done.
+**How it's fully declarative.** The app receives its `catalog`/`schema`/`warehouse_id` as env
+straight from the bundle variables (`apps.*.config.env` in `databricks.yml`), so there's no
+config file to pin and the bundle is the single source of truth. The schema `grants` reference
+`${resources.apps.….service_principal_client_id}`, so Terraform creates the app, reads its
+service principal, and applies the grant in one `bundle deploy` — the old two-pass deploy is
+gone. The frontend build runs as the bundle's `artifacts` step.
 
 App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.com`.
 `GET /api/health` returns `{"status":"ok"}`, or `misconfigured` naming exactly what is unset.
 
-<details>
-<summary>Manual equivalent, if you can't run the script</summary>
-
-```bash
-cd frontend && npm ci && npm run build && cd ..   # or just: databricks bundle deploy (builds for you)
-
-# warehouse_id and catalog are required — no defaults, so a missing one fails immediately
-# rather than deploying an app that fails every governance step in front of the customer.
-databricks bundle deploy -t dev -p <profile> \
-  --var="warehouse_id=<id>" --var="catalog=<catalog>"
-
-# Read the app's service principal, then re-deploy so the schema grants attach to it
-APP_SP=$(databricks apps get ai-governance-workshop -p <profile> --output json \
-          | jq -r .service_principal_client_id)
-databricks bundle deploy -t dev -p <profile> \
-  --var="warehouse_id=<id>" --var="catalog=<catalog>" \
-  --var="app_service_principal_id=$APP_SP"
-
-databricks bundle run ai_governance_workshop_app -t dev -p <profile> \
-  --var="warehouse_id=<id>" --var="catalog=<catalog>"
-```
-
-Also set `catalog.name`/`catalog.schema` in `config/workshop.yaml` to the same values, or
-the app will write to a different schema than the bundle created.
-</details>
+> **Local development** points the app at a workspace without the bundle — set
+> `DATABRICKS_WAREHOUSE_ID`, `WORKSHOP_CATALOG`, and `WORKSHOP_SCHEMA` in the environment (or
+> a `config/workshop.local.yaml` override). See the Local development section below.
 
 > **Building the frontend on a Databricks laptop.** Public package registries
 > (`registry.npmjs.org`, `registry.yarnpkg.com`, `pypi.org`) are pinned to `127.0.0.1` in
@@ -146,15 +129,20 @@ the app will write to a different schema than the bundle created.
 
 ### The one manual step: two `system` grants (account admin)
 
-`deploy.sh` handles the warehouse, Lakebase, schema, and app-group grants. Unity Catalog
-`system` schemas can't be granted from a bundle and need an account or metastore admin, so
-the script prints these with the real service principal filled in:
+The bundle handles the warehouse, schema, and progress-volume grants (`READ/WRITE VOLUME`) to
+the app's service principal automatically. Unity Catalog `system` schemas are the one thing no
+bundle can grant — they need an account or metastore admin. Get the app's service principal
+with `databricks apps get ai-governance-workshop -p <profile> --output json` (field
+`service_principal_client_id`), then have your admin run:
 
 ```sql
 GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
 GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;  -- usage, spend
 GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;  -- audit trail
 ```
+
+(The app's Walkthrough page also shows these grants, and `GET /api/health` reports whether the
+telemetry steps have what they need.)
 
 **Only these two schemas.** The app deliberately reads no other — `system.billing`,
 `system.serving`, and `system.information_schema` were all removed once each turned out to
@@ -184,21 +172,21 @@ See `docs/APIS_AND_SETUP.md` for the full dependency list.
 
 ### Known deployment caveats
 
-- **Lakebase provisioning** — the app depends on the instance resource, so Terraform orders
-  them, but a first deploy can still outrun a cold `CU_1` instance. The app no longer dies
-  if Lakebase is unreachable: it starts without progress tracking and logs a warning, so the
-  guidebook and every Try-It step still work.
+- **Progress store is best-effort** — progress lives in a JSON file on a UC volume. The app
+  never dies if the volume is briefly unreachable: it starts without progress tracking, keeps
+  the in-memory copy, and retries the write on the next update. The guidebook and every Try-It
+  step still work regardless.
 - **Attendee access** — the bundle adds no `permissions:` block, so by default only the
   deployer can open the app. Grant `CAN_USE` to the workshop group before the session.
-- **One deploy per workspace** — the app and Lakebase instance use literal names, so two
-  people deploying to the same workspace collide. Override `--var="lakebase_instance=..."`
-  and the app `name:` if that matters.
+- **One deploy per workspace** — the app uses a literal name, so two people deploying to the
+  same workspace collide. Override the app `name:` (and `--var="schema=..."`) if that matters.
 
 ### Local development
 
 ```bash
-# Backend — local dev has no app resource, so set a warehouse explicitly
+# Backend — local dev has no bundle, so pass the values the bundle would inject as env
 DATABRICKS_PROFILE=<profile> DATABRICKS_WAREHOUSE_ID=<id> \
+  WORKSHOP_CATALOG=<catalog> WORKSHOP_SCHEMA=ai_governance_workshop \
   uv run uvicorn app:app --reload --port 8000
 # Frontend (proxies /api to :8000)
 cd frontend && npm ci && npm run dev
@@ -211,14 +199,16 @@ committed so the app deploys without Node:
 cd frontend && npm ci && npm run build
 ```
 
-## Progress tracking (Lakebase)
+## Progress tracking (UC volume)
 
-Progress is stored in the bundle's Lakebase instance, schema `workshop`, table `step_progress`:
-one row per `(customer_sfid, step_id)` with `status` (not_started / in_progress / done / failed),
-the last Try-It/Verify `last_result` (JSON), and timestamps. The whole workshop is keyed to the
-Account ID set on the Walkthrough page, so progress and the outcomes export flow
-straight into the internal sales app. (Deployments from before this change auto-migrate the
-legacy `run_id` column to `customer_sfid` on startup.)
+Progress is stored in a single JSON file on the bundle's Unity Catalog volume
+(`/Volumes/<catalog>/<schema>/workshop_state/progress.json`), keyed by `customer_sfid` then
+`step_id`: each entry carries `status` (not_started / in_progress / action_required / done /
+failed), the last Try-It/Verify `last_result` (JSON), notes, and a timestamp. The app reads the
+file into memory at startup (`server/store.py`) and rewrites it write-through on every update —
+there is no database to provision, wait on, or grant CONNECT to. The whole workshop is keyed to
+the Account ID set on the Walkthrough page, so progress and the outcomes export flow straight
+into the internal sales app.
 
 ## Export → the internal sales app
 

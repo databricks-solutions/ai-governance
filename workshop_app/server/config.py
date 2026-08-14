@@ -37,6 +37,13 @@ def get_config() -> dict:
             cfg["catalog"]["name"] = catalog
         if schema:
             cfg["catalog"]["schema"] = schema
+    # The progress-volume name is a bundle variable too, so it must flow to the app the same
+    # way catalog/schema do — otherwise `--var=progress_volume=...` creates one volume while
+    # the app writes to the default-named path, and progress silently lands nowhere.
+    volume = os.environ.get("WORKSHOP_VOLUME")
+    if volume:
+        cfg.setdefault("volume", {})
+        cfg["volume"]["name"] = volume
     return cfg
 
 
@@ -55,6 +62,12 @@ def get_accelerators() -> dict:
 @lru_cache(maxsize=1)
 def get_prerequisites() -> dict:
     with open(_CONFIG_DIR / "prerequisites.yaml") as f:
+        return yaml.safe_load(f)
+
+
+@lru_cache(maxsize=1)
+def get_brochure() -> dict:
+    with open(_CONFIG_DIR / "brochure.yaml") as f:
         return yaml.safe_load(f)
 
 
@@ -78,9 +91,10 @@ def get_oauth_token() -> str:
 def get_warehouse_id() -> str:
     """The SQL warehouse the app runs statements against.
 
-    DATABRICKS_WAREHOUSE_ID wins: app.yaml binds it to the bundle's `sql-warehouse`
-    resource, so the value passed to `bundle deploy --var="warehouse_id=..."` is
-    authoritative. config/workshop.yaml is the local-development fallback.
+    DATABRICKS_WAREHOUSE_ID wins: the bundle sets it on the app from the `warehouse_id`
+    variable (databricks.yml → apps.*.config.env), so the value passed to
+    `bundle deploy --var="warehouse_id=..."` is authoritative. config/workshop.yaml is the
+    local-development fallback.
     """
     wid = (os.environ.get("DATABRICKS_WAREHOUSE_ID")
            or get_config().get("workspace", {}).get("warehouse_id"))

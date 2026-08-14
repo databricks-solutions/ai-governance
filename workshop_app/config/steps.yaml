@@ -2,7 +2,7 @@
 #
 # Steps are grouped by pillar (choice / cost / control) — the Aug 2026 messaging
 # source of truth. Each step has:
-#   id       : stable key used for progress tracking in Lakebase
+#   id       : stable key used for progress tracking (the JSON progress file on the UC volume)
 #   title    : shown in the UI
 #   concept  : the "why" (markdown) — the CONCEPT card
 #   action   : optional Try-It test; `test` names a backend test (see server/routes/tests.py)

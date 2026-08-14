@@ -207,6 +207,142 @@ def prerequisites_pdf(prereqs: dict, customer: str | None = None) -> bytes:
     return buf.getvalue()
 
 
+def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
+    """The one-page workshop brochure: what it covers, how long, who it's for, accelerators.
+
+    A leave-ahead an account team sends to book the session. Deliberately one page and
+    marketing-toned — the substance lives in the app itself and the prerequisites checklist.
+    """
+    from reportlab.lib.colors import HexColor, white
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+
+    ss = getSampleStyleSheet()
+    base = ss["BodyText"]
+    st = {
+        "title": ParagraphStyle("bt", parent=base, fontName="Helvetica-Bold", fontSize=24,
+                                leading=27, textColor=HexColor(NAVY), spaceAfter=3),
+        "subtitle": ParagraphStyle("bst", parent=base, fontName="Helvetica", fontSize=11,
+                                   leading=15, textColor=HexColor(LAVA), spaceAfter=10),
+        "lead": ParagraphStyle("bl", parent=base, fontName="Helvetica", fontSize=9.5,
+                               leading=13.5, textColor=HexColor(MUTED), spaceAfter=4),
+        "h2": ParagraphStyle("bh2", parent=base, fontName="Helvetica-Bold", fontSize=11.5,
+                             leading=14, textColor=HexColor(NAVY), spaceBefore=14, spaceAfter=6),
+        "pillar_title": ParagraphStyle("bpt", parent=base, fontName="Helvetica-Bold",
+                                       fontSize=12, leading=14, textColor=white),
+        "pillar_body": ParagraphStyle("bpb", parent=base, fontName="Helvetica", fontSize=8.3,
+                                      leading=11, textColor=HexColor(NAVY)),
+        "role": ParagraphStyle("br", parent=base, fontName="Helvetica-Bold", fontSize=8.7,
+                               leading=11, textColor=HexColor(NAVY)),
+        "role_val": ParagraphStyle("brv", parent=base, fontName="Helvetica", fontSize=8.3,
+                                   leading=11, textColor=HexColor(MUTED)),
+        "acc": ParagraphStyle("bacc", parent=base, fontName="Helvetica", fontSize=8.7,
+                              leading=12, textColor=HexColor(NAVY), alignment=TA_LEFT),
+        "acc_h": ParagraphStyle("bacch", parent=base, fontName="Helvetica-Bold", fontSize=10.5,
+                                leading=13, textColor=HexColor(NAVY), spaceAfter=3),
+        "note": ParagraphStyle("bn", parent=base, fontName="Helvetica-Oblique", fontSize=7.8,
+                               leading=10.5, textColor=HexColor(MUTED), spaceBefore=12),
+        "meta": ParagraphStyle("bm", parent=base, fontName="Helvetica-Bold", fontSize=9,
+                               leading=12, textColor=HexColor(NAVY)),
+    }
+
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.platypus import SimpleDocTemplate
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=LETTER,
+        leftMargin=0.7 * inch, rightMargin=0.7 * inch,
+        topMargin=0.55 * inch, bottomMargin=0.55 * inch,
+        title="AI Governance Workshop", author="Databricks", subject="AI Governance Workshop",
+    )
+    avail_w = doc.width
+
+    story: list[Any] = [Paragraph(_esc(b.get("title", "AI Governance Workshop")), st["title"])]
+    if b.get("subtitle"):
+        story.append(Paragraph(_md_inline(b["subtitle"]), st["subtitle"]))
+
+    # Duration + format band — the two facts a reader scans for first.
+    meta_bits = [x for x in (b.get("duration"), b.get("format")) if x]
+    if meta_bits:
+        meta = Table([[Paragraph(" &nbsp;·&nbsp; ".join(_esc(m) for m in meta_bits), st["meta"])]],
+                     colWidths=[avail_w])
+        meta.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F5F7F8")),
+            ("BOX", (0, 0), (-1, -1), 0.4, HexColor(RULE)),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story += [meta, Spacer(1, 8)]
+
+    if customer:
+        story.append(Paragraph(f"Prepared for <b>{_esc(customer)}</b>", st["lead"]))
+    if b.get("lead"):
+        story.append(Paragraph(_md_inline(b["lead"]), st["lead"]))
+
+    # Three pillars as a 3-column card row: navy title cell over a white blurb cell.
+    pillars = b.get("pillars", [])[:3]
+    if pillars:
+        story.append(Paragraph("What you'll cover", st["h2"]))
+        titles = [Paragraph(_esc(p.get("title")), st["pillar_title"]) for p in pillars]
+        blurbs = [Paragraph(_md_inline(p.get("blurb")), st["pillar_body"]) for p in pillars]
+        n = len(pillars)
+        col_w = [avail_w / n] * n
+        pt = Table([titles, blurbs], colWidths=col_w)
+        style = [
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor(NAVY)),
+            ("BACKGROUND", (0, 1), (-1, 1), white),
+            ("BOX", (0, 0), (-1, -1), 0.4, HexColor(RULE)),
+            ("INNERGRID", (0, 0), (-1, -1), 3, white),  # white gutters between cards
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 9), ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+            ("TOPPADDING", (0, 0), (-1, 0), 7), ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+            ("TOPPADDING", (0, 1), (-1, 1), 8), ("BOTTOMPADDING", (0, 1), (-1, 1), 10),
+        ]
+        pt.setStyle(TableStyle(style))
+        story.append(pt)
+
+    # Personas — two columns: bold role, muted why-they're-here.
+    personas = b.get("personas", [])
+    if personas:
+        story.append(Paragraph("Who it's for", st["h2"]))
+        if b.get("personas_intro"):
+            story.append(Paragraph(_md_inline(b["personas_intro"]), st["lead"]))
+            story.append(Spacer(1, 2))
+        rows = [[Paragraph(_md_inline(p.get("role")), st["role"]),
+                 Paragraph(_md_inline(p.get("value")), st["role_val"])] for p in personas]
+        pers = Table(rows, colWidths=[2.5 * inch, avail_w - 2.5 * inch])
+        pers.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.4, HexColor(RULE)),
+        ]))
+        story.append(pers)
+
+    # Accelerators blurb, closing the page in a tinted band.
+    acc = b.get("accelerators", {}) or {}
+    if acc.get("body"):
+        story.append(Spacer(1, 12))
+        cell = [Paragraph(_esc(acc.get("title", "Accelerators")), st["acc_h"]),
+                Paragraph(_md_inline(acc["body"]), st["acc"])]
+        band = Table([[cell]], colWidths=[avail_w])
+        band.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#FBEDEA")),  # faint lava tint
+            ("BOX", (0, 0), (-1, -1), 0.4, HexColor("#F3C9C0")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        story.append(band)
+
+    if b.get("footer_note"):
+        story.append(Paragraph(_md_inline(b["footer_note"]), st["note"]))
+
+    doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
+    return buf.getvalue()
+
+
 def _row_for(item: dict, S: dict, widths: list) -> Any:
     from reportlab.platypus import Paragraph
 
@@ -214,7 +350,7 @@ def _row_for(item: dict, S: dict, widths: list) -> Any:
     if item.get("optional"):
         label += ' <font size="7" color="%s">(SCOPE-DEPENDENT)</font>' % MUTED
     why = Paragraph(_md_inline(item["why"]), S["why"]) if item.get("why") else None
-    who = (Paragraph(f'<font size="7.5"><b>Owner:</b> {_esc(item["who"])}</font>', S["why"])
+    who = (Paragraph(f'<font size="7.5"><b>Persona:</b> {_esc(item["who"])}</font>', S["why"])
            if item.get("who") else None)
     return _checklist_row(_checkbox(), Paragraph(label, S["item"]), why, who, widths)
 

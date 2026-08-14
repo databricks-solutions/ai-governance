@@ -48,9 +48,9 @@ principal** — see §5 on why that matters.
 | SQL Statement Execution | `w.statement_execution.execute_statement(warehouse_id, statement, wait_timeout)` | every system-table query, the policy DDL |
 | Registered models — list | `w.registered_models.list(catalog_name, schema_name)` | `list_registered_assets` |
 | UC functions — list | `w.functions.list(catalog_name, schema_name)` | `list_registered_assets` (avoids a `system` grant) |
-| Current user | `w.current_user.me()` | Lakebase user resolution |
-| Database (Lakebase) — get instance | `w.database.get_database_instance(name)` | progress store host |
-| Database (Lakebase) — credentials | `w.database.generate_database_credential(...)` | per-connection OAuth token |
+| Current user | `w.current_user.me()` | workspace context (`workspace_context`) |
+| Files — read | `w.files.download(path)` | progress store: read `progress.json` from the UC volume |
+| Files — write | `w.files.upload(path, contents, overwrite=True)` | progress store: rewrite `progress.json` on the UC volume |
 
 **Not used, deliberately:** no endpoint create/update, no tag writes, no policy attachment.
 Those are guided UI steps so the app never makes unattended changes to a customer workspace.
@@ -151,7 +151,7 @@ signal. Dropped deliberately (see §8).
 | Service-policy function | The app (`create_mcp_policy`) | `CREATE OR REPLACE FUNCTION`; needs `CREATE FUNCTION`. |
 | Inference table | AI Gateway UI | `<catalog>.<schema>.<prefix>_payload`. Needs an external-storage catalog. |
 | MCP service | Built-in (`system.ai.*`) | e.g. `system.ai.atlassian`. Grant with `GRANT EXECUTE`. |
-| Lakebase instance | **The bundle** | `CU_1`. Progress only — the workshop runs without it. |
+| Progress volume | **The bundle** (`resources.volumes`) | Managed volume `<catalog>.<schema>.workshop_state`. Holds `progress.json`; needs `READ/WRITE VOLUME`. Progress only — the workshop runs without it. |
 
 ### Managed MCP vs MCP Services — the distinction that decides your controls
 
@@ -353,14 +353,14 @@ Two caveats to state out loud:
 
 ## 8. Permissions checklist
 
-**Deploying user:** create Databricks Apps; create a database instance (workspace users
-normally inherit `CAN CREATE`); `CAN_USE` on the warehouse; `USE CATALOG` + `CREATE SCHEMA`
-on the target catalog.
+**Deploying user:** create Databricks Apps; `CAN_USE` on the warehouse; `USE CATALOG` +
+`CREATE SCHEMA` on the target catalog (the bundle creates the schema and progress volume
+under it).
 
-**App service principal** — granted by the bundle: `CAN_USE` on the warehouse,
-`CAN_CONNECT_AND_CREATE` on Lakebase. Unity Catalog grants are manual (see the README grant
-block): `USE CATALOG` + `USE SCHEMA`/`CREATE FUNCTION`/`EXECUTE`/`SELECT`/`MODIFY` on the
-workshop schema, plus `USE SCHEMA` + `SELECT` on exactly **two** system schemas.
+**App service principal** — granted by the bundle: `CAN_USE` on the warehouse, and on the
+workshop schema `USE SCHEMA`/`CREATE FUNCTION`/`EXECUTE`/`SELECT`/`MODIFY` plus
+`READ VOLUME`/`WRITE VOLUME` (for the progress file). The two `system`-schema grants
+(`USE SCHEMA` + `SELECT`) are manual — an account admin runs them (see the README grant block).
 
 ### Keeping the `system` grant surface to two schemas
 

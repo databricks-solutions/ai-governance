@@ -1,14 +1,12 @@
 """Workshop content, test execution, and progress tracking."""
-import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel
 
-from .. import deep_links, pdf, routing
-from ..config import get_accelerators, get_prerequisites, get_steps
-from ..db import pool
+from .. import deep_links, pdf, routing, store
+from ..config import get_accelerators, get_brochure, get_prerequisites, get_steps
 from ..tests_registry import run_test
 
 router = APIRouter()
@@ -103,6 +101,11 @@ class RunTest(BaseModel):
 
 @router.post("/test")
 def run_and_record(body: RunTest):
+    # Validate BEFORE running: several tests mutate the workspace or call paid endpoints
+    # (create_mcp_policy, the routing tests, SQL steps). Running one with no Account ID would
+    # incur that cost/change and then 400 on the save — so gate on the id up front.
+    if not body.customer_sfid:
+        raise HTTPException(400, "customer_sfid is required — set the Account ID before running steps.")
     result = run_test(body.test)
     # A test can come back three ways, and collapsing them would overstate progress:
     # ok + action_required means "ran fine, but nothing is proven yet" (a guided step, or
@@ -135,41 +138,18 @@ def set_progress(body: Progress):
 
 @router.get("/progress/{customer_sfid}")
 def get_progress(customer_sfid: str):
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """SELECT step_id, pillar_id, status, last_result, notes, updated_at
-                   FROM step_progress WHERE customer_sfid = %s""",
-                (customer_sfid,),
-            )
-            rows = cur.fetchall()
     return {
-        r[0]: {"pillar_id": r[1], "status": r[2], "last_result": r[3],
-               "notes": r[4], "updated_at": r[5].isoformat() if r[5] else None}
-        for r in rows
+        step_id: {"pillar_id": r.get("pillar_id"), "status": r.get("status"),
+                  "last_result": r.get("last_result"), "notes": r.get("notes"),
+                  "updated_at": r.get("updated_at")}
+        for step_id, r in store.get(customer_sfid).items()
     }
 
 
 def _save_progress(customer_sfid, step_id, pillar_id, status, result, updated_by, notes=None):
     if not customer_sfid:
         raise HTTPException(400, "customer_sfid is required")
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """INSERT INTO step_progress
-                   (customer_sfid, step_id, pillar_id, status, last_result, notes, updated_by, updated_at)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s, now())
-                   ON CONFLICT (customer_sfid, step_id) DO UPDATE SET
-                     status = EXCLUDED.status,
-                     last_result = COALESCE(EXCLUDED.last_result, step_progress.last_result),
-                     notes = COALESCE(EXCLUDED.notes, step_progress.notes),
-                     pillar_id = EXCLUDED.pillar_id,
-                     updated_by = EXCLUDED.updated_by,
-                     updated_at = now()""",
-                (customer_sfid, step_id, pillar_id, status,
-                 json.dumps(result) if result is not None else None, notes, updated_by),
-            )
-        conn.commit()
+    store.save(customer_sfid, step_id, pillar_id, status, result, updated_by, notes)
 
 
 # --------------------------------------------------------------------------- Export
@@ -302,6 +282,20 @@ def _require_pdf() -> None:
             "PDF generation is unavailable on this deployment (reportlab failed to import: "
             f"{reason}). Use the Markdown/JSON export instead.",
         )
+
+
+@router.get("/export/brochure.pdf")
+def export_brochure_pdf(customer_name: str | None = None):
+    """The one-page workshop brochure as a PDF — the leave-ahead an account team sends to book
+    the session (cost/choice/control, 4-hour format, target personas, accelerators).
+
+    Needs no customer_sfid: it exists before any workshop does.
+    """
+    _require_pdf()
+    return _pdf_response(
+        pdf.brochure_pdf(get_brochure(), customer_name),
+        "ai-governance-workshop-brochure.pdf",
+    )
 
 
 @router.get("/export/prerequisites.pdf")

@@ -84,7 +84,9 @@ function RowsTable({ rows }: { rows: Row[] }) {
 function RowsChart({ rows }: { rows: Row[] }) {
   const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   const labelCol = cols.find((c) => rows.every((r) => num(r[c]) === null));
-  const valueCol = cols.find((c) => rows.some((r) => num(r[c]) !== null));
+  // Fully-numeric, matching chartable()'s gate — a "some numeric" column can pick a
+  // half-text column the gate never approved, mislabelling the chart and drawing zero bars.
+  const valueCol = cols.find((c) => rows.every((r) => num(r[c]) !== null));
   if (!labelCol || !valueCol) return null;
   const max = Math.max(...rows.map((r) => Math.abs(num(r[valueCol]) ?? 0)));
   if (!(max > 0)) return null;

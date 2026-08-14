@@ -59,8 +59,9 @@ them before the day so the room isn't blocked.
 
 ## How is my progress tracked?
 
-Progress is stored per account (by the **Account ID** set on the Walkthrough page) in a
-Lakebase table on the deployment. You can pause and resume; nothing is lost between sessions.
+Progress is stored per account (by the **Account ID** set on the Walkthrough page) in a JSON
+file on a Unity Catalog volume on the deployment — no database required. You can pause and
+resume; nothing is lost between sessions.
 
 A step can end in one of three states, and the distinction is deliberate: **done** (proved),
 **action needed** (the step ran, but nothing is proven yet — a guided UI action, or a

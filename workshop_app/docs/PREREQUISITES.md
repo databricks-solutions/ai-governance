@@ -33,7 +33,8 @@ SHOW GRANTS ON SCHEMA system.ai;   -- look for EXECUTE granted to `account users
 SHOW GRANTS ON CATALOG system;     -- the grant is inherited from here
 ```
 
-`deploy.sh` prints the exact GRANT statements with the real service principal filled in:
+Get the app's service principal with `databricks apps get ai-governance-workshop --output json`
+(field `service_principal_client_id`), then run:
 
 ```sql
 GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
@@ -126,8 +127,9 @@ Verified on a live workspace, 2026-08-06:
 Run these in order. Each has an unambiguous pass condition.
 
 ```bash
-# 1. Deploy (idempotent — safe to re-run)
-./deploy.sh -p <profile> -w <warehouse-id> -c <catalog> -g <workshop-group>
+# 1. Deploy + start (idempotent — safe to re-run). Plain Databricks Asset Bundle, no scripts.
+databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<catalog>"
+databricks bundle run ai_governance_workshop_app -t dev -p <profile>
 
 # 2. Health: must be {"status":"ok","config_problems":[]}
 curl -s -H "Authorization: Bearer $(databricks auth token -p <profile> | jq -r .access_token)" \

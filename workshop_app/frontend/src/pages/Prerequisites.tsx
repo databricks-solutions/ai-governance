@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckSquare, Square, FileDown, Loader2, Clock, AlertCircle } from "lucide-react";
+import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle } from "lucide-react";
 import { api, type Prerequisites as Prereqs } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 import PageHeader from "@/components/PageHeader";
@@ -8,8 +8,9 @@ import { cn } from "@/lib/cn";
 // The pre-workshop checklist. Content is config-driven (config/prerequisites.yaml) so an SE can
 // tailor it per customer without a code change.
 //
-// Ticking here is deliberately LOCAL-ONLY (browser localStorage, not Lakebase): these are the
-// customer's platform tasks, done days before the session by people who never open this app.
+// Ticking here is deliberately LOCAL-ONLY (browser localStorage, not the workshop progress
+// store): these are the customer's platform tasks, done days before the session by people who
+// never open this app.
 // Recording them as workshop progress would inflate the outcomes JSON the sales app ingests
 // with items nobody did in the room. The PDF is the artifact that actually travels.
 const LS_KEY = "aigov_prereq_checked";
@@ -71,7 +72,7 @@ export default function Prerequisites() {
       <PageHeader
         eyebrow="Before the workshop"
         title="Prerequisites"
-        lead="Everything that must be true before the room sits down — ordered by lead time, because the items that stall a workshop need an account admin and those take days."
+        lead="What to have in place before the workshop, tagged by persona. The session needs as few as three people — an account admin, a business champion, and a technical champion. Long-lead items need an admin and take days, so start those about a week out."
       />
       <div className="mx-auto max-w-4xl px-8 py-12 lg:px-14">
 
@@ -88,12 +89,20 @@ export default function Prerequisites() {
           </div>
         </div>
         {data.pdf_available ? (
-          <a
-            href={api.prerequisitesPdfUrl(sfid.trim() || undefined)}
-            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
-          >
-            <FileDown className="h-4 w-4" /> Download checklist (PDF)
-          </a>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <a
+              href={api.brochurePdfUrl(sfid.trim() || undefined)}
+              className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white px-4 py-2 text-sm font-semibold text-navy hover:border-navy/40"
+            >
+              <FileText className="h-4 w-4" /> Workshop brochure (PDF)
+            </a>
+            <a
+              href={api.prerequisitesPdfUrl(sfid.trim() || undefined)}
+              className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
+            >
+              <FileDown className="h-4 w-4" /> Download checklist (PDF)
+            </a>
+          </div>
         ) : (
           <div className="flex items-start gap-2 text-xs text-muted">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#B7791F]" />
@@ -163,7 +172,7 @@ export default function Prerequisites() {
                         {item.why && <p className="mt-1 text-xs leading-relaxed text-muted">{item.why}</p>}
                         {item.who && (
                           <p className="mt-1 text-[11px] text-navy-300">
-                            <span className="font-semibold">Owner:</span> {item.who}
+                            <span className="font-semibold">Persona:</span> {item.who}
                           </p>
                         )}
                       </div>

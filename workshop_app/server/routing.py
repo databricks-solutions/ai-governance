@@ -274,6 +274,10 @@ def classify(prompt: str) -> dict:
                 reason = str(parsed.get("reason", ""))[:200]
             except (ValueError, TypeError):
                 reason = "defaulted to frontier (classifier returned unparseable JSON)"
+        else:
+            # The classifier DID answer, just with no JSON object — don't mislabel that as
+            # "unavailable"; say what actually happened so the surfaced reason is truthful.
+            reason = "defaulted to frontier (classifier response had no JSON object)"
     return {
         "complexity": complexity,
         "reason": reason,

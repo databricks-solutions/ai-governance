@@ -7,9 +7,9 @@
 
 workspace:
   # Left blank on purpose. When deployed as a bundle the app reads the warehouse from the
-  # DATABRICKS_WAREHOUSE_ID env var, which app.yaml binds to the bundle's sql-warehouse
-  # resource — so `--var="warehouse_id=..."` is the single source of truth and you do not
-  # need to set this. Set it only for LOCAL development, where there is no app resource.
+  # DATABRICKS_WAREHOUSE_ID env var, which the bundle sets on the app from the `warehouse_id`
+  # variable (databricks.yml → apps.*.config.env) — so `--var="warehouse_id=..."` is the
+  # single source of truth and you do not need to set this. Set it only for LOCAL development.
   warehouse_id: ""
 
 # Unity Catalog location for governance artifacts (the MCP policy function, inference
@@ -105,8 +105,9 @@ project:
 mlflow:
   experiment_id: ""
 
-# Lakebase instance that stores workshop progress (created by the asset bundle).
-lakebase:
-  instance_name: ai-governance-workshop
-  database: databricks_postgres
-  schema: workshop
+# Where workshop progress is stored. Progress is a single JSON file on a Unity Catalog
+# volume (created by the asset bundle in the catalog/schema above) — no database to
+# provision. The app reads it at startup and rewrites it on every step update.
+volume:
+  name: workshop_state          # created by the bundle in <catalog>.<schema>
+  file: progress.json

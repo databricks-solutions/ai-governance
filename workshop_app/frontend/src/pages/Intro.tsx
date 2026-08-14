@@ -183,9 +183,10 @@ GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO \`<app-service-principal
         <code className="rounded bg-navy/5 px-1 py-0.5">USE CATALOG</code> on{" "}
         <code className="rounded bg-navy/5 px-1 py-0.5">system</code> is required too —{" "}
         <code className="rounded bg-navy/5 px-1 py-0.5">USE SCHEMA</code> alone does not grant
-        traversal to the parent catalog, so the query fails before it reaches the table.{" "}
-        <code className="rounded bg-navy/5 px-1 py-0.5">deploy.sh</code> prints these with the real
-        principal filled in. Needs an account or metastore admin, so{" "}
+        traversal to the parent catalog, so the query fails before it reaches the table. Get the
+        app's service principal with{" "}
+        <code className="rounded bg-navy/5 px-1 py-0.5">databricks apps get ai-governance-workshop</code>{" "}
+        and fill it in above. Needs an account or metastore admin, so{" "}
         <button onClick={() => go("prereqs")} className="font-semibold text-navy underline decoration-lava decoration-2 underline-offset-2 hover:text-lava">
           start it early
         </button>

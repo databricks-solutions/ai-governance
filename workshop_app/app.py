@@ -3,13 +3,13 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.config import config_problems
-from server.db import init_schema, pool
 from server.routes import workshop
+from server import store
 
 log = logging.getLogger("uvicorn.error")
 
@@ -21,20 +21,12 @@ async def lifespan(app: FastAPI):
     for problem in config_problems():
         log.error("CONFIG: %s", problem)
 
-    # Lakebase backs progress tracking only — the guidebook and the Try-It tests do not
-    # need it. Never let an unreachable/still-provisioning instance take down the whole
-    # app: a workshop with no saved progress is recoverable, a workshop with no app is not.
-    try:
-        pool.open(wait=True, timeout=30.0)
-        init_schema()
-    except Exception as e:
-        log.warning("Lakebase progress store unavailable — running without progress "
-                    "tracking. Steps and tests still work. Cause: %s", e)
+    # The volume-backed progress store backs progress tracking only — the guidebook and the
+    # Try-It tests do not need it. load() is best-effort by design (an empty/missing file on a
+    # fresh deploy is normal), so a workshop with no saved progress is recoverable, whereas a
+    # workshop with no app is not.
+    store.load()
     yield
-    try:
-        pool.close()
-    except Exception:  # noqa: BLE001 — nothing useful to do on a shutdown path
-        pass
 
 
 app = FastAPI(title="AI Governance Workshop", lifespan=lifespan)
@@ -53,6 +45,12 @@ if os.path.exists(_frontend):
 
     @app.get("/{full_path:path}")
     async def spa(full_path: str):
+        # An unmatched /api/* path is a real 404 (a typo or a removed endpoint), not an SPA
+        # route. Falling through to index.html would return HTML with status 200, which the
+        # frontend's JSON parser chokes on with an opaque "Unexpected token <" — worst during
+        # a live workshop. Answer it honestly instead.
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(404, "Not found")
         # Resolve and confine to the build directory before serving. Starlette normalizes a
         # literal `../` but NOT a percent-encoded one (`..%2f`), which arrives here decoded
         # and would otherwise escape the directory and serve app source or host files.

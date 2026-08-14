@@ -121,4 +121,8 @@ export const api = {
   prerequisitesPdfUrl: (customerName?: string) =>
     "/api/export/prerequisites.pdf" +
     (customerName ? `?${new URLSearchParams({ customer_name: customerName }).toString()}` : ""),
+  // The one-page workshop brochure — a leave-ahead to book the session. No account needed.
+  brochurePdfUrl: (customerName?: string) =>
+    "/api/export/brochure.pdf" +
+    (customerName ? `?${new URLSearchParams({ customer_name: customerName }).toString()}` : ""),
 };
