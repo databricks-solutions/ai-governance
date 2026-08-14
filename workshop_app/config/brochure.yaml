@@ -44,7 +44,7 @@ pillars:
 personas_intro: "Built for the team that owns AI in production. Ideal attendees:"
 personas:
   - role: Platform Admins
-    value: Own the control plane, model serving, and Unity Catalog — the people who set it up and run it.
+    value: Own the control plane, model serving, Unity Catalog, and budget controls.
   - role: Technical Champions
     value: Deploy the workshop app and drive governed-AI adoption across the platform team.
   - role: Business Champions
