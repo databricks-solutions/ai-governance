@@ -1,9 +1,9 @@
-import { Layers, Lock, DollarSign, ArrowRight, Rocket } from "lucide-react";
+import { Layers, Lock, DollarSign, ArrowRight, Rocket, FileDown } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
 import ExportPanel from "@/components/ExportPanel";
 import Markdown from "@/components/Markdown";
-import type { Pillar, ProgressMap } from "@/lib/api";
+import { api, type Pillar, type ProgressMap } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 import { cn } from "@/lib/cn";
 
@@ -45,6 +45,25 @@ export default function Intro({
         </div>
       </PageHeader>
       <div className="mx-auto max-w-4xl space-y-12 px-8 py-12 lg:px-14">
+        {/* The invite artifact: a one-page overview to share with people BEFORE they open the
+            app — hence it lives at the top of the landing page and needs no Account ID. */}
+        <section className="flex flex-col gap-4 rounded-2xl border border-lava/20 bg-oat p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-navy">Inviting people to the workshop?</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
+              Share the one-page overview — what the four-hour session covers (choice, cost,
+              control), who should be in the room, and the optional accelerators. Send it to
+              anyone deciding whether to attend.
+            </p>
+          </div>
+          <a
+            href={api.brochurePdfUrl()}
+            className="inline-flex shrink-0 items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
+          >
+            <FileDown className="h-4 w-4" /> Download one-pager (PDF)
+          </a>
+        </section>
+
         <Markdown text={intro.body} />
 
         <section>

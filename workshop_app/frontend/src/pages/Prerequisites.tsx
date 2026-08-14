@@ -91,7 +91,7 @@ export default function Prerequisites() {
         {data.pdf_available ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <a
-              href={api.brochurePdfUrl(sfid.trim() || undefined)}
+              href={api.brochurePdfUrl()}
               className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white px-4 py-2 text-sm font-semibold text-navy hover:border-navy/40"
             >
               <FileText className="h-4 w-4" /> Workshop brochure (PDF)
