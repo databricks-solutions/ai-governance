@@ -90,8 +90,18 @@ cost:
       frontier: databricks-claude-sonnet-4-5
       mid: databricks-meta-llama-3-3-70b-instruct
       cheap: databricks-meta-llama-3-1-8b-instruct
-    # The prompt the routing steps send. Replace with a representative customer prompt —
-    # the ROI number only means something on work they actually run.
+    # Monthly request volume the comparison scales per-request cost by, so it reports a
+    # monthly dollar figure. Set it to the workload's real volume.
+    requests_per_month: 10000
+    # Prompts the comparison runs against all three models. Shown to the room, so use ones
+    # representative of the workload — the numbers only mean something on work they run. A
+    # spread of complexity makes the smart-routing estimate realistic (it routes each to a
+    # different tier).
+    sample_prompts:
+      - "What is a rate limit on a model serving endpoint?"
+      - "Draft a 120-word summary of Unity Catalog model services for a platform team."
+      - "Design a phased plan to move an organization's AI traffic behind a governed gateway, covering access control, cost attribution, and guardrails."
+    # The single prompt the end-to-end routing (ROI) step sends.
     sample_prompt: "Summarize the key cost drivers of running large language models in production."
 
 # Project tags for cost attribution (Cost pillar).

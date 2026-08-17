@@ -115,6 +115,39 @@ def dbu_to_usd() -> float:
     return float(_routing_cfg().get("dbu_to_usd", DEFAULT_DBU_TO_USD))
 
 
+# Monthly request volume the per-request costs are scaled by, so the comparison reports a
+# monthly dollar amount rather than a fraction of a cent. Override with
+# `cost.routing.requests_per_month`.
+DEFAULT_REQUESTS_PER_MONTH = 10_000
+
+
+def requests_per_month() -> int:
+    try:
+        return int(_routing_cfg().get("requests_per_month", DEFAULT_REQUESTS_PER_MONTH))
+    except (TypeError, ValueError):
+        return DEFAULT_REQUESTS_PER_MONTH
+
+
+# The prompts the comparison runs, shown to the room. A small set spanning complexity so the
+# smart-routing estimate reflects a realistic mix rather than one prompt's tier. Override with
+# `cost.routing.sample_prompts` (a list); `sample_prompt` (singular) still feeds the ROI step.
+_DEFAULT_PROMPTS = [
+    "What is a rate limit on a model serving endpoint?",
+    "Draft a 120-word summary of Unity Catalog model services for a platform team.",
+    "Design a phased plan to move an organization's AI traffic behind a governed gateway, "
+    "covering access control, cost attribution, and guardrails.",
+]
+
+
+def sample_prompts() -> list[str]:
+    cfg = _routing_cfg()
+    prompts = cfg.get("sample_prompts")
+    if isinstance(prompts, list) and prompts:
+        return [str(p) for p in prompts]
+    single = cfg.get("sample_prompt")
+    return [str(single)] if single else list(_DEFAULT_PROMPTS)
+
+
 def models() -> dict:
     """The model panel, with per-key endpoint overrides from config/workshop.yaml."""
     overrides = _routing_cfg().get("endpoints", {}) or {}
@@ -238,6 +271,111 @@ def compare(prompt: str) -> dict:
         spread = {"max_usd": hi, "min_usd": lo,
                   "ratio": round(hi / lo, 1) if lo > 0 else None}
     return {"results": results, "spread": spread, "pricing_note": pricing_note()}
+
+
+def evaluate() -> dict:
+    """Monthly cost of the three configured models, plus a smart-routing placeholder.
+
+    Every prompt in the sample set runs against every model; each model's per-request cost is
+    averaged across the set and multiplied by `requests_per_month`, so the figure is a monthly
+    dollar amount rather than a fraction of a cent. The smart-routing row is an ESTIMATE:
+    Databricks smart routing has no chat-completions API to call from here (it is enabled per
+    account and used through the Omnigent/ucode harnesses), so this classifies each prompt's
+    complexity and prices the cheapest sufficient model, reusing the costs already measured.
+    """
+    prompts = sample_prompts()
+    n_month = requests_per_month()
+    keys = PANEL_ORDER
+
+    # One task per (prompt, model), plus one classifier call per prompt for the routing
+    # estimate. The routed model's cost is reused from the comparison, not re-queried.
+    tasks: list[tuple] = []
+    for pi, prompt in enumerate(prompts):
+        tasks += [("model", pi, k, prompt) for k in keys]
+        tasks.append(("classify", pi, None, prompt))
+
+    def _run(t):
+        kind, pi, k, prompt = t
+        return (kind, pi, k, query(k, prompt) if kind == "model" else classify(prompt))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(tasks) or 1)) as ex:
+        done = list(ex.map(_run, tasks))
+
+    model_res: dict[str, dict[int, dict]] = {k: {} for k in keys}
+    cls_res: dict[int, dict] = {}
+    for kind, pi, k, res in done:
+        (model_res[k] if kind == "model" else cls_res).__setitem__(pi, res)
+
+    M = models()
+    results, monthly_by_key, per_request_by_key = [], {}, {}
+    for k in keys:
+        costs = [model_res[k][pi]["cost_usd"] for pi in range(len(prompts))
+                 if not model_res[k][pi]["error"]]
+        avg = (sum(costs) / len(costs)) if costs else None
+        monthly = round(avg * n_month, 2) if avg is not None else None
+        monthly_by_key[k], per_request_by_key[k] = monthly, avg
+        results.append({"option": f"{M[k]['label']} only", "monthly_cost_usd": monthly})
+
+    # Smart-routing estimate: classify each prompt, reuse the chosen tier's measured cost.
+    decisions, routed_costs = [], []
+    for pi in range(len(prompts)):
+        c = cls_res[pi]
+        chosen_key = COMPLEXITY_TO_MODEL.get(c["complexity"], "frontier")
+        chosen = model_res[chosen_key][pi]
+        routed = c["classifier_cost_usd"] + (0.0 if chosen["error"] else chosen["cost_usd"])
+        routed_costs.append(routed)
+        decisions.append({"prompt_index": pi + 1, "complexity": c["complexity"],
+                          "routed_to": M[chosen_key]["label"],
+                          "routed_cost_usd": round(routed, 8),
+                          "classifier_reason": c["reason"]})
+    smart_avg = (sum(routed_costs) / len(routed_costs)) if routed_costs else None
+    smart_monthly = round(smart_avg * n_month, 2) if smart_avg is not None else None
+    results.append({"option": "Smart routing (estimated)", "monthly_cost_usd": smart_monthly})
+
+    frontier_monthly = monthly_by_key.get("frontier")
+    saving = (round(frontier_monthly - smart_monthly, 2)
+              if frontier_monthly is not None and smart_monthly is not None else None)
+    saving_pct = (round(saving / frontier_monthly * 100, 1)
+                  if saving is not None and frontier_monthly else None)
+
+    # Per-prompt transparency: the prompt itself, and each model's answer/cost/tokens.
+    per_prompt = [{
+        "prompt_index": pi + 1,
+        "prompt": prompt,
+        "models": [{"model": M[k]["label"],
+                    "input_tokens": model_res[k][pi]["input_tokens"],
+                    "output_tokens": model_res[k][pi]["output_tokens"],
+                    "cost_usd": round(model_res[k][pi]["cost_usd"], 8),
+                    "duration_s": model_res[k][pi]["duration_s"],
+                    "answer": model_res[k][pi]["answer"],
+                    "error": model_res[k][pi]["error"]} for k in keys],
+    } for pi, prompt in enumerate(prompts)]
+
+    return {
+        "requests_per_month": n_month,
+        "prompts_evaluated": prompts,
+        "results": results,
+        "frontier_monthly_usd": frontier_monthly,
+        "smart_routing": {
+            "is_placeholder": True,
+            "monthly_cost_usd": smart_monthly,
+            "avg_cost_per_request_usd": round(smart_avg, 8) if smart_avg is not None else None,
+            "saving_vs_frontier_usd": saving,
+            "saving_vs_frontier_pct": saving_pct,
+            "decisions": decisions,
+            "note": (
+                "Placeholder estimate. Databricks smart routing has no chat-completions API to "
+                "call from this app — it is a Beta feature enabled per account and used through "
+                "the Omnigent and ucode harnesses. This row approximates its cost by classifying "
+                "each prompt's complexity and pricing the cheapest sufficient model, including "
+                "the classifier's own token cost."),
+        },
+        "per_prompt": per_prompt,
+        "avg_cost_per_request_usd": {
+            M[k]["label"]: (round(per_request_by_key[k], 8)
+                            if per_request_by_key[k] is not None else None) for k in keys},
+        "pricing_note": pricing_note(),
+    }
 
 
 def _classifier_prompt(prompt: str) -> str:

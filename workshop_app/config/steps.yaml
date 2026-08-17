@@ -12,26 +12,26 @@
 # `test` values map to backend handlers; `null`/absent means the step is guided-only.
 
 intro:
-  title: What this workshop accomplishes
+  title: What this workshop covers
   body: |
-    In four hours you will stand up a governed AI control plane on your own workspace and
-    watch each control fire. Every test runs against this workspace — nothing is simulated.
+    Over four hours, this workshop stands up a governed AI control plane on your own
+    workspace. Each step runs against this workspace rather than a simulation.
 
     Three pillars:
 
-    - **Choice** — put any model, tool, or agent behind one control plane, addressed as a
-      Unity Catalog securable instead of a workspace endpoint name.
-    - **Cost** — measure what routing between models actually saves, set budgets and rate
-      limits, and attribute every request to a team.
-    - **Control** — rate limits, guardrails, and MCP service policies that deny the right
-      calls, plus the telemetry that proves they did.
+    - **Choice** — place any model, tool, or agent behind one control plane, addressed as a
+      Unity Catalog securable rather than a workspace endpoint name.
+    - **Cost** — project the cost of routing between models, set budgets and rate limits, and
+      attribute each request to a team.
+    - **Control** — rate limits, guardrails, and MCP service policies that deny specific
+      calls, with the telemetry that records them.
 
-    Each step has three parts: the concept, a **Try It** that exercises the control here, and
-    a **Verify** that proves it fired. Results show the API called and the SQL run, so you can
-    see exactly what the app does to your workspace. Progress is saved per Account ID.
+    Each step has a concept, a **Try It** action that exercises the control on this workspace,
+    and a **Verify** step that checks the result. Results show the API called and any SQL run.
+    Progress is saved per Account ID.
 
-    **Start with Prerequisites** if you have not already — two `system` grants need an account
-    admin, and they gate 8 of the 20 steps.
+    Begin with **Prerequisites** if you have not: two `system` grants require an account admin
+    and gate 8 of the 20 steps.
 
 pillars:
   - id: choice
@@ -100,12 +100,12 @@ pillars:
           - **Model selector** — `<endpoint-name>` → `<catalog>.<schema>.<service>`
 
           A new base URL with an old endpoint name fails; so does an FQN against the legacy
-          path. Both paths still work today, which is what makes a staged migration safe —
-          and also why teams don't notice they never actually migrated.
+          path. Both paths work today, which allows a staged migration but also lets a team
+          leave the migration unfinished without noticing.
 
           There is **no in-place rename**. Stand the service up alongside the old endpoint,
           validate on real traffic, move clients in stages, then revoke the old path. A 200
-          is not acceptance: compare latency, tokens, cost, and output quality.
+          response is not acceptance: compare latency, tokens, cost, and output quality.
         action:
           label: Show model services & the client contract
           test: model_services
@@ -123,63 +123,62 @@ pillars:
 
   - id: cost
     title: Cost
-    tagline: Measure routing savings, cap spend and throughput, attribute every request.
+    tagline: Project routing cost, cap spend and throughput, and attribute each request.
     steps:
       - id: cost_model_panel
-        title: Three ways to route — and what each costs
+        title: The models and their prices
         concept: |
-          Most AI spend is a model-choice problem: every request goes to a frontier model
-          because that is the safe default. Three ways to fix it, differing mainly in who owns
-          the routing policy:
+          The Cost pillar reduces spend by sending each request to an appropriately priced
+          model rather than defaulting every request to a frontier model. Routing can be owned
+          three ways, differing in who holds the routing policy:
 
-          - **Smart routing (Databricks-managed)** — the Gateway classifies each request and
-            picks a suitable model for you. No policy to write. *Beta* — confirm availability
-            on this account before planning around it.
-          - **Omnigent (partner layer)** — an agent meta-harness above Claude Code, Codex,
-            Cursor, and custom agents, with routing and policy above the harness. Governed
-            through the same Gateway.
-          - **Custom router (yours)** — a cheap classifier scores each request and dispatches
-            to the cheapest model that clears your bar. You own the rubric.
+          - **Smart routing (Databricks-managed)** — the Gateway selects a model per request.
+            Enabled per account and used through the Omnigent and ucode harnesses. Beta.
+          - **Omnigent (partner layer)** — a meta-harness above Claude Code, Codex, Cursor, and
+            custom agents, routing above the harness and governed through the same Gateway.
+          - **Custom router** — a classifier scores each request and sends it to the cheapest
+            model that meets a defined bar.
 
-          The router changes; the control plane does not. This workshop runs the **custom
-          router** — the one you can build today and measure. Start with the price panel so the
-          arithmetic is on screen before any prompt is sent.
+          The router changes; the control plane does not. This panel lists the three configured
+          models and their per-token prices. The following steps use those prices to project
+          monthly cost and to estimate routing.
         action:
-          label: Show the model panel & routing policy
+          label: Show the models and prices
           test: routing_panel
 
       - id: cost_routing_compare
-        title: Same prompt, three price points
+        title: Projected monthly cost by model
         concept: |
-          One prompt, all three models, measured tokens and latency and cost. Expect a
-          **10-25x spread** between cheapest and most expensive.
+          This step runs the configured prompts against all three models, measures the tokens
+          each returns, and multiplies the per-request cost by the monthly request volume set
+          in `cost.routing.requests_per_month` (default 10,000). The result is the projected
+          monthly cost of sending every request to each model, alongside the estimated cost of
+          routing each request to the cheapest sufficient model.
 
-          Read the answers, not just the prices. Savings only count if quality holds, and the
-          cheap model is sometimes just wrong — which is the argument for writing a routing
-          rubric instead of assuming one.
+          The prompts and each model's answer are shown, so the output can be assessed on
+          quality as well as price. The smart-routing figure is an estimate: it classifies each
+          prompt's complexity and prices the cheapest model that meets it. Dollar figures depend
+          on the DBU rate in config; token counts are measured.
         action:
-          label: Compare cost across models
+          label: Compare monthly cost across models
           test: routing_compare
 
       - id: cost_routing_roi
-        title: Measure the routing saving
+        title: How a single request is routed
         concept: |
-          Now run the router end to end: classify, dispatch to the cheapest sufficient model,
-          and compare against what always-frontier would have cost for the same tokens. The
-          classifier is itself a model call, so **its cost counts as overhead** — that is why
-          an easy prompt saves ~90% while a genuinely hard one saves nothing at all.
+          This runs the custom router on one prompt end to end: a classifier scores the
+          request's complexity, the request is sent to the model that tier maps to, and the
+          cost is compared against sending the same request to the frontier model.
 
-          Two honesty notes worth saying out loud in the room:
-          - The router **fails safe**: if the classifier errors, the request goes to the
-            frontier model. A router that silently downgrades on failure trades correctness
-            for cost.
-          - The frontier comparison prices the *routed* response's token counts, so it is a
-            close estimate of the per-request delta, not an exact figure.
+          The classifier is itself a model call, so its cost is included as overhead. A request
+          rated simple routes to the cheapest model and saves the most; a request rated complex
+          routes to the frontier model and saves nothing. If the classifier fails, the request
+          is sent to the frontier model, so a failure does not silently downgrade quality.
 
-          To turn this into a business case, apply the per-request delta to the request mix
-          in your own Gateway logs — the next two steps show that spend.
+          The frontier comparison is priced on the routed response's token counts, so it is an
+          estimate of the per-request difference, not an exact figure.
         action:
-          label: Route a prompt & show the saving
+          label: Route one request and show the cost difference
           test: routing_roi
 
       - id: cost_spend_by_model
@@ -196,11 +195,10 @@ pillars:
       - id: cost_rate_limits
         title: Rate limits — the hard control
         concept: |
-          Two controls, easy to conflate. **Rate limits** cap *throughput* — exceed one and you
-          get HTTP 429 immediately. They are GA. **Budgets** cap *spend*, and today they
-          reliably **alert**; hard blocking is still rolling out.
-
-          So rate limits are the one you can commit to holding.
+          Two controls, easily conflated. **Rate limits** cap *throughput* — exceeding one
+          returns HTTP 429 immediately. They are GA. **Budgets** cap *spend*, and today they
+          reliably **alert**; hard blocking is still rolling out. Rate limits are therefore the
+          control that reliably enforces a hard ceiling today.
 
           They apply per service, per user, and per group, in queries/minute (QPM) and
           tokens/minute (TPM), with the most restrictive limit winning. This reads back what
@@ -233,9 +231,9 @@ pillars:
       - id: cost_tags
         title: Tag for cost attribution
         concept: |
-          Tags turn a single AI line item into cost-per-team. This applies the workshop's
-          project tags (project, cost_center, environment, use_case) to the governed service —
-          so every AI dollar attributes to a team, project, and use case.
+          Tags attribute a single AI line item to individual teams. This applies the workshop's
+          project tags (project, cost_center, environment, use_case) to the governed service,
+          so each request attributes to a team, project, and use case.
 
           One distinction that matters for anything financial: **server-side** tags are set by
           the platform owner on the service and apply to every request through it — those are
@@ -259,8 +257,8 @@ pillars:
       - id: cost_usage
         title: Usage & cost by project
         concept: |
-          With tags in place, `system.ai_gateway.usage` rolls up tokens by project — the
-          foundation of AI FinOps and the visibility that makes AI spend predictable.
+          With tags in place, `system.ai_gateway.usage` rolls up tokens by project, which is
+          the basis for attributing and forecasting AI spend.
 
           The result splits the count two ways on purpose: **request-tagged** calls (the ones
           this app sent with the header) prove per-caller attribution works end to end, while
@@ -271,18 +269,17 @@ pillars:
           not a bug: attribution is working, but only in the form a caller can switch off. Fix
           it by tagging the service itself, not by trusting the header.
 
-          **The table is not real-time, and this trips people up.** On a reference workspace the
-          latest recorded event stayed 13-21 minutes behind the wall clock. So an empty result right
-          after the routing steps means *not ingested yet*, not *tagging is broken* — check
-          `SELECT max(event_time) FROM system.ai_gateway.usage` before you start debugging a
-          control that is actually working.
+          The table is **not real-time**. On a reference workspace the latest recorded event
+          stayed 13-21 minutes behind the wall clock, so an empty result right after the
+          routing steps means *not ingested yet*, not *tagging is broken*. Check
+          `SELECT max(event_time) FROM system.ai_gateway.usage` before treating it as a fault.
         action:
           label: Query usage by project tag
           test: usage_by_project
 
   - id: control
     title: Control
-    tagline: Policies, guardrails, identity propagation, and the telemetry that proves them.
+    tagline: Policies, guardrails, identity propagation, and the telemetry that records them.
     steps:
       - id: control_governed_endpoint
         title: Create a governed endpoint
@@ -357,12 +354,12 @@ pillars:
       - id: control_coding_agents
         title: Govern coding-agent traffic
         concept: |
-          Developers adopt Cursor, Claude Code, and Codex faster than platform teams can govern
-          them. Route that traffic through the Gateway and you get per-developer attribution,
-          one policy set, and secret-leak detection.
+          Coding-agent adoption (Cursor, Claude Code, Codex) often runs ahead of platform
+          governance. Routing that traffic through the Gateway provides per-developer
+          attribution, one policy set, and secret-leak detection.
 
-          Coding agents identify themselves in `user_agent`, so this works with no tagging
-          required — which is why it is usually the fastest governance win to demonstrate.
+          Coding agents identify themselves in `user_agent`, so this requires no tagging — the
+          attribution works from the request itself.
         action:
           label: Check coding-agent usage & attribution
           test: coding_agent_usage

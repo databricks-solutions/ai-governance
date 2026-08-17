@@ -105,7 +105,9 @@ API_DOCS: dict[str, dict[str, str]] = {
     "verify_governed_endpoint": {"api": "GET /api/2.0/serving-endpoints/{name}"},
     "rate_limits": {"api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway.rate_limits)"},
     "test_guardrail": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
-    "routing_compare": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
+    "routing_compare": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions (each model per prompt + a classifier)",
+        "note": "Per-request cost × the configured monthly request volume; smart-routing row is an estimate."},
     "routing_roi": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
     "create_mcp_policy": {"api": "POST /api/2.0/sql/statements (CREATE OR REPLACE FUNCTION)"},
     "mcp_policy_enforcement": {"api": "POST /api/2.0/sql/statements"},
@@ -391,24 +393,30 @@ def t_routing_panel() -> TestResult:
 
 
 def t_routing_compare() -> TestResult:
-    """Send ONE prompt to every model and measure real tokens, latency, and cost.
+    """Project each configured model's monthly cost, and estimate smart routing against it.
 
-    This is the measurable-ROI step: same question, three price points, answers side by
-    side. Note the answers are shown so the room can judge whether the cheap model was
-    actually good enough — cost savings only count if quality holds.
+    Runs the sample prompts against all three models, averages each model's per-request cost,
+    and scales it by the configured monthly request volume. The prompts and per-model answers
+    are returned so the room can read the answers, not only the prices. The smart-routing row
+    is a labelled placeholder estimate — see routing.evaluate.
     """
-    prompt = _routing_prompt()
-    out = routing.compare(prompt)
-    live = [r for r in out["results"] if not r["error"]]
-    if not live:
+    out = routing.evaluate()
+    priced = [r for r in out["results"] if r.get("monthly_cost_usd") is not None]
+    if not priced:
         return _fail(
-            "No model endpoint answered — check the endpoints in config `cost.routing.endpoints`.",
-            prompt=prompt, **out)
-    summary = f"{len(live)} model(s) answered."
-    if out["spread"] and out["spread"]["ratio"]:
-        summary += (f" Most expensive cost {out['spread']['ratio']}x the cheapest "
-                    f"(${out['spread']['max_usd']:.6f} vs ${out['spread']['min_usd']:.6f}).")
-    return _ok(summary, prompt=prompt, **out)
+            "No model endpoint answered — check `cost.routing.endpoints` in config/workshop.yaml.",
+            **out)
+    n = out["requests_per_month"]
+    fm = out.get("frontier_monthly_usd")
+    sr = out["smart_routing"]
+    summary = (f"At {n:,} requests/month across {len(out['prompts_evaluated'])} prompts: "
+               f"all-frontier costs about ${fm:,.2f}" if fm is not None
+               else f"Projected monthly cost at {n:,} requests/month")
+    if fm is not None and sr.get("monthly_cost_usd") is not None:
+        summary += f", smart routing (estimated) about ${sr['monthly_cost_usd']:,.2f}"
+        if sr.get("saving_vs_frontier_pct") is not None:
+            summary += f" — roughly {sr['saving_vs_frontier_pct']}% lower"
+    return _ok(summary + ".", **out)
 
 
 def t_routing_roi() -> TestResult:
