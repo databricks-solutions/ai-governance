@@ -6,13 +6,12 @@
 overview:
   title: How to use the accelerators
   body: |
-    The core workshop proves the control plane across choice, cost, and control. Accelerators
-    are optional ~4-hour add-ons, each on one problem. Run the one or two that match what the
-    customer is trying to unblock — not all five. There is not time, and breadth does not
-    persuade anyone.
+    The core workshop covers the control plane across choice, cost, and control. Accelerators
+    are optional ~4-hour add-ons, each on a single topic. Run the one or two that match what
+    the customer needs to unblock rather than all five.
 
-    Same **concept → Try It → Verify** flow as the core steps, tracked in the same progress
-    store, and included in the exported outcomes.
+    Each uses the same **concept → Try It → Verify** flow as the core steps, is tracked in the
+    same progress store, and is included in the exported outcomes.
 
     **To run one:**
 
@@ -29,8 +28,8 @@ accelerators:
       - id: acc_mcp_two_kinds
         title: Two kinds of MCP — and why it decides what you can govern
         concept: |
-          Two different things are both called "MCP" on Databricks. Conflating them is the
-          most common source of confusion here, and it determines which controls you get:
+          Two different things are both called "MCP" on Databricks. They are frequently
+          conflated, and which one you use determines which controls apply:
 
           - **Managed (UC-native) endpoints** — `/api/2.0/mcp/functions|genie|sql|ai-search`.
             These expose Unity Catalog objects as tools. Governed by **authentication** and
@@ -51,8 +50,8 @@ accelerators:
           3. **Behavior** — service policies inspect the request/response and return
              ALLOW / DENY / ASK. **MCP Services only.**
 
-          The diagram below is the whole model on one page — keep it open while you work
-          through the rest of the accelerator. Then list what is actually registered here.
+          The diagram below shows the full model on one page. The action lists the MCP
+          services registered on this workspace.
         visual: mcp_planes
         action:
           label: List MCP services (provided & external)
@@ -63,11 +62,11 @@ accelerators:
         concept: |
           The managed endpoint turns the UC functions in a schema into MCP tools. Note the
           deny behavior: a caller without `USE CATALOG` + `USE SCHEMA` gets an **empty
-          list**, not an error — *deny by absence*, at object grain. That is elegant, and it
-          means an empty result is ambiguous, so read the outcome carefully.
+          list**, not an error — *deny by absence*, at object grain. An empty result is
+          therefore ambiguous, so read the outcome carefully.
 
           Governance here is UC grants plus column masks / ABAC on the underlying data.
-          Worth stating plainly: masks are an **access** control, not a **safety** control —
+          Note that masks are an **access** control, not a **safety** control —
           they don't stop prompt injection, and they don't constrain what an agent does
           downstream with a result it was entitled to read.
         action:
@@ -77,12 +76,10 @@ accelerators:
       - id: acc_mcp_service_tools
         title: MCP Service — the live tool surface
         concept: |
-          Now the other kind. This is a real `tools/call`-capable service, and the tool list
-          comes back live over JSON-RPC.
+          This is a `tools/call`-capable service; the tool list returns over JSON-RPC.
 
-          One protocol detail worth knowing before you debug this with a customer:
-          **JSON-RPC errors ride inside HTTP 200** over Streamable HTTP. Never infer success
-          from the status code. `MCP-Protocol-Version` is also required on every request
+          One protocol detail: **JSON-RPC errors ride inside HTTP 200** over Streamable HTTP,
+          so do not infer success from the status code. `MCP-Protocol-Version` is also required on every request
           after `initialize`.
         action:
           label: List tools on the configured MCP service
@@ -91,12 +88,11 @@ accelerators:
       - id: acc_mcp_grants
         title: Who is allowed to call it (Plane 2)
         concept: |
-          The permission question a security team will ask first. Check it before writing any
-          policy, because this is the control that decides *callability*.
+          The permission question, checked before writing any policy: this is the control
+          that decides *callability*.
 
-          The finding that usually lands: **`system.ai` grants `EXECUTE` to all account
-          users by default**, so a provided service is open to the whole account until you
-          scope it. Recommended posture is **deny-by-absence** — register in a
+          By default, **`system.ai` grants `EXECUTE` to all account users**, so a provided
+          service is open to the whole account until it is scoped. Recommended posture is **deny-by-absence** — register in a
           customer-owned catalog and grant explicitly, rather than revoking inside
           `system.ai`, where a schema-level revoke may not cascade to individual objects.
         action:
@@ -106,7 +102,7 @@ accelerators:
       - id: acc_mcp_obo
         title: Prove on-behalf-of identity
         concept: |
-          The headline of MCP governance: the tool runs as the **calling user**, not a shared
+          The tool runs as the **calling user**, not a shared
           service account. If a user can't see a record, neither can their agent — and no
           per-provider secrets are handed out.
 
@@ -114,7 +110,7 @@ accelerators:
           come back rather than taking OBO on trust. Have two participants run it and compare
           — different answers is the proof.
 
-          The honest limit: nothing today expresses *"the analyst may, but her agent may
+          One limitation: nothing today expresses *"the analyst may, but her agent may
           not."* The only way to separate them is to give the agent its own identity,
           typically a service principal.
         action:
@@ -124,7 +120,7 @@ accelerators:
       - id: acc_mcp_policy_target
         title: Confirm a policy can attach here (Plane 3)
         concept: |
-          The check that saves a wasted hour. Service policies attach **only** to
+          Service policies attach **only** to
           `MCP_SERVICE` securables. Point one at a managed UC-native endpoint and there is
           nothing to attach to — the product surfaces this confusingly, so verify first.
 
@@ -142,7 +138,7 @@ accelerators:
           **ON RESULT** against the response, and evaluation is **fail-closed** — an error
           during evaluation means DENY.
 
-          Two implementation details that cost real debugging time: the function is
+          Two implementation details: the function is
           `to_variant_object(...)` (not `to_variant`, which doesn't exist), and VARIANT paths
           need casting — `event:context.tool.name::STRING`.
 
@@ -164,14 +160,14 @@ accelerators:
       - id: acc_mcp_external
         title: External & custom MCP — the activation path
         concept: |
-          The step that matters most for a customer **not yet running MCP on Databricks**,
-          because registering an external server is what unlocks service policies for them.
+          For a customer **not yet running MCP on Databricks**, registering an external
+          server is what enables service policies.
 
           A custom server your team hosts is not a separate category — it registers and is
           governed exactly like any external MCP Service: HTTP connection → MCP Service
           securable → `EXECUTE` grant → policy → invoke through the gateway.
 
-          Two things to get right: don't grant `USE CONNECTION` to end users (it bypasses
+          Two requirements: do not grant `USE CONNECTION` to end users (it bypasses
           tool selection and auditing), and make a self-hosted server **stateless** — a
           stateful server behind the replicated gateway proxy can fail the first
           `tools/call` even though `initialize` and `tools/list` both succeeded.
@@ -182,8 +178,8 @@ accelerators:
       - id: acc_mcp_telemetry
         title: What was actually recorded
         concept: |
-          Close the loop on evidence, and be precise about what exists — this is where
-          over-promising is easiest.
+          This step is precise about what telemetry exists, because it is easy to
+          over-promise here.
 
           MCP Service calls write a **usage row** (identity, service, tool, latency, cost)
           and an **`mcpCall` audit row**. Managed UC-native endpoints write **no MCP-specific
@@ -191,8 +187,7 @@ accelerators:
 
           **Arguments and results are not captured** — MCP payload logging is not in the
           current Beta. So "no payload logging" does not mean "no auditability": you have
-          identity and tool name, just not the contents. Say that plainly rather than
-          implying full request/response capture.
+          identity and tool name, just not the contents.
         action:
           label: Show MCP calls from the Gateway usage table
           test: mcp_telemetry
@@ -213,7 +208,7 @@ accelerators:
         title: Register & version a representative agent
         concept: |
           Register one representative agent as a UC model with an owner, then log a new
-          version. This is the end-to-end pattern the customer repeats for their fleet.
+          version. This is the pattern to repeat across the fleet.
         manual:
           label: Register the agent in Unity Catalog (MLflow → UC model)
           deep_link: experiment
@@ -233,9 +228,9 @@ accelerators:
       - id: acc_coding_route
         title: Route coding-agent traffic through the Gateway
         concept: |
-          Claude Code, Cursor, Codex, and Copilot-likes each hit model providers directly by
-          default. Point them at the governed Gateway endpoint (OpenAI-compatible base URL +
-          per-user token) so every request is governed and attributable.
+          Claude Code, Cursor, and Codex call model providers directly by default. Pointing
+          them at the governed Gateway endpoint (OpenAI-compatible base URL + per-user token)
+          makes every request governed and attributable.
         manual:
           label: Open the governed endpoint (copy the base URL)
           deep_link: serving_endpoint
@@ -243,7 +238,7 @@ accelerators:
         title: Per-developer attribution
         concept: |
           With traffic through the Gateway and a `use_case` tag, coding-agent spend and usage
-          roll up per developer — the blind spot becomes a measured surface.
+          roll up per developer.
         action:
           label: Check coding-agent usage & attribution
           test: coding_agent_usage
@@ -263,8 +258,8 @@ accelerators:
       - id: acc_ext_inventory
         title: Inventory current provider access
         concept: |
-          Map how external providers are reached today (direct keys, another proxy). The goal
-          is one governed path; start by seeing the serving endpoints that exist.
+          Map how external providers are reached today (direct keys, another proxy). The
+          target is a single governed path; this lists the serving endpoints that exist.
         action:
           label: List serving endpoints
           test: list_endpoints
@@ -316,7 +311,7 @@ accelerators:
         title: Review guardrail activity
         concept: |
           Every blocked request lands in the inference table. Review which guardrails fired
-          and for whom — the evidence security teams ask for.
+          and for whom.
         action:
           label: Show guardrail activity
           test: guardrail_activity
