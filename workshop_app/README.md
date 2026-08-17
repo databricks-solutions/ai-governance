@@ -149,13 +149,14 @@ telemetry steps have what they need.)
 be avoidable (see `docs/APIS_AND_SETUP.md`).
 
 **If the grants aren't ready, the workshop still runs.** The model panel, full routing ROI,
-endpoint discovery, asset inventory, rate limits, guardrail tests, the `system.ai` default-access
-check, the endpoint ACL check, and MCP policy create/verify all use the serving and UC APIs and
-need no `system` *data* access. Only the telemetry steps do, and they report "action needed"
-rather than failing.
+endpoint discovery, asset inventory, rate limits, guardrail tests, the model-reach check
+(`default_access`), the endpoint ACL check, and MCP policy create/verify all use the serving and
+UC APIs and need no `system` *data* access. Only the telemetry steps do, and they report "action
+needed" rather than failing.
 
-(`default_access` reads grants **on** the `system` catalog through the UC permissions API, which
-is a metadata read — it does not need `SELECT` on any `system` schema.)
+(`default_access` reads the app identity's **effective permissions** on `system` / `system.ai`
+through the UC permissions API — a metadata read that does not need `SELECT` on any `system`
+schema.)
 
 | Grant | Unlocks | Skippable? |
 |---|---|---|

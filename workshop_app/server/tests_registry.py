@@ -88,8 +88,8 @@ API_INDEX = "https://docs.databricks.com/api/workspace/aigateway"
 API_DOCS: dict[str, dict[str, str]] = {
     "connection": {"api": "POST /api/2.0/sql/statements (SELECT 1)"},
     "default_access": {
-        "api": "GET /api/2.1/unity-catalog/permissions/{catalog|schema}/{name}",
-        "note": "Read-only — reports the default grants, never revokes them."},
+        "api": "GET /api/2.1/unity-catalog/effective-permissions/{catalog|schema}/{name}?principal=<app-sp>",
+        "note": "Read-only — reports this identity's effective reach, never changes a grant."},
     "endpoint_acl": {
         "api": "GET /api/2.0/permissions/serving-endpoints/{endpoint_id}",
         "note": "Takes the endpoint ID, not its name."},
@@ -212,110 +212,112 @@ def t_model_services() -> TestResult:
                               "stages, then revoke the old path.")
 
 
-# Principals that mean "effectively everyone on the account". Matched case-insensitively
-# against the grant's principal. `account users` is the one that actually appears by default.
-_BROAD_PRINCIPALS = {"account users", "users", "all account users"}
-
-# Privileges that let a principal REACH a model through the securable, as opposed to merely
+# Privileges that let a principal CALL a model through the securable, as opposed to merely
 # seeing that it exists. USE_SCHEMA/USE_CATALOG alone are traversal, not access.
 _REACH_PRIVILEGES = {"EXECUTE", "ALL_PRIVILEGES"}
 
 
-def _broad_grants(privilege_assignments: list[dict]) -> list[dict]:
-    """Assignments that give a reach privilege to an everyone-shaped principal."""
-    out = []
-    for a in privilege_assignments or []:
-        principal = (a.get("principal") or "").strip().lower()
-        privileges = {str(p).upper() for p in (a.get("privileges") or [])}
-        if principal in _BROAD_PRINCIPALS and (privileges & _REACH_PRIVILEGES):
-            out.append({"principal": a.get("principal"),
-                        "privileges": sorted(privileges)})
-    return out
+def _me_identity(w) -> str:
+    """Best-effort identifier for the calling identity (the app's service principal)."""
+    try:
+        me = w.current_user.me()
+    except Exception:  # noqa: BLE001
+        return ""
+    if getattr(me, "user_name", None):
+        return me.user_name
+    if getattr(me, "emails", None) and me.emails:
+        return me.emails[0].value
+    return ""
 
 
 def t_default_access() -> TestResult:
-    """What can EVERYONE already reach before any governance is applied?
+    """What can THIS identity reach on the provided model surface?
 
-    The first question a security team asks, and the one the workshop used to skip. Every
-    control downstream is theatre if the default path is wide open — so this runs early, in
-    Choice, and it is read-only.
+    Provided model services are closed by default now — a model in `system.ai` is callable
+    only by an identity explicitly granted EXECUTE (directly, or inherited from the `system`
+    catalog). So the useful question in Choice is no longer "what is everyone exposed to?" but
+    "what can this caller actually reach?"
 
-    Verified live on a reference workspace: `system.ai` grants EXECUTE, SELECT, READ_VOLUME
-    and USE_SCHEMA to `account users`, inherited from the `system` catalog. That is the
-    Databricks default, not a misconfiguration, and it means every account user can call
-    every provided model service until it is scoped.
-
-    Deliberately reports rather than remediates: revoking on `system` is a decision for the
-    platform owner, and an app should not silently narrow access on a customer's metastore.
+    Reports the EFFECTIVE permissions of the app's own service principal on `system` and
+    `system.ai` — the privileges it really holds and whether they let it call the provided
+    models — so the room sees the reach of a real, governed identity rather than a default
+    that no longer exists. Read-only: it grants and revokes nothing.
     """
     w = get_workspace_client()
-    findings, errors = [], {}
+    identity = _me_identity(w)
+    if not identity:
+        return _fail("Could not resolve the app's calling identity (current_user.me()).")
 
+    findings, errors = [], {}
     for securable_type, name in (("catalog", "system"), ("schema", "system.ai")):
         try:
             resp = w.api_client.do(
-                "GET", f"/api/2.1/unity-catalog/permissions/{securable_type}/{name}")
+                "GET", f"/api/2.1/unity-catalog/effective-permissions/{securable_type}/{name}",
+                query={"principal": identity})
         except Exception as e:  # noqa: BLE001 — one unreadable securable shouldn't fail the step
             errors[f"{securable_type}:{name}"] = str(e)[:300]
             continue
-        assignments = (resp or {}).get("privilege_assignments", []) or []
+        # effective-permissions returns privilege_assignments[].privileges[] as objects
+        # carrying inheritance info: {privilege, inherited_from_type, inherited_from_name}.
+        # Scoped to `principal`, so every returned privilege is one THIS identity effectively
+        # holds (group membership already resolved server-side).
+        privs: dict[str, str | None] = {}
+        for a in (resp or {}).get("privilege_assignments", []) or []:
+            for p in a.get("privileges", []) or []:
+                if isinstance(p, dict):
+                    pname = str(p.get("privilege") or "").upper()
+                    src = (f"{(p.get('inherited_from_type') or '').lower()} "
+                           f"{p.get('inherited_from_name')}").strip() if p.get("inherited_from_name") else None
+                else:
+                    pname, src = str(p).upper(), None
+                if pname:
+                    privs[pname] = src  # value None => granted directly on this securable
+        reach = sorted(pv for pv in privs if pv in _REACH_PRIVILEGES)
         findings.append({
             "securable": f"{securable_type} {name}",
-            "broad_grants": _broad_grants(assignments),
-            "all_assignments": [
-                {"principal": a.get("principal"), "privileges": a.get("privileges")}
-                for a in assignments],
+            "your_privileges": sorted(privs),
+            "can_call_models": bool(reach),
+            "reach_via": (f"inherited from {privs[reach[0]]}" if reach and privs[reach[0]]
+                          else "granted directly" if reach else None),
         })
 
-    open_securables = [f for f in findings if f["broad_grants"]]
-    # Reading grants on a securable needs ownership, MANAGE, or metastore-admin. The app's
-    # service principal usually has none of those on `system`, so a permission error here is
-    # an expected outcome that must read as "ask an admin", not as a broken test.
+    reachable = [f for f in findings if f["can_call_models"]]
     denied = {k: v for k, v in errors.items()
               if any(s in v.lower() for s in ("permission", "does not have", "denied",
                                               "unauthorized", "403"))}
     detail = {
+        "identity": identity,
         "findings": findings,
         "errors": errors or None,
         "why_this_matters": (
-            "EXECUTE on system.ai lets any account user call any provided model service "
-            "directly, bypassing whatever governed service you stand up later."),
-        "recommended_actions": [
-            "REVOKE EXECUTE ON SCHEMA system.ai FROM `account users` (check the `system` "
-            "catalog too — the grant is inherited).",
-            "Register the models you approve as model services in a customer-owned catalog "
-            "and grant EXECUTE to named groups.",
-            "Remove CAN_QUERY from broad groups on Foundation Model API endpoints "
-            "(see the endpoint ACL check in Control).",
-        ],
-        "note": ("Read-only. Narrowing access on `system` is a platform-owner decision, so "
-                 "the workshop reports it rather than changing it."),
+            "Provided model services are governed by EXECUTE grants — an identity can call "
+            "only what it holds EXECUTE on, directly or inherited. This is exactly what this "
+            "identity can reach today; anything not listed is denied to it."),
+        "note": (f"Read-only. Shows the effective reach of the app's own identity ({identity}) "
+                 "on the provided model surface; it grants and revokes nothing. Effective "
+                 "permissions include grants inherited via group membership, so a listed "
+                 "privilege may come from a broad group (e.g. `account users`) rather than a "
+                 "grant to this identity alone."),
     }
     if not findings:
         if denied:
             return _todo(
-                "This app's identity cannot read grants on `system` — that needs MANAGE on the "
-                "securable or metastore-admin. Have an admin run "
-                "`SHOW GRANTS ON SCHEMA system.ai` and check for `EXECUTE` granted to "
-                "`account users`; it is the default and it is the finding that matters.",
+                f"Could not read effective permissions on `system` / `system.ai` for {identity} "
+                "— that read itself needs a grant. Ask an admin to confirm what this identity "
+                f"may call, e.g. `SHOW GRANTS TO `{identity}``.",
                 **detail)
-        return _fail("Could not read grants on `system` / `system.ai`.", **detail)
-    if open_securables:
-        names = ", ".join(f["securable"] for f in open_securables)
-        return _todo(
-            f"Open by default: {names} grant(s) reach privileges to all account users — "
-            "every user on the account can call the provided models today. Scope this before "
-            "rollout; it is the first action on the lockdown list.",
+        return _fail("Could not read effective permissions on `system` / `system.ai`.", **detail)
+    if reachable:
+        names = ", ".join(f["securable"] for f in reachable)
+        return _ok(
+            f"This identity ({identity}) can call the provided model services in {names} — it "
+            "holds EXECUTE. That is the model surface reachable by this identity today.",
             **detail)
-    if denied:
-        # Partial read: report what was seen, but don't let it imply the rest is clean.
-        return _todo(
-            f"Read {len(findings)} of 2 securables and found no broad grant there, but "
-            f"{', '.join(denied)} could not be read (needs MANAGE or metastore-admin). Have an "
-            "admin confirm the rest before calling the default path scoped.",
-            **detail)
-    return _ok("No everyone-shaped principal holds EXECUTE on `system` or `system.ai` — the "
-               "default model path is already scoped.", **detail)
+    return _ok(
+        f"This identity ({identity}) cannot call any provided model service by default — no "
+        "EXECUTE on `system` or `system.ai`. The surface is closed to it until access is "
+        "explicitly granted, which is the posture you want before rollout.",
+        **detail)
 
 
 def t_endpoint_acl() -> TestResult:

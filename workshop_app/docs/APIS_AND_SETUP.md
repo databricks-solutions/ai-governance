@@ -44,7 +44,8 @@ principal** — see §5 on why that matters.
 | Serving endpoints — query | `w.serving_endpoints.query(name, messages=[ChatMessage(...)], max_tokens=...)` | `test_guardrail` |
 | Serving endpoints — ACL | `w.serving_endpoints.get_permissions(endpoint_id)` | `endpoint_acl` |
 | Gateway chat completions | `w.api_client.do("POST", "/ai-gateway/mlflow/v1/chat/completions", ...)` | all routing steps (see §7) |
-| UC permissions | `w.api_client.do("GET", "/api/2.1/unity-catalog/permissions/{type}/{name}")` | `default_access`, `mcp_grants` |
+| UC permissions | `w.api_client.do("GET", "/api/2.1/unity-catalog/permissions/{type}/{name}")` | `mcp_grants` |
+| UC effective permissions | `w.api_client.do("GET", "/api/2.1/unity-catalog/effective-permissions/{type}/{name}?principal=…")` | `default_access` (this identity's model reach) |
 | SQL Statement Execution | `w.statement_execution.execute_statement(warehouse_id, statement, wait_timeout)` | every system-table query, the policy DDL |
 | Registered models — list | `w.registered_models.list(catalog_name, schema_name)` | `list_registered_assets` |
 | UC functions — list | `w.functions.list(catalog_name, schema_name)` | `list_registered_assets` (avoids a `system` grant) |

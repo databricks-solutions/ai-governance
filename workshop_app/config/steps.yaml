@@ -55,29 +55,32 @@ pillars:
         concept: |
           Lists every serving endpoint on this workspace: foundation models, external models,
           and custom ones. This is the inventory you are about to govern — and the baseline for
-          the next step, which shows how much of it is already reachable by everyone.
+          the next step, which shows how much of it this identity can actually reach.
         action:
           label: List serving endpoints
           test: list_endpoints
 
       - id: choice_default_access
-        title: What can everyone already reach?
+        title: What can you actually reach?
         concept: |
-          Check the default before adding controls. `system.ai` grants **`EXECUTE` to
-          `account users`**, inherited from the `system` catalog. Every user on the account can
-          call every provided model service right now.
+          Provided model services are **closed by default**: a model in `system.ai` is callable
+          only by an identity that has been granted **`EXECUTE`** — directly, or inherited from
+          the `system` catalog. So the question isn't "what is everyone exposed to?" but "what
+          can *this* identity reach?"
 
-          This is the shipped default, not a misconfiguration. It does mean a governed endpoint
-          with guardrails and budgets sits *beside* an open path rather than in front of it, so
-          locking it down is the first rollout action.
+          This checks the **effective permissions of the app's own service principal** on the
+          provided model surface (`system` / `system.ai`): the privileges it actually holds and
+          whether they let it call the provided models. That is this caller's real reach — the
+          same question you'd ask of any pilot user before rollout.
 
-          Note the inheritance: revoking on `system.ai` alone does not close the path, because
-          the grant comes from the parent catalog. This step checks both.
+          Because it reads *effective* permissions, grants inherited from the parent `system`
+          catalog or from a group the identity belongs to (e.g. `account users`) are already
+          folded in — no reasoning about inheritance by hand, and no false sense that a path is
+          closed when a broad group still opens it.
 
-          **Read-only.** It reports the grants and the remediation. Narrowing `system` is the
-          platform owner's call, so the app does not change it.
+          **Read-only.** It reports what this identity can reach; it changes no grants.
         action:
-          label: Show what all account users can reach
+          label: Show what this identity can reach
           test: default_access
 
       - id: choice_model_services
