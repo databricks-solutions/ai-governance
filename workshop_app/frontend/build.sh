@@ -50,15 +50,12 @@ frontend: npm ci FAILED, and dist/ is stale or missing.
 The deploy is stopping here on purpose: shipping a stale dist means the app serves an old UI
 (or a blank page) with no error, which is much harder to debug than this message.
 
-On a Databricks-managed laptop the public npm registry is blocked at /etc/hosts by the Jamf
-JAMF-DNS-v1 supply-chain control. Do NOT edit /etc/hosts — point npm at the Databricks proxy
-instead (no auth required):
+If your environment routes npm through a private registry mirror, point npm at it and re-run:
 
-    npm config set registry https://npm-proxy.cloud.databricks.com/
+    npm config set registry <your-registry-mirror>
 
-Then re-run the deploy. See go/registry-access, or #npm-registry-access if a package is
-blocked. To ship a dist built elsewhere, copy it into frontend/dist/ — this script then
-detects it as current and skips the build.
+Then re-run the deploy. To ship a dist built elsewhere, copy it into frontend/dist/ — this
+script then detects it as current and skips the build.
 MSG
   exit 1
 fi

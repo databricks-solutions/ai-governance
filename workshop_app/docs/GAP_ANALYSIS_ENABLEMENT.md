@@ -44,7 +44,7 @@ customer could finish the workshop with a beautifully governed endpoint *and* an
 Read-only by design — narrowing `system` is a platform-owner decision, so the step reports the
 grants and names the remediation rather than revoking on a customer metastore.
 
-Live result on the reference workspace (`fevm-shm-skunkworks`, 2026-08-06):
+Live result on a reference workspace (2026-08-06):
 
 ```
 catalog system   -> account users: BROWSE, EXECUTE, READ_VOLUME, SELECT, USE_CATALOG, USE_SCHEMA

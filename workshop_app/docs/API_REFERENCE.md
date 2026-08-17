@@ -13,7 +13,7 @@ for within it:
 > **https://docs.databricks.com/api/workspace/aigateway**
 
 Navigate to the operation by name in the left-hand nav. Every path below was verified by
-calling it live against a workspace (`fevm-shm-skunkworks`, 2026-08-06), which is a stronger
+calling it live against a reference workspace (2026-08-06), which is a stronger
 guarantee than a doc link: the response shapes in `server/` are what the API actually
 returned, not what a doc implied.
 

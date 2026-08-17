@@ -106,7 +106,7 @@ Two POC DOC items we do **not** cover, deliberately:
 
 **`choice_model_services`** — the one genuine gap, and it was conceptual rather than cosmetic.
 The workshop demonstrated controls but never named **what they attach to**, or that the client
-contract changes. Verified live on `fevm-shm-skunkworks`:
+contract changes. Verified live on a reference workspace:
 
 - `/serving-endpoints/<name>/invocations` → **200** (legacy path still works)
 - `/ai-gateway/mlflow/v1/chat/completions` with `model=<endpoint-name>` → **200**

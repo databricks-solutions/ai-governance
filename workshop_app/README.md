@@ -100,32 +100,10 @@ App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.
 > `DATABRICKS_WAREHOUSE_ID`, `WORKSHOP_CATALOG`, and `WORKSHOP_SCHEMA` in the environment (or
 > a `config/workshop.local.yaml` override). See the Local development section below.
 
-> **Building the frontend on a Databricks laptop.** Public package registries
-> (`registry.npmjs.org`, `registry.yarnpkg.com`, `pypi.org`) are pinned to `127.0.0.1` in
-> `/etc/hosts` by the Jamf-managed `JAMF-DNS-v1` control, so a default `npm install` fails with
-> `ECONNREFUSED`. This is deliberate supply-chain protection, not a broken laptop: the
-> Databricks proxy quarantines newly published packages (~7 days) and blocks known-malicious
-> ones. **Do not edit `/etc/hosts`** — Jamf restores it, and it is a policy violation.
->
-> Point npm at the Databricks proxy instead. **No token or auth is required:**
->
-> ```bash
-> npm config set registry https://npm-proxy.cloud.databricks.com/
-> cd frontend && npm install && npm run build
-> ```
->
-> For Python, the equivalent is
-> `pip config set global.index-url https://pypi-proxy.cloud.databricks.com/simple`
-> (or `UV_INDEX_URL=...` for uv). Full guide: **go/registry-access**. If a package is blocked
-> as risky, ask in `#npm-registry-access` or `#public-registry-access` rather than working
-> around the control.
->
-> **Lockfile.** `frontend/package-lock.json` is committed and complete (86 packages, all with
-> `resolved` + `integrity`), so `npm ci` gives reproducible builds. The `resolved` URLs point at
-> `registry.npmjs.org` **on purpose**, not at the internal proxy: this is a public repo and a
-> customer must be able to `npm ci` it. Integrity hashes are registry-independent, so the
-> Databricks proxy serves the same lockfile transparently — verified by a clean
-> `rm -rf node_modules && npm ci` through the proxy.
+> **Lockfile.** `frontend/package-lock.json` is committed and complete, so `npm ci` gives a
+> reproducible build. If your environment routes package installs through a private registry
+> mirror, point npm at it (`npm config set registry <your-mirror>`) before building; the
+> integrity hashes in the lockfile are registry-independent.
 
 ### The one manual step: two `system` grants (account admin)
 

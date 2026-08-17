@@ -3,7 +3,7 @@
 Everything the workshop app touches, what it needs, and — importantly — what is **GA** vs
 **Beta/Preview**. Read this before promising a capability to a customer.
 
-Verified against a live workspace (`fevm-shm-skunkworks`, AWS) on **2026-08-05**. Unity AI
+Verified against a live AWS workspace on **2026-08-05**. Unity AI
 Gateway went GA on **2026-08-04**, so several adjacent pieces are still Beta; those are
 called out per row rather than glossed.
 
@@ -157,7 +157,7 @@ signal. Dropped deliberately (see §8).
 ### Managed MCP vs MCP Services — the distinction that decides your controls
 
 Two different things are both called "MCP". Which one you point at determines whether a
-service policy can exist at all. All rows verified live on `fevm-shm-skunkworks`, 2026-08-06.
+service policy can exist at all. All rows verified live on a reference workspace, 2026-08-06.
 
 | | **Managed (UC-native) endpoints** | **MCP Services** |
 |---|---|---|

@@ -31,8 +31,7 @@ bundle:
 #
 # Does NOT require npm on every deploy: build.sh skips the build when dist/ is already newer
 # than every source file, so a dist built elsewhere (or by CI) deploys with no network access.
-# npm is only needed when dist is genuinely stale. On a Databricks-managed laptop the public
-# registry is blocked by the Jamf JAMF-DNS-v1 control — use the Databricks npm proxy (README).
+# npm is only needed when dist is genuinely stale.
 artifacts:
   frontend:
     path: ./frontend
