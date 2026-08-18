@@ -15,9 +15,8 @@ frontend/dist/
 # Local config override
 config/workshop.local.yaml
 
-# Local npm config, if anyone sets one per-project. The sanctioned registry is the
-# unauthenticated Databricks proxy (see README), so no token belongs here — but ignore it
-# anyway so a credential can never be committed by accident.
+# Local npm config, if anyone sets one per-project. Ignored so a registry token can never
+# be committed by accident.
 frontend/.npmrc
 
 # Databricks

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 
 // The whole workshop is tracked against one Account ID (a Salesforce account id in practice,
 // but labelled neutrally because the app is customer-facing). Progress, tests, and the
-// outcomes export are all keyed by it, so results flow straight into the internal sales app.
+// outcomes export are all keyed by it, so results flow straight into the Databricks account-tracking system.
 // Persisted to localStorage so a room can pause and resume.
 interface AccountCtx {
   sfid: string;

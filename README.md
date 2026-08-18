@@ -1,17 +1,17 @@
-# Databricks Unity AI Gateway — POC Labs
+# Databricks Unity AI Gateway Ã¢ÂÂ POC Labs
 
 ```
 Hands-on labs for running a proof of concept with the Databricks Unity AI Gateway.
 Each lab is a self-contained Databricks notebook that applies one production
-governance control — rate limiting, guardrails, usage/cost tracking, fallbacks,
-traffic routing — to a real Model Serving endpoint, and proves it works.
+governance control Ã¢ÂÂ rate limiting, guardrails, usage/cost tracking, fallbacks,
+traffic routing Ã¢ÂÂ to a real Model Serving endpoint, and proves it works.
 ```
 
 The Unity AI Gateway puts a single, governed control plane in front of the models,
 tools, and agents your organization uses. This repo shows how to stand that up as a
 proof of concept: deploy one endpoint, then layer on each control and watch it take
-effect. Labs are organized exactly the way you'd evaluate the platform — **Models**,
-**Guardrails**, **Tools**, and **Agents** — and the whole workshop deploys from a single
+effect. Labs are organized exactly the way you'd evaluate the platform Ã¢ÂÂ **Models**,
+**Guardrails**, **Tools**, and **Agents** Ã¢ÂÂ and the whole workshop deploys from a single
 Databricks Asset Bundle.
 
 > The Unity AI Gateway is in Beta. Feature availability and API shapes may change; the
@@ -21,19 +21,19 @@ Databricks Asset Bundle.
 
 ```
         clients / agents / apps
-                  │
-                  ▼
-        ┌────────────────────────┐
-        │   Unity AI Gateway      │  rate limits · guardrails · usage tracking
-        │  (governed endpoint)    │  payload logging · fallbacks · traffic routing
-        └───────────┬────────────┘
-                    │
-      ┌─────────────┼──────────────┐
-      ▼             ▼              ▼
+                  Ã¢ÂÂ
+                  Ã¢ÂÂ¼
+        Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+        Ã¢ÂÂ   Unity AI Gateway      Ã¢ÂÂ  rate limits ÃÂ· guardrails ÃÂ· usage tracking
+        Ã¢ÂÂ  (governed endpoint)    Ã¢ÂÂ  payload logging ÃÂ· fallbacks ÃÂ· traffic routing
+        Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ¬Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+                    Ã¢ÂÂ
+      Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ¼Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+      Ã¢ÂÂ¼             Ã¢ÂÂ¼              Ã¢ÂÂ¼
  Foundation     External      Custom / fine-
  Models         models        tuned models
-      │
-      ▼
+      Ã¢ÂÂ
+      Ã¢ÂÂ¼
  Unity Catalog: inference tables, system tables, permissions, lineage
 ```
 
@@ -43,8 +43,8 @@ in `system.billing.usage`; full request/response payloads in Unity Catalog **inf
 
 ## Labs
 
-### 🧠 Unity AI Gateway for Models
-General platform governance — setup, cost control, tagging, resilience.
+### Ã°ÂÂ§Â  Unity AI Gateway for Models
+General platform governance Ã¢ÂÂ setup, cost control, tagging, resilience.
 
 | # | Lab | What it shows |
 |---|-----|---------------|
@@ -53,31 +53,31 @@ General platform governance — setup, cost control, tagging, resilience.
 | 03 | [Fallbacks](labs/models/03-fallbacks) | Automatic failover across served entities |
 | 04 | [Traffic routing](labs/models/04-traffic-routing) | Load balancing + A/B/canary across backends |
 
-### 🛡️ Guardrails
-Self-contained guardrail track — apply, then benchmark. See [`labs/guardrails`](labs/guardrails).
+### Ã°ÂÂÂ¡Ã¯Â¸Â Guardrails
+Self-contained guardrail track Ã¢ÂÂ apply, then benchmark. See [`labs/guardrails`](labs/guardrails).
 
 | Part | Lab | What it shows |
 |------|-----|---------------|
 | 1 | [Apply guardrails](labs/guardrails/01-apply-guardrails) | PII masking, safety, topic moderation, keyword filtering at the gateway |
 | 2 | [Guardrail benchmark](labs/guardrails/02-guardrail-benchmark) | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination; online vs two managed judges + DSPy/GEPA alignment |
 
-### 🔧 Unity AI Gateway for Tools
+### Ã°ÂÂÂ§ Unity AI Gateway for Tools
 | Lab | What it shows |
 |-----|---------------|
 | [Managed MCP servers](labs/tools/01-managed-mcp) | UC functions, Genie, Vector Search as governed MCP tools |
 | [Function calling](labs/tools/03-function-calling) | Unity Catalog functions as governed tools |
 
-### 🤖 Unity AI Gateway for Agents
+### Ã°ÂÂ¤Â Unity AI Gateway for Agents
 | Lab | What it shows |
 |-----|---------------|
 | [Agent Framework](labs/agents/01-agent-framework) | Mosaic AI agent on governed endpoints, logged + registered to UC |
 | [Agent evaluation](labs/agents/02-agent-evaluation) | Evaluate & monitor governed agents with MLflow judges |
 | [OpenAI Agents SDK](labs/agents/03-openai-agents-sdk) | Existing agent stack on the OpenAI-compatible endpoint |
 
-### 🏁 Capstone
+### Ã°ÂÂÂ Capstone
 | Lab | What it shows |
 |-----|---------------|
-| [Zero to production](labs/zero-to-production) | One endpoint, end to end: observability → guardrails → limits → fallback → governed tools → validate → checklist |
+| [Zero to production](labs/zero-to-production) | One endpoint, end to end: observability Ã¢ÂÂ guardrails Ã¢ÂÂ limits Ã¢ÂÂ fallback Ã¢ÂÂ governed tools Ã¢ÂÂ validate Ã¢ÂÂ checklist |
 
 Every lab above is built, deployable, and verified end-to-end in a workspace.
 
@@ -100,28 +100,36 @@ databricks secrets put-secret  ai_governance api_token      # paste a PAT
 # 4. Deploy the gateway endpoint, schema, jobs, and every lab notebook:
 databricks bundle deploy -t dev
 
-# 5. Run a lab group as a job — or just open a notebook and run it:
-databricks bundle run run_core_labs          -t dev    # rate limit · usage/FinOps · fallbacks · routing
+# 5. Run a lab group as a job Ã¢ÂÂ or just open a notebook and run it:
+databricks bundle run run_core_labs          -t dev    # rate limit ÃÂ· usage/FinOps ÃÂ· fallbacks ÃÂ· routing
 databricks bundle run run_guardrail_labs     -t dev    # apply guardrails
-databricks bundle run run_tools_labs         -t dev    # managed MCP · function calling
-databricks bundle run run_agent_labs         -t dev    # agent framework · evaluation
+databricks bundle run run_tools_labs         -t dev    # managed MCP ÃÂ· function calling
+databricks bundle run run_agent_labs         -t dev    # agent framework ÃÂ· evaluation
 databricks bundle run run_zero_to_production  -t dev    # capstone
 ```
 
 **Prerequisites:** a workspace with Model Serving + Foundation Model APIs, the Databricks CLI, and
 permission to create a serving endpoint, a Unity Catalog schema, and jobs. The guardrail **benchmark**
-(Part 2) is interactive — it streams datasets and calls models — so open it and set the `n_examples`
+(Part 2) is interactive Ã¢ÂÂ it streams datasets and calls models Ã¢ÂÂ so open it and set the `n_examples`
 widget rather than running it as a job.
 
 ## Repository layout
 
 ```
-databricks.yml          Asset Bundle root — one bundle for the whole workshop
+databricks.yml          Asset Bundle root Ã¢ÂÂ one bundle for the whole workshop
 resources/              Bundle resources (endpoint + schema + jobs)
 shared/setup.py         %run helper used by every lab
-labs/                   models · guardrails · tools · agents · zero-to-production
+labs/                   models ÃÂ· guardrails ÃÂ· tools ÃÂ· agents ÃÂ· zero-to-production
                         (each lab folder = README.md + notebook.py)
 ```
+
+## Maintainers
+
+Maintained by the Databricks Field Engineering team. For questions or issues, open a GitHub
+issue (below) or reach a maintainer:
+
+- Scott McKean â scott.mckean@databricks.com
+- Tim Lortz â tim.lortz@databricks.com
 
 ## How to get help
 
@@ -141,3 +149,5 @@ All included or referenced third party libraries are subject to their respective
 | openai | OpenAI Python client | Apache 2.0 | https://github.com/openai/openai-python |
 | requests | HTTP client | Apache 2.0 | https://github.com/psf/requests |
 | polars | DataFrame library | MIT | https://github.com/pola-rs/polars |
+
+A full third-party dependency audit for the workshop app and labs — versions, licenses, and purpose — is in [DEPENDENCIES.md](DEPENDENCIES.md).

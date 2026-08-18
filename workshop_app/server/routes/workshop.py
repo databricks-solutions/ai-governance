@@ -11,7 +11,7 @@ from ..tests_registry import run_test
 
 router = APIRouter()
 
-# Version of the outcomes-JSON contract the internal sales app ingests.
+# Version of the outcomes-JSON contract the Databricks account-tracking system ingests.
 OUTCOMES_SCHEMA_VERSION = 1
 
 
@@ -156,10 +156,10 @@ def _save_progress(customer_sfid, step_id, pillar_id, status, result, updated_by
 def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
     """Assemble the workshop outcomes: every step with its status, keyed to the Account ID.
 
-    The wire field stays `customer_sfid` — it is the contract the internal sales app ingests,
+    The wire field stays `customer_sfid` — it is the contract the Databricks account-tracking system ingests,
     so renaming it would break that consumer. Only the user-visible label changed.
 
-    This is the contract the internal sales app ingests (schema_version). It merges the
+    This is the contract the Databricks account-tracking system ingests (schema_version). It merges the
     workshop definition (so every step appears, even untouched ones) with saved progress.
     """
     progress = get_progress(customer_sfid)  # {step_id: {status, last_result, notes, ...}}
@@ -210,7 +210,7 @@ def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
 
 @router.get("/export/outcomes")
 def export_outcomes(customer_sfid: str, customer_name: str | None = None):
-    """The JSON the internal sales app loads to track workshop outcomes + next steps."""
+    """The JSON the Databricks account-tracking system loads to track workshop outcomes + next steps."""
     if not customer_sfid:
         raise HTTPException(400, "customer_sfid is required")
     return _build_outcomes(customer_sfid, customer_name)

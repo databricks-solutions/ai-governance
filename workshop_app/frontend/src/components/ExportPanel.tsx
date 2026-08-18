@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { useAccount } from "@/lib/account";
 
 // Export the workshop outcomes: a PDF leave-behind (the primary artifact — it gets emailed and
-// attached to a POC), a Markdown report, and an outcomes.json the internal sales app ingests.
+// attached to a POC), a Markdown report, and an outcomes.json the Databricks account-tracking system ingests.
 // Everything is keyed to the Account ID set at the top of the Walkthrough.
 export default function ExportPanel() {
   const { sfid } = useAccount();
@@ -33,7 +33,7 @@ export default function ExportPanel() {
         <h3 className="font-semibold text-navy">Export workshop outcomes</h3>
       </div>
       <p className="mb-4 text-sm leading-relaxed text-muted">
-        Generate the leave-behind report and the outcomes file the internal sales app loads to
+        Generate the leave-behind report and the outcomes file the Databricks account-tracking system loads to
         track this account's workshop and next steps. Everything is keyed to the Account ID
         set at the top of the Walkthrough.
       </p>
@@ -63,7 +63,7 @@ export default function ExportPanel() {
       )}
       <p className="mt-3 text-xs text-muted">
         Account: <code className="rounded bg-navy/5 px-1 py-0.5">{sfid || "not set"}</code> — the PDF is the
-        customer leave-behind; load the .json in the internal sales app's account journey.
+        customer leave-behind; load the .json in the Databricks account-tracking system's account journey.
       </p>
     </div>
   );

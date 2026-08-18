@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
  * as inline SVG + divs (no chart library) so it stays crisp, themeable, and printable in a
  * leave-behind.
  *
- * Content follows the three-plane model from the internal MCP field guide:
+ * Content follows the three-plane MCP governance model:
  *   Plane 1 Authenticate — OAuth scope picks the endpoint FAMILY
  *   Plane 2 Authorize    — UC grants pick the OBJECT
  *   Plane 3 Behavior     — service policies inspect the CALL (MCP Services only)

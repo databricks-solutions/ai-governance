@@ -54,7 +54,7 @@ Two rules carry more weight than the rest:
 
 The POC DOC measures on **Cost / Usage / Access / Inventory**. Our app is organized on
 **Choice / Cost / Control** (the FY27 messaging pillars). They aren't in conflict — ours is
-the customer-facing narrative, theirs is the internal scorecard — but the mapping should be
+the customer-facing narrative, theirs is the POC delivery scorecard — but the mapping should be
 explicit so an SA can report against the POC DOC without re-deriving it.
 
 | POC DOC pillar | Its primary measure | Our steps |

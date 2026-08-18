@@ -59,8 +59,7 @@ concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
 Run the one that matches the customer's priority (the accelerator overview and links live on
 the in-app **Walkthrough** page). Accelerator progress is tracked in the same volume-backed
-store and included in the exported outcomes, so anything you run shows up in the internal
-sales app.
+store and included in the exported outcomes, so anything you run shows up in the Databricks account-tracking system.
 
 ## Deploy on a customer workspace
 
@@ -187,9 +186,9 @@ failed), the last Try-It/Verify `last_result` (JSON), notes, and a timestamp. Th
 file into memory at startup (`server/store.py`) and rewrites it write-through on every update —
 there is no database to provision, wait on, or grant CONNECT to. The whole workshop is keyed to
 the Account ID set on the Walkthrough page, so progress and the outcomes export flow straight
-into the internal sales app.
+into the Databricks account-tracking system.
 
-## Export → the internal sales app
+## Export → the Databricks account-tracking system
 
 The Intro page's **Export workshop outcomes** panel produces two files (the deliverer confirms
 the Salesforce account id first):
@@ -197,7 +196,7 @@ the Salesforce account id first):
 - **`<sfid>_workshop_report.md`** — a per-step complete/incomplete report grouped by pillar, for
   the customer leave-behind (`GET /api/export/report`).
 - **`<sfid>_workshop_outcomes.json`** — the machine-readable outcomes (`schema_version` 1) the
-  internal AI Governance sales app ingests to track the account and drive next steps
+  Databricks AI Governance account-tracking system ingests to track the account and drive next steps
   (`GET /api/export/outcomes`). Load it in that app's **Account Journey → Workshop handoff**.
 
 ## Extending

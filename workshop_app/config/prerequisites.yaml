@@ -1,7 +1,7 @@
 # Workshop prerequisites — the checklist we send the customer BEFORE the session.
 #
 # This is written as a note FROM the Databricks account team TO the customer, so it reads as
-# customer-facing prose, not internal run-of-show instructions. Config-driven (same as
+# customer-facing prose, not a run-of-show runbook. Config-driven (same as
 # steps.yaml) so it can be tailored per customer without a code change. Rendered on the
 # Prerequisites page and exported as a PDF with real checkboxes (GET /api/export/prerequisites.pdf).
 #

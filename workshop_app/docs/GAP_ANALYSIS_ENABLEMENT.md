@@ -274,6 +274,6 @@ Core is **20 steps**, still inside 4 hours: items 1–2 spend the budget recover
 
 **Fork per customer:** everything in NICE TO HAVE.
 
-**Verify before promising:** which built-in policies exist on the account. Two internal
+**Verify before promising:** which built-in policies exist on the account. Two Databricks
 documents disagree (four vs three, `block_pii` present or not) and none of the four resolve as
 SQL functions — check the AI Gateway UI Policies tab rather than quoting a name.

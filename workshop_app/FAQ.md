@@ -95,8 +95,7 @@ Export the outcomes from the Walkthrough page:
 
 - a per-step **report** (`.md`) — every step with its status and notes, grouped by pillar,
   with the incomplete items listed as next steps. This is the leave-behind.
-- an **outcomes.json** — the same data machine-readable, which the internal Databricks sales
-  app ingests to track the account and drive follow-up.
+- an **outcomes.json** — the same data machine-readable, which the Databricks account-tracking system ingests to track the account and drive follow-up.
 
 Both include the accelerators, and both are keyed to the Account ID. The incomplete items are
 the follow-up list: they become the 1–2 weeks of work after the workshop, and they are the

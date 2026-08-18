@@ -1,6 +1,6 @@
 """Cost-routing ROI: measure what routing actually saves on token spend.
 
-A simplified port of the internal app's Routing Impact demo, kept to one file because the
+A simplified port of the Routing Impact demo, kept to one file because the
 workshop only needs the measurable-ROI story, not the full three-tab demo. Three router
 options are framed for the customer (Cost pillar):
 
