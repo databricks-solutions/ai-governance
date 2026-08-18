@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Databricks design system — Navy / Oat / White surfaces; Lava is the spark only. */
+@theme {
+  --color-navy: #1b3139;
+  --color-navy-700: #24424c;
+  --color-navy-300: #5a676c;
+  --color-oat: #f9f7f4;
+  --color-oat-200: #efe9e1;
+  --color-lava: #ff3621;
+  --color-ink: #1b3139;
+  --color-muted: #5a676c;
+
+  --font-sans: "DM Sans", "Inter", system-ui, -apple-system, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-oat);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Editorial headline rhythm. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+::selection {
+  background: var(--color-lava);
+  color: #fff;
+}

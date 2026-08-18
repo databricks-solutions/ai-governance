@@ -1,0 +1,112 @@
+# Workshop prerequisites — the checklist we send the customer BEFORE the session.
+#
+# This is written as a note FROM the Databricks account team TO the customer, so it reads as
+# customer-facing prose, not a run-of-show runbook. Config-driven (same as
+# steps.yaml) so it can be tailored per customer without a code change. Rendered on the
+# Prerequisites page and exported as a PDF with real checkboxes (GET /api/export/prerequisites.pdf).
+#
+# Two groups only — long lead time and short lead time — and only the essentials. Every item is
+# tagged by persona in `who`. The workshop needs as few as THREE people:
+#   - Account admin      — enables platform capabilities and runs the account-level grants.
+#   - Business champion   — owns the AI budget and the "why this matters to us".
+#   - Technical champion  — deploys the app and provides the catalog and warehouse.
+# Everything else is optional; items only some customers need are marked `optional: true`.
+#
+# Fields:
+#   id        stable key (used as the PDF checkbox anchor)
+#   item      what needs to be true (short — it is a checkbox label)
+#   why       what it buys you / what it unblocks. Plain language, customer-facing.
+#   who       the persona who owns it (Account admin / Business champion / Technical champion)
+#   optional  true if only some customers need it; say who/when in `why`
+
+lead_time_note: >-
+  These are the prerequisites for your AI Governance Workshop — getting them in place ahead of
+  time is what lets us spend the four hours proving governance on your own workspace instead of
+  waiting on access. Each item is tagged by persona. The session needs as few as three people:
+  an account admin, a business champion, and a technical champion — everyone else is optional.
+  The long-lead items need an account admin and can take a few days, so please start those about
+  a week out; the short-lead items we can run together the day before.
+
+groups:
+  - id: long_lead
+    title: Long lead time — please start about a week out
+    lead_time: Days
+    intro: >-
+      These need an account or metastore admin and can take a few days to arrange, so they are
+      the ones that stall a workshop if we leave them to the day. Getting them done early is the
+      single biggest thing you can do to make the session go smoothly.
+    items:
+      - id: uaig_enabled
+        item: Turn on Unity AI Gateway for the account and this workspace
+        why: >-
+          This is the control plane the whole workshop is built on. Nothing else works until it
+          is enabled, so it is the first thing to confirm.
+        who: Account admin
+      - id: system_grants
+        item: Grant the app read access to two `system` schemas (`system.ai_gateway` and `system.access`)
+        why: >-
+          These let the app read the telemetry that proves cost and control actually fired — spend
+          by model, budgets, per-team attribution, and the audit trail. The deploy script prints the
+          exact GRANT statements with the app's identity filled in. If they are not ready in time the
+          workshop still runs; those specific steps simply show "action needed" instead of a result.
+        who: Account admin
+      - id: catalog_and_warehouse
+        item: Provide a Unity Catalog catalog and a running SQL warehouse the app can use
+        why: >-
+          The app deploys into a catalog you choose and runs every live check through the warehouse.
+          A serverless warehouse starts fastest. The catalog must already exist — the app creates
+          only its own schema inside it.
+        who: Technical champion
+      - id: pilot_users
+        item: Line up a few pilot users from your identity provider
+        why: >-
+          Per-user cost attribution and the on-behalf-of identity demo are only convincing with real,
+          separate logins. Optional, but it makes those moments land — shared logins prove nothing.
+        who: Technical champion
+        optional: true
+      - id: mcp_previews
+        item: Enable the MCP previews (Service policies and Managed MCP)
+        why: >-
+          Only needed if we plan to run the MCP governance steps or the MCP accelerator. Both are
+          Beta features an account admin toggles on.
+        who: Account admin
+        optional: true
+
+  - id: short_lead
+    title: Short lead time — the day before (with us, if you like)
+    lead_time: Minutes to an hour
+    intro: >-
+      Quick to do once the long-lead items are in place. We are happy to walk through these together
+      on a short call the day before so the room opens to a working app.
+    items:
+      - id: deploy_app
+        item: "Deploy the app to your workspace and confirm it is healthy"
+        why: >-
+          You run this in your own environment to try the capabilities first-hand. It is a
+          standard Databricks Asset Bundle — no scripts. From the `workshop_app/` folder:
+          `databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"`
+          then `databricks bundle run ai_governance_workshop_app -t dev -p <profile>`. Open the
+          app URL it prints and check `GET /api/health` returns `{"status":"ok","config_problems":[]}`.
+          If it names a problem, that is exactly what still needs setting.
+        who: Technical champion
+      - id: sample_prompt_and_rate
+        item: Pick a representative prompt and share your negotiated $/DBU rate
+        why: >-
+          The cost-routing step shows real savings, and the number only persuades when it runs on
+          your kind of work at your price. A generic prompt at list price produces a figure nobody
+          believes.
+        who: Business champion
+      - id: budget_owner
+        item: Have the person who owns the AI budget in the room
+        why: >-
+          The cost pillar lands when the budget owner sees spend, budgets, and hard caps live. If
+          that is not the business champion, invite them for that hour.
+        who: Business champion
+      - id: accelerator_choice
+        item: Decide whether to run an accelerator, and which one
+        why: >-
+          There are five optional ~4-hour deep dives (MCP, agent registry, coding agents, external
+          providers, policies & guardrails). Pick the one matching your top priority — we won't run
+          all of them, there isn't time.
+        who: Business champion
+        optional: true

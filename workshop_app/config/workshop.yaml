@@ -1,0 +1,123 @@
+# AI Governance Workshop — customer configuration
+#
+# This is the ONE file a customer edits to run the workshop on their own workspace.
+# Everything the app does (which endpoints to govern, which MCP service to policy,
+# which catalog/schema to write to) is driven from here. Copy to workshop.local.yaml
+# to override locally without touching this file.
+
+workspace:
+  # Left blank on purpose. When deployed as a bundle the app reads the warehouse from the
+  # DATABRICKS_WAREHOUSE_ID env var, which the bundle sets on the app from the `warehouse_id`
+  # variable (databricks.yml → apps.*.config.env) — so `--var="warehouse_id=..."` is the
+  # single source of truth and you do not need to set this. Set it only for LOCAL development.
+  warehouse_id: ""
+
+# Unity Catalog location for governance artifacts (the MCP policy function, inference
+# tables, audit views). REQUIRED — the bundle creates this schema in this catalog, and the
+# catalog must already exist. Pass the catalog at deploy time with
+# `--var="catalog=<your-catalog>"` so the bundle and the app agree.
+catalog:
+  name: ""                        # e.g. main — must match the bundle's `catalog` variable
+  schema: ai_governance_workshop
+
+# Foundation Model endpoints the workshop references (Choice pillar).
+gateway:
+  # A shared, out-of-the-box foundation-model endpoint (tags only, no per-project limits).
+  ootb_endpoint: databricks-claude-sonnet-4-5
+  # Alternate model used by the routing-agent cost demo (Cost pillar).
+  cheap_endpoint: databricks-meta-llama-3-3-70b-instruct
+
+# The governed endpoint the workshop creates and layers controls onto (Control pillar).
+governed_endpoint:
+  name: ai-governance-workshop-governed
+  primary_model: databricks-claude-sonnet-4-5
+  fallback_model: databricks-meta-llama-3-3-70b-instruct
+  inference_table_prefix: workshop_governed
+  rate_limit_per_user_per_min: 50
+  guardrails:
+    pii_behavior: BLOCK
+    keyword_policy:
+      function_name: keyword_blocklist_policy
+      blocked_keywords:
+        - social security number
+        - credit card number
+
+# MCP service the workshop governs (Control pillar + MCP accelerator).
+#
+# Must be an MCP_SERVICE securable — a Databricks-provided `system.ai.*` service or an
+# external one you registered. The managed UC-native endpoints (/api/2.0/mcp/functions/...)
+# are NOT securables and cannot carry a service policy.
+#
+# Run the accelerator's first step to see what is actually registered here: availability
+# differs per workspace (one workspace exposed 6 provided services and returned 403 on
+# system.ai.atlassian, which needs per-user OAuth consent first).
+mcp:
+  builtin_service: system.ai.github
+  service_policy:
+    function_name: mcp_read_only_policy
+    policy_name: mcp-write-block
+    # Tool names the policy DENIES; everything else is ALLOWed.
+    #
+    # NOTE: the provided `system.ai.github` service is already filtered to READ-ONLY tools,
+    # so there is no write tool on it to deny. `get_file_contents` is therefore used as the
+    # deny target — denying a tool that genuinely exists still proves enforcement, and it is
+    # honest about what this service exposes. Point this at a real write tool
+    # (e.g. `push_files`, `create_issue`) on an external MCP that exposes one.
+    deny_tools:
+      - get_file_contents
+    # Reason returned to the caller in the structured DENY error. Keep it specific — this is
+    # what a developer sees when the policy fires.
+    deny_reason: "Blocked by workshop policy: this tool is not permitted for the pilot group."
+    allow_probe_tool: get_commit      # a read tool used to prove ALLOW still works
+    # Read tool that echoes the calling user, used to prove on-behalf-of identity.
+    identity_probe_tool: get_me
+
+# Cost pillar — routing ROI.
+#
+# The workshop frames three ways to cut token spend:
+#   a) Smart routing — Databricks-managed model selection. Beta; nothing to configure here.
+#   b) Omnigent      — partner routing layer above the agent harnesses.
+#   c) Custom router — a cheap classifier picks the cheapest sufficient model. This is the
+#                      one the app actually runs, because it is the one you can stand up
+#                      today and measure.
+cost:
+  routing:
+    # Your negotiated $/DBU. The default is LIST PRICE — until you change it, dollar
+    # figures are illustrative (token counts are always real).
+    dbu_to_usd: 0.070
+    # Retarget the three tiers to endpoints that exist on this workspace.
+    endpoints:
+      frontier: databricks-claude-sonnet-4-5
+      mid: databricks-meta-llama-3-3-70b-instruct
+      cheap: databricks-meta-llama-3-1-8b-instruct
+    # Monthly request volume the comparison scales per-request cost by, so it reports a
+    # monthly dollar figure. Set it to the workload's real volume.
+    requests_per_month: 10000
+    # Prompts the comparison runs against all three models. Shown to the room, so use ones
+    # representative of the workload — the numbers only mean something on work they run. A
+    # spread of complexity makes the smart-routing estimate realistic (it routes each to a
+    # different tier).
+    sample_prompts:
+      - "What is a rate limit on a model serving endpoint?"
+      - "Draft a 120-word summary of Unity Catalog model services for a platform team."
+      - "Design a phased plan to move an organization's AI traffic behind a governed gateway, covering access control, cost attribution, and guardrails."
+    # The single prompt the end-to-end routing (ROI) step sends.
+    sample_prompt: "Summarize the key cost drivers of running large language models in production."
+
+# Project tags for cost attribution (Cost pillar).
+project:
+  name: ai_governance_workshop
+  cost_center: platform
+  environment: workshop
+  use_case: governance_enablement
+
+# MLflow experiment for agent traces (Control pillar — observability). Leave blank to skip trace steps.
+mlflow:
+  experiment_id: ""
+
+# Where workshop progress is stored. Progress is a single JSON file on a Unity Catalog
+# volume (created by the asset bundle in the catalog/schema above) — no database to
+# provision. The app reads it at startup and rewrites it on every step update.
+volume:
+  name: workshop_state          # created by the bundle in <catalog>.<schema>
+  file: progress.json

@@ -1,0 +1,16 @@
+# Software Composition Analysis for the public repo: Dependabot raises PRs for vulnerable or
+# outdated dependencies. Pair with GitHub secret scanning (on by default for public repos).
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/workshop_app"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/workshop_app/frontend"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

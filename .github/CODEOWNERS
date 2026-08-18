@@ -1,0 +1,7 @@
+# Code owners for databricks-solutions/ai-governance.
+# https://docs.github.com/articles/about-code-owners
+#
+# These owners are automatically requested for review on every pull request.
+# Emails must be associated with a GitHub account that has access to this repo.
+
+*   scott.mckean@databricks.com   tim.lortz@databricks.com

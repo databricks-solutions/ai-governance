@@ -1,0 +1,68 @@
+# AI Governance Workshop — one-page brochure.
+#
+# The invite artifact an account team (or a customer) hands to people to bring them to the
+# workshop: what it covers, how long it runs, who should attend, and the optional accelerators.
+# Config-driven like the rest of the app so an SE can tailor it without touching code. Rendered
+# by server/pdf.py (brochure_pdf) and downloaded from GET /api/export/brochure.pdf (the
+# "Download one-pager" callout on the Walkthrough page).
+#
+# Keep it to ONE page — it is a hand-out, not a spec.
+
+title: AI Governance Workshop
+subtitle: Work with Databricks to stand up Unity AI Gateway in your workshop and see it live.
+duration: 4-hour hands-on workshop
+format: Live in your own Databricks workspace
+
+# The one-line frame that sits under the title band.
+lead: >-
+  In one focused half-day your platform team builds a governed AI control plane and proves it
+  works: every model, tool, and agent behind one Unity Catalog control plane, with the cost,
+  choice, and control to run AI at scale without slowing teams down.
+
+# The three pillars — the spine of the workshop and of the brochure.
+pillars:
+  - id: choice
+    title: Choice
+    blurb: >-
+      Put any model, tool, or agent behind one control plane, addressed as a Unity Catalog
+      securable instead of a workspace endpoint name. Discover the model surface and register
+      agents and MCP servers as first-class, governed assets.
+  - id: cost
+    title: Cost
+    blurb: >-
+      Measure what routing between models actually saves on your own prompts, set budgets and
+      hard spend caps, and attribute every request to a team — turning AI spend from a blind
+      spot into a measured, controllable line item.
+  - id: control
+    title: Control
+    blurb: >-
+      Rate limits, guardrails, and MCP service policies that deny the right calls — plus the
+      audit trail and telemetry that prove they fired. The evidence a security and risk team
+      asks for before they say yes.
+
+# Who should be in the room — role plus a short line on why they're there.
+personas_intro: "Built for the team that owns AI in production. Ideal attendees:"
+personas:
+  - role: Platform Admins
+    value: Own the control plane, model serving, Unity Catalog, and budget controls.
+  - role: Technical Champions
+    value: Deploy the workshop app and drive governed-AI adoption across the platform team.
+  - role: Business Champions
+    value: Own the AI budget and the case for governed AI — here for spend, budgets, and attribution.
+  - role: AI/ML Engineers
+    value: Build the agents and apps that consume governed models, tools, and MCP servers.
+  - role: Security, Risk & Compliance
+    value: Need guardrails, policy enforcement, and an audit trail before AI reaches production.
+  - role: Data & AI Leadership
+    value: Sponsor governed adoption that speeds teams up rather than slowing them down.
+
+# The blurb that closes the page: an intro line, then one bullet per accelerator.
+accelerators:
+  title: Go deeper with accelerators
+  intro: "There are also five optional ~4-hour accelerators to explore concepts deeper:"
+  items:
+    - "**MCP Servers** — on-behalf-of identity, UC permissions, and service policies"
+    - "**Agent Registry** — register, version, and own a representative agent"
+    - "**Coding Agents** — govern dev-agent traffic with per-developer attribution and secret detection"
+    - "**External Providers** — route Bedrock, OpenAI, and Anthropic through the Gateway"
+    - "**Policies & Guardrails** — safety filters and a custom PII-leakage judge"

@@ -1,0 +1,15 @@
+[project]
+name = "ai-governance-workshop"
+version = "0.1.0"
+description = "Customer-facing AI Governance Workshop app (FastAPI backend)."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "databricks-sdk>=0.38",
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+    "python-multipart>=0.0.12",
+    # PDF leave-behinds (brochure, prerequisites, outcomes). Keep in sync with requirements.txt.
+    "reportlab>=4.2",
+]

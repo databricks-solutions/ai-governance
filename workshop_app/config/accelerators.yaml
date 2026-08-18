@@ -1,0 +1,317 @@
+# Optional add-on accelerators — each a ~4-hour deep dive on one customer need, run after
+# the core choice/cost/control workshop. Same step shape as pillars (config/steps.yaml),
+# so they reuse the StepCard UI, the backend tests, and the outcomes export. `test` values
+# map to server/tests_registry.py; several reuse core tests.
+
+overview:
+  title: How to use the accelerators
+  body: |
+    The core workshop covers the control plane across choice, cost, and control. Accelerators
+    are optional ~4-hour add-ons, each on a single topic. Run the one or two that match what
+    the customer needs to unblock rather than all five.
+
+    Each uses the same **concept → Try It → Verify** flow as the core steps, is tracked in the
+    same progress store, and is included in the exported outcomes.
+
+    **To run one:**
+
+    1. Pick the accelerator matching the customer's priority.
+    2. Check its prerequisites are in place on the workspace — they are noted on the page.
+    3. Work top to bottom, capturing notes as you go.
+    4. Export outcomes at the end (Walkthrough → Export).
+
+accelerators:
+  - id: acc_mcp
+    title: MCP Servers
+    tagline: Managed vs external MCP, UC permissions, on-behalf-of identity, and policies.
+    steps:
+      - id: acc_mcp_two_kinds
+        title: Two kinds of MCP — and why it decides what you can govern
+        concept: |
+          Two different things are both called "MCP" on Databricks. They are frequently
+          conflated, and which one you use determines which controls apply:
+
+          - **Managed (UC-native) endpoints** — `/api/2.0/mcp/functions|genie|sql|ai-search`.
+            These expose Unity Catalog objects as tools. Governed by **authentication** and
+            **UC grants**. They are *not* `MCP_SERVICE` securables, so
+            **service policies cannot attach to them.**
+          - **MCP Services** — `/ai-gateway/mcp-services/<catalog>.<schema>.<name>`. Real UC
+            securables: the Databricks-provided `system.ai.*` services plus any
+            **external/custom** server you register behind an HTTP connection. These get UC
+            grants **and** service policies (ALLOW / DENY / ASK).
+
+          Three planes run in sequence on every governed tool call:
+
+          1. **Authenticate** — the OAuth scope decides which endpoint *family* you reach
+             (`unity-catalog`, `genie`, `ai-search`, `sql`). It grants no per-object access.
+          2. **Authorize** — UC grants decide the object: `USE CATALOG` + `USE SCHEMA` to
+             **see** a tool, `EXECUTE` to **call** it. Holding EXECUTE without the two USE
+             grants is the most common silent failure.
+          3. **Behavior** — service policies inspect the request/response and return
+             ALLOW / DENY / ASK. **MCP Services only.**
+
+          The diagram below shows the full model on one page. The action lists the MCP
+          services registered on this workspace.
+        visual: mcp_planes
+        action:
+          label: List MCP services (provided & external)
+          test: mcp_inventory
+
+      - id: acc_mcp_managed
+        title: Managed MCP — UC objects as tools
+        concept: |
+          The managed endpoint turns the UC functions in a schema into MCP tools. Note the
+          deny behavior: a caller without `USE CATALOG` + `USE SCHEMA` gets an **empty
+          list**, not an error — *deny by absence*, at object grain. An empty result is
+          therefore ambiguous, so read the outcome carefully.
+
+          Governance here is UC grants plus column masks / ABAC on the underlying data.
+          Note that masks are an **access** control, not a **safety** control —
+          they don't stop prompt injection, and they don't constrain what an agent does
+          downstream with a result it was entitled to read.
+        action:
+          label: List tools from the managed functions endpoint
+          test: mcp_managed_tools
+
+      - id: acc_mcp_service_tools
+        title: MCP Service — the live tool surface
+        concept: |
+          This is a `tools/call`-capable service; the tool list returns over JSON-RPC.
+
+          One protocol detail: **JSON-RPC errors ride inside HTTP 200** over Streamable HTTP,
+          so do not infer success from the status code. `MCP-Protocol-Version` is also required on every request
+          after `initialize`.
+        action:
+          label: List tools on the configured MCP service
+          test: mcp_service_tools
+
+      - id: acc_mcp_grants
+        title: Who is allowed to call it (Plane 2)
+        concept: |
+          The permission question, checked before writing any policy: this is the control
+          that decides *callability*.
+
+          By default, **`system.ai` grants `EXECUTE` to all account users**, so a provided
+          service is open to the whole account until it is scoped. Recommended posture is **deny-by-absence** — register in a
+          customer-owned catalog and grant explicitly, rather than revoking inside
+          `system.ai`, where a schema-level revoke may not cascade to individual objects.
+        action:
+          label: Show UC grants on the MCP service
+          test: mcp_grants
+
+      - id: acc_mcp_obo
+        title: Prove on-behalf-of identity
+        concept: |
+          The tool runs as the **calling user**, not a shared
+          service account. If a user can't see a record, neither can their agent — and no
+          per-provider secrets are handed out.
+
+          This calls a read tool that echoes the upstream identity, so you see a real name
+          come back rather than taking OBO on trust. Have two participants run it and compare
+          — different answers is the proof.
+
+          One limitation: nothing today expresses *"the analyst may, but her agent may
+          not."* The only way to separate them is to give the agent its own identity,
+          typically a service principal.
+        action:
+          label: Call a read tool and show the caller's identity
+          test: mcp_obo
+
+      - id: acc_mcp_policy_target
+        title: Confirm a policy can attach here (Plane 3)
+        concept: |
+          Service policies attach **only** to
+          `MCP_SERVICE` securables. Point one at a managed UC-native endpoint and there is
+          nothing to attach to — the product surfaces this confusingly, so verify first.
+
+          Attaching needs `EXECUTE` on the policy function and `MANAGE` on the service.
+        action:
+          label: Verify the securable type
+          test: mcp_policy_target
+
+      - id: acc_mcp_policy
+        title: Write and verify a contextual policy
+        concept: |
+          A service policy is a UC SQL function taking `event VARIANT` and returning
+          **ALLOW**, **DENY**, or **ASK** (ASK pauses for human approval via URL-mode
+          elicitation, cached an hour). It runs **ON CALL** against the request and
+          **ON RESULT** against the response, and evaluation is **fail-closed** — an error
+          during evaluation means DENY.
+
+          Two implementation details: the function is
+          `to_variant_object(...)` (not `to_variant`, which doesn't exist), and VARIANT paths
+          need casting — `event:context.tool.name::STRING`.
+
+          There are built-in LLM-as-judge guardrails (`system.ai.block_unsafe_content`,
+          `block_jailbreak`, `block_hallucination`, and possibly `block_pii` — the reference docs
+          disagree, and none of them resolve as SQL functions during Beta). **Read the actual
+          list in the AI Gateway UI Policies tab** rather than quoting a name from memory, and
+          don't commit to a specific built-in until you've seen it on this account.
+        action:
+          label: Create the policy function
+          test: create_mcp_policy
+        verify:
+          label: Verify DENY / ALLOW logic
+          test: mcp_policy_enforcement
+        manual:
+          label: Attach the policy in the AI Gateway UI
+          deep_link: mcp_service
+
+      - id: acc_mcp_external
+        title: External & custom MCP — the activation path
+        concept: |
+          For a customer **not yet running MCP on Databricks**, registering an external
+          server is what enables service policies.
+
+          A custom server your team hosts is not a separate category — it registers and is
+          governed exactly like any external MCP Service: HTTP connection → MCP Service
+          securable → `EXECUTE` grant → policy → invoke through the gateway.
+
+          Two requirements: do not grant `USE CONNECTION` to end users (it bypasses
+          tool selection and auditing), and make a self-hosted server **stateless** — a
+          stateful server behind the replicated gateway proxy can fail the first
+          `tools/call` even though `initialize` and `tools/list` both succeeded.
+        action:
+          label: Check external-MCP readiness & show the steps
+          test: mcp_external_readiness
+
+      - id: acc_mcp_telemetry
+        title: What was actually recorded
+        concept: |
+          This step is precise about what telemetry exists, because it is easy to
+          over-promise here.
+
+          MCP Service calls write a **usage row** (identity, service, tool, latency, cost)
+          and an **`mcpCall` audit row**. Managed UC-native endpoints write **no MCP-specific
+          telemetry at all**.
+
+          **Arguments and results are not captured** — MCP payload logging is not in the
+          current Beta. So "no payload logging" does not mean "no auditability": you have
+          identity and tool name, just not the contents.
+        action:
+          label: Show MCP calls from the Gateway usage table
+          test: mcp_telemetry
+
+  - id: acc_agent_registry
+    title: Agent Registry
+    tagline: Register, version, and own a representative agent end to end.
+    steps:
+      - id: acc_agent_inventory
+        title: Inventory registered agents & tools
+        concept: |
+          An agent registry makes agents first-class Unity Catalog assets — discoverable,
+          versioned, and owned. Start by listing what's registered in the workshop schema.
+        action:
+          label: List registered agents & tools
+          test: list_registered_assets
+      - id: acc_agent_register
+        title: Register & version a representative agent
+        concept: |
+          Register one representative agent as a UC model with an owner, then log a new
+          version. This is the pattern to repeat across the fleet.
+        manual:
+          label: Register the agent in Unity Catalog (MLflow → UC model)
+          deep_link: experiment
+      - id: acc_agent_trace
+        title: Confirm traces & ownership
+        concept: |
+          A registered agent should emit MLflow traces (tool calls, responses, latency) and
+          carry a clear UC owner. Confirm the telemetry tables that back this are populated.
+        verify:
+          label: Check AI telemetry tables
+          test: telemetry_readiness
+
+  - id: acc_coding_agent
+    title: Coding Agents
+    tagline: Govern dev-agent traffic with per-developer attribution and secret detection.
+    steps:
+      - id: acc_coding_route
+        title: Route coding-agent traffic through the Gateway
+        concept: |
+          Claude Code, Cursor, and Codex call model providers directly by default. Pointing
+          them at the governed Gateway endpoint (OpenAI-compatible base URL + per-user token)
+          makes every request governed and attributable.
+        manual:
+          label: Open the governed endpoint (copy the base URL)
+          deep_link: serving_endpoint
+      - id: acc_coding_attribution
+        title: Per-developer attribution
+        concept: |
+          With traffic through the Gateway and a `use_case` tag, coding-agent spend and usage
+          roll up per developer.
+        action:
+          label: Check coding-agent usage & attribution
+          test: coding_agent_usage
+      - id: acc_coding_secrets
+        title: Code-secret detection
+        concept: |
+          Coding agents can leak API keys and tokens in prompts. Scan recent activity for
+          secret-shaped strings (sk-*, AKIA*, ghp_*) to prove detection is in place.
+        verify:
+          label: Scan for leaked secrets in the audit log
+          test: audit_scan
+
+  - id: acc_external_provider
+    title: External Providers
+    tagline: Route Bedrock, OpenAI, and Anthropic through the Gateway; migrate one shadow workload.
+    steps:
+      - id: acc_ext_inventory
+        title: Inventory current provider access
+        concept: |
+          Map how external providers are reached today (direct keys, another proxy). The
+          target is a single governed path; this lists the serving endpoints that exist.
+        action:
+          label: List serving endpoints
+          test: list_endpoints
+      - id: acc_ext_route
+        title: Route a provider through the Gateway
+        concept: |
+          Register Bedrock / OpenAI / Anthropic as external models behind a governed endpoint,
+          with business-relevant tags, so they inherit the same limits, guardrails, and logging.
+        manual:
+          label: Add an external-model endpoint in the workspace
+          deep_link: serving_endpoint
+        verify:
+          label: Find external-provider routes on this workspace
+          test: external_provider_routing
+      - id: acc_ext_migrate
+        title: Migrate one shadow workload as proof
+        concept: |
+          Pick one workload that currently bypasses governance and move it onto the governed
+          endpoint. Then confirm its traffic and cost now attribute by project tag.
+        verify:
+          label: Confirm routed usage by project
+          test: usage_by_project
+
+  - id: acc_policies_guardrails
+    title: Policies & Guardrails
+    tagline: Safety filter on input & output, custom PII-leakage judge, red-team dataset.
+    steps:
+      - id: acc_pg_guardrail
+        title: Safety & PII guardrail on input and output
+        concept: |
+          Configure the Gateway safety filter and PII detection on the governed endpoint
+          (input and output), then send a prompt that should be blocked to prove it fires.
+        manual:
+          label: Configure guardrails in the AI Gateway UI
+          deep_link: serving_endpoint
+        action:
+          label: Send a blocked prompt (expect block)
+          test: test_guardrail
+      - id: acc_pg_readiness
+        title: Custom PII-leakage judge & red-team dataset
+        concept: |
+          Beyond the built-in filters, a custom LLM-as-judge scores responses for PII leakage
+          against a red-team evaluation dataset. Confirm the telemetry + inference tables the
+          judge and its evaluation read from are present.
+        verify:
+          label: Check guardrail activity + telemetry readiness
+          test: pii_safety_readiness
+      - id: acc_pg_review
+        title: Review guardrail activity
+        concept: |
+          Every blocked request lands in the inference table. Review which guardrails fired
+          and for whom.
+        action:
+          label: Show guardrail activity
+          test: guardrail_activity

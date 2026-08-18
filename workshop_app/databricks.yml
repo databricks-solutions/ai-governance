@@ -1,0 +1,164 @@
+# AI Governance Workshop — Databricks Asset Bundle (customer-deployable).
+#
+# Deploy on any customer workspace with the two STANDARD bundle commands — no shell script:
+#   databricks bundle deploy -t dev -p <profile> \
+#     --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
+#   databricks bundle run ai_governance_workshop_app -t dev -p <profile>
+#
+# `deploy` builds the frontend (artifacts step below), creates the schema + volume, creates the
+# app AND grants the app's own service principal on the schema/volume in ONE pass (the grant
+# references the app resource's service_principal_client_id, so Terraform orders it). `run`
+# starts the app — Databricks requires a separate run to start app compute; a deploy alone does
+# not start it. Everything catalog/schema-specific reaches the app as env from the bundle
+# variables (app.config.env below), so the bundle is the single source of truth.
+#
+# The only thing NOT expressible in a bundle is the two `system.*` grants (account-admin only) —
+# see README. workspace.host is intentionally not set — the target comes from --profile.
+bundle:
+  name: ai-governance-workshop
+
+# The frontend is a compiled artifact: the FastAPI backend serves frontend/dist and never
+# reads frontend/src, so `src` changes are invisible until the bundle is rebuilt.
+#
+# `dist` is gitignored (a 240KB single-line bundle dominates every diff and overflows review
+# tooling), which used to make the build a MANUAL prerequisite — and a forgotten build was
+# silent: `bundle deploy` happily uploaded a stale or empty dist and the app served a blank
+# page with no error anywhere. Owning the build here makes `bundle deploy` the single entry
+# point and turns a broken build into a loud, immediate failure.
+#
+# `type` is deliberately omitted — it is only for whl/jar. An artifact with just `build`,
+# `path`, and `files` is a plain local build step.
+#
+# Does NOT require npm on every deploy: build.sh skips the build when dist/ is already newer
+# than every source file, so a dist built elsewhere (or by CI) deploys with no network access.
+# npm is only needed when dist is genuinely stale.
+artifacts:
+  frontend:
+    path: ./frontend
+    # Delegated to a script because `bundle deploy` runs this unconditionally and with no
+    # timeout: a bare `npm install` on a machine with the public registry blocked retries
+    # until it hangs, so the deploy never finishes. build.sh skips the build when dist/ is
+    # already newer than every source file, and fails loudly (never silently) when dist is
+    # stale and cannot be rebuilt. It uses `npm ci` (reproducible, lockfile-exact).
+    build: ./build.sh
+    files:
+      # Declaring the entry point makes the CLI fail if the build produced nothing, instead
+      # of deploying an empty dist. Vite content-hashes the asset filenames, so only
+      # index.html is stable enough to assert on.
+      - source: ./frontend/dist/index.html
+
+# config/*.yaml must be synced with the app source (customer-edited config lives here).
+# Sync honors .gitignore, so the gitignored build output has to be re-included explicitly.
+# frontend/src is excluded because only the built output is served. catalog/schema no longer
+# need a per-deploy override file — the app receives them as env from the bundle variables
+# (apps.*.config.env below).
+sync:
+  include:
+    - "frontend/dist/**"
+  exclude:
+    - "frontend/src"
+
+variables:
+  # Required, with no default. A bundle command missing one of these fails immediately
+  # ("no value assigned to required variable ...") rather than deploying an app that looks
+  # fine and then fails every governance step in front of the customer.
+  warehouse_id:
+    description: "SQL warehouse id the app uses. Find one: databricks warehouses list"
+  catalog:
+    description: "Existing UC catalog to create the workshop schema in, e.g. main."
+  workshop_group:
+    description: "Group granted CAN_USE on the app so attendees can open it."
+    default: users
+  schema:
+    description: "UC schema for workshop artifacts (policy function, inference tables)."
+    default: ai_governance_workshop
+  progress_volume:
+    description: "UC volume (in the workshop schema) that stores the progress JSON file."
+    default: workshop_state
+
+resources:
+  # The app writes the MCP service-policy function here, reads inference tables from here,
+  # and stores workshop progress in a volume here. Without this the schema never exists and
+  # those steps fail on a fresh workspace.
+  schemas:
+    workshop_schema:
+      catalog_name: ${var.catalog}
+      name: ${var.schema}
+      comment: "AI Governance Workshop artifacts (service policies, inference tables, progress)."
+      # Grant the app's OWN service principal what it needs here, in ONE pass: the principal
+      # references the app resource's service_principal_client_id (defined below), so the
+      # bundle engine orders "create app → read its SP → apply grant" automatically — no
+      # second deploy, no service-principal variable. READ/WRITE VOLUME at the schema level
+      # cascade to every volume in it, covering the progress file. The only grants left for a
+      # human are the two `system.*` schemas, which no bundle can express (account admin).
+      grants:
+        - principal: ${resources.apps.ai_governance_workshop_app.service_principal_client_id}
+          privileges:
+            - USE_SCHEMA
+            - CREATE_FUNCTION
+            - EXECUTE
+            - SELECT
+            - MODIFY
+            - READ_VOLUME
+            - WRITE_VOLUME
+
+  # Progress store: a managed volume holding one small JSON file. Replaces the Lakebase
+  # instance — no database to provision, wait on, or grant CONNECT to. The app reads it at
+  # startup and rewrites it on every update (server/store.py).
+  volumes:
+    workshop_volume:
+      catalog_name: ${var.catalog}
+      # Reference the schema resource (not var.schema) so Terraform creates the schema first.
+      schema_name: ${resources.schemas.workshop_schema.name}
+      name: ${var.progress_volume}
+      volume_type: MANAGED
+      comment: "AI Governance Workshop progress store (single JSON file)."
+
+  apps:
+    ai_governance_workshop_app:
+      name: ai-governance-workshop
+      description: "AI Governance Workshop — guided choice/cost/control with live tests."
+      source_code_path: ./
+      # App runtime config lives HERE (not a committed app.yaml) so catalog/schema/warehouse
+      # reach the app straight from the bundle variables — one source of truth, no per-deploy
+      # config file to pin. get_config() reads WORKSHOP_CATALOG/WORKSHOP_SCHEMA and
+      # get_warehouse_id() reads DATABRICKS_WAREHOUSE_ID.
+      config:
+        command:
+          - "python"
+          - "-m"
+          - "uvicorn"
+          - "app:app"
+          - "--host"
+          - "0.0.0.0"
+          - "--port"
+          - "8000"
+        env:
+          - name: DATABRICKS_WAREHOUSE_ID
+            value: ${var.warehouse_id}
+          - name: WORKSHOP_CATALOG
+            value: ${var.catalog}
+          - name: WORKSHOP_SCHEMA
+            value: ${var.schema}
+          # Must match the volume the bundle creates below, or progress writes go nowhere.
+          - name: WORKSHOP_VOLUME
+            value: ${var.progress_volume}
+      # Attendees need to open the app, not just the deployer.
+      permissions:
+        - level: CAN_USE
+          group_name: ${var.workshop_group}
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+
+targets:
+  dev:
+    # `mode: development` is deliberately NOT used. It prefixes `schemas`/`volumes` names
+    # (dev_<user>_<name>) while leaving the app literal, which would point the app at a
+    # schema/volume the bundle did not create. Names stay literal here so the bundle,
+    # config/workshop.yaml, and the running app all agree.
+    default: true
+  prod:
+    mode: production

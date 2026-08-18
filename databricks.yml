@@ -28,9 +28,18 @@ targets:
     # matching the variables and the names the labs/docs reference. Development mode would
     # prepend a per-user prefix that breaks the job parameters and inference-table target.
     default: true
-    # The host must be set explicitly here (not just via a CLI profile): the
+    #
+    # >>> EDIT THIS BEFORE DEPLOYING <<<
+    #
+    # Set this to YOUR workspace URL. It must match the host of the profile you deploy
+    # with, or every bundle command fails with a host-mismatch error.
+    #
+    # It cannot be a bundle variable: `workspace.host` is resolved during auth setup,
+    # before `${var.*}` interpolation runs, so a variable here renders literally and
+    # breaks authentication.
+    #
+    # The host must be set explicitly (not just via the CLI profile) because the
     # external-model served entity reads `${workspace.host}` as its target URL, and that
-    # substitution only resolves when the target's workspace.host is defined. Change this
-    # to your own workspace before deploying.
+    # substitution only resolves when the target's workspace.host is defined.
     workspace:
-      host: https://adb-984752964297111.11.azuredatabricks.net
+      host: https://your-workspace.cloud.databricks.com
