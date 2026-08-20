@@ -81,12 +81,12 @@ for coding agents, and observability-as-control-plane.
 - [~] Policy **rank + fail-closed** — fail-closed is covered in the block-shape step; policy
   *rank ordering* is service-policy semantics, so it moves to the MCP accelerator (Tier 1C).
 
-**C. MCP — extend the strong accelerator with the top gap** *(not started)*
-- [ ] **Managed-MCP read-only governance** — `REVOKE USE CONNECTION` + a `disallow_writes`
-  policy so coding-agent users are read-only while UI users keep write. Test:
-  `mcp_readonly_enforcement`.
-- [ ] **Tool-poisoning defense** — inspect tool metadata/manifests for injection. Test:
-  `mcp_tool_metadata_scan`.
+**C. MCP — extend the strong accelerator with the top gap** *(done — 9 → 11 steps)*
+- [x] **Read-only enforcement** — classify the service's tools read vs write, and spell out the
+  enforcement recipe for MCP Services (deny-writes policy + no `USE CONNECTION`) vs managed
+  endpoints (read functions only + UC grants). Test: `mcp_readonly_enforcement`.
+- [x] **Tool-poisoning scan** — heuristic scan of tool name/description for prompt-injection
+  smuggled into metadata (the top MCP supply-chain risk). Test: `mcp_tool_metadata_scan`.
 
 ### Tier 2 — deepen after Tier 1
 **D. External Providers** *(not started)* — secret handling (`databricks secrets put`),

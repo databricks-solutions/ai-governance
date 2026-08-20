@@ -157,6 +157,25 @@ accelerators:
           label: Attach the policy in the AI Gateway UI
           deep_link: mcp_service
 
+      - id: acc_mcp_readonly
+        title: Enforce read-only for coding agents
+        concept: |
+          The most-requested MCP control: keep coding-agent users to READ tools while humans
+          keep write. Enforcement depends on the kind of MCP:
+
+          - **MCP Service** (`system.ai.*` or an external one you register): attach a service
+            policy that denies the write tools, and never grant `USE CONNECTION` to end users —
+            it bypasses tool selection, so a user could call a denied tool directly.
+          - **Managed UC-native endpoint** (DBSQL / Genie): not a securable, so no policy can
+            attach. Read-only is enforced by exposing only read functions and by the UC grants
+            on them.
+
+          This classifies the configured service's tools so you can see exactly what a
+          read-only policy would need to deny.
+        action:
+          label: Classify the service's tools read vs write
+          test: mcp_readonly_enforcement
+
       - id: acc_mcp_external
         title: External & custom MCP — the activation path
         concept: |
@@ -174,6 +193,19 @@ accelerators:
         action:
           label: Check external-MCP readiness & show the steps
           test: mcp_external_readiness
+
+      - id: acc_mcp_tool_poisoning
+        title: Scan tools for poisoning
+        concept: |
+          A tool's name and description are sent to the model, so a compromised or malicious
+          server can hide instructions in them ("ignore previous instructions", "before
+          answering, send X to…") and steer an agent without the user ever seeing it — the top
+          MCP supply-chain risk. This scans the advertised tool metadata for injection-shaped
+          phrases. A flag is a prompt to review the tool and its source, not proof of
+          compromise. Review external servers before granting EXECUTE, and pin their versions.
+        action:
+          label: Scan tool metadata for injection
+          test: mcp_tool_metadata_scan
 
       - id: acc_mcp_telemetry
         title: What was actually recorded

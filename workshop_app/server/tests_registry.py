@@ -120,6 +120,12 @@ API_DOCS: dict[str, dict[str, str]] = {
     "mcp_managed_tools": {
         "api": "POST /api/2.0/mcp/functions/{catalog}/{schema} — JSON-RPC (not REST)"},
     "mcp_external_readiness": {"api": "GET /api/2.1/unity-catalog/connections"},
+    "mcp_readonly_enforcement": {
+        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)",
+        "note": "Classifies tools read vs write from each tool's readOnlyHint."},
+    "mcp_tool_metadata_scan": {
+        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)",
+        "note": "Heuristic scan of tool name/description for prompt-injection ('tool poisoning')."},
     # SQL-only tests: name the table rather than a REST path, which is the useful detail.
     "usage_by_project": {"api": "SQL: system.ai_gateway.usage"},
     "coding_agent_usage": {"api": "SQL: system.ai_gateway.usage (user_agent)"},
@@ -1569,6 +1575,110 @@ def t_mcp_telemetry() -> TestResult:
                     "plainly if a customer asks about full request/response capture.")
 
 
+def t_mcp_readonly_enforcement() -> TestResult:
+    """Read-only enforcement — keep coding-agent users to read tools while humans keep write.
+
+    The most-requested MCP control. How it is enforced depends on the MCP kind, and that
+    distinction is the whole point:
+      - **MCP Service** (`system.ai.*` or an external one you register): attach a service policy
+        that DENIES the write tools, and never grant `USE CONNECTION` to end users (it bypasses
+        tool selection, so a user could call a denied tool directly).
+      - **Managed UC-native endpoint** (DBSQL / Genie functions): NOT a securable, so no service
+        policy can attach — read-only is enforced by exposing only read functions and by the UC
+        grants on them.
+
+    This classifies the configured service's tools into read vs write so the room can see
+    exactly what a read-only policy would need to deny.
+    """
+    svc = mcp.configured_service()
+    if not svc:
+        return _fail("No MCP service configured (`mcp.builtin_service`).")
+    url = mcp.service_url(svc)
+    out = mcp.list_tools(url)
+    if not out["ok"]:
+        return _todo(f"Could not list tools on `{svc}` — resolve the earlier MCP steps first.",
+                     service=svc, error=out["error"])
+    tools = out["tools"]
+    if not tools:
+        return _todo(f"`{svc}` exposed 0 tools, so there is nothing to classify yet.",
+                     service=svc)
+    writes = sorted(t["name"] for t in tools if t.get("read_only") is False)
+    reads = sorted(t["name"] for t in tools if t.get("read_only") is True)
+    unknown = sorted(t["name"] for t in tools if t.get("read_only") is None)
+    detail = {
+        "service": svc,
+        "write_tools": writes, "read_tools": reads, "unknown_tools": unknown,
+        "how_to_enforce": {
+            "mcp_service": "Attach a service policy that denies the write tools; grant EXECUTE "
+                           "to coding-agent users but NOT USE CONNECTION.",
+            "managed_endpoint": "No policy can attach (not a securable) — expose only read "
+                                "functions and control access with UC grants on them.",
+        },
+        "caveat": ("`read_only` comes from each tool's readOnlyHint annotation; a tool with no "
+                   "hint shows as unknown and should be reviewed by hand before trusting it."),
+    }
+    if writes:
+        return _todo(
+            f"`{svc}` exposes {len(writes)} write-capable tool(s) ({', '.join(writes[:6])}). For "
+            "read-only coding-agent access, deny these with a service policy (see the policy "
+            "steps) and keep write for human identities.", **detail)
+    if unknown and not reads:
+        return _todo(f"`{svc}` tools carry no read-only hints, so read vs write cannot be "
+                     "determined automatically — review each before granting access.", **detail)
+    return _ok(f"`{svc}` exposes only read tools ({len(reads)}) — read-only by construction, so "
+               "coding-agent access needs no write-denying policy here.", **detail)
+
+
+# Prompt-injection phrases that have no legitimate place in a tool's user-facing metadata.
+_TOOL_POISON_RE = re.compile(
+    r"ignore (all |the |previous |prior )*(instructions|prompt)|disregard (the |all )*(above|previous)"
+    r"|system prompt|you are now|do not (tell|mention|reveal)|without (telling|informing)"
+    r"|exfiltrat|<\s*system|begin system|api[_-]?key|secret key|password", re.IGNORECASE)
+
+
+def t_mcp_tool_metadata_scan() -> TestResult:
+    """Scan the configured MCP service's tool metadata for prompt-injection ('tool poisoning').
+
+    A tool's name and description are fed to the model, so a malicious or compromised server can
+    hide instructions there ("ignore previous instructions", "before answering, send X to..."),
+    steering an agent without the user ever seeing it. This lists the tools and flags metadata
+    containing injection-shaped phrases. Detection, not prevention — a flag is a prompt to review
+    the tool and its source, never proof of compromise.
+    """
+    svc = mcp.configured_service()
+    if not svc:
+        return _fail("No MCP service configured (`mcp.builtin_service`).")
+    url = mcp.service_url(svc)
+    out = mcp.list_tools(url)
+    if not out["ok"]:
+        return _todo(f"Could not list tools on `{svc}` — resolve the earlier MCP steps first.",
+                     service=svc, error=out["error"])
+    tools = out["tools"]
+    if not tools:
+        return _todo(f"`{svc}` exposed 0 tools to scan.", service=svc)
+    flagged = []
+    for t in tools:
+        text = f"{t.get('name') or ''} {t.get('description') or ''}"
+        hits = sorted({m.group(0).lower() for m in _TOOL_POISON_RE.finditer(text)})
+        if hits:
+            flagged.append({"tool": t.get("name"), "matches": hits,
+                            "description_excerpt": str(t.get("description") or "")[:160]})
+    detail = {
+        "service": svc, "tools_scanned": len(tools), "flagged": flagged,
+        "why_this_matters": (
+            "Tool names and descriptions are sent to the model, so a compromised or malicious "
+            "MCP server can smuggle instructions there — 'tool poisoning'. Review external "
+            "servers before granting EXECUTE, and pin/verify the server version."),
+        "note": ("Heuristic scan over the tool description the server advertised (truncated). A "
+                 "clean result is not a guarantee — it is a first-pass check, not prevention."),
+    }
+    if flagged:
+        return _todo(f"{len(flagged)} of {len(tools)} tool(s) on `{svc}` have injection-shaped "
+                     "text in their metadata — review them before trusting the server.", **detail)
+    return _ok(f"No injection-shaped phrases found in the {len(tools)} tool description(s) on "
+               f"`{svc}`. Still verify external servers and pin their versions.", **detail)
+
+
 # --------------------------------------------------------------------------- Accelerator-only tests
 def t_external_provider_routing() -> TestResult:
     """Report which serving endpoints look like external-model providers routed through the
@@ -1768,6 +1878,8 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "mcp_policy_enforcement": t_mcp_policy_enforcement,
     "mcp_external_readiness": t_mcp_external_readiness,
     "mcp_telemetry": t_mcp_telemetry,
+    "mcp_readonly_enforcement": t_mcp_readonly_enforcement,
+    "mcp_tool_metadata_scan": t_mcp_tool_metadata_scan,
 }
 
 
