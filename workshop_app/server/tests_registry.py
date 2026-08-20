@@ -98,6 +98,15 @@ API_DOCS: dict[str, dict[str, str]] = {
                       "note": "Prices are config, not a live API."},
     "test_mcp_policy": {"api": "POST /api/2.0/sql/statements (evaluate the policy function)"},
     "external_provider_routing": {"api": "GET /api/2.0/serving-endpoints"},
+    "provider_secret_readiness": {
+        "api": "GET /api/2.0/secrets/scopes/list + GET /api/2.0/serving-endpoints/{name}",
+        "note": "Read-only; never reads a secret value — checks for {{secrets/...}} references."},
+    "workspace_binding_check": {
+        "api": "GET /api/2.1/unity-catalog/catalogs/{name} + /api/2.1/unity-catalog/bindings/catalog/{name}"},
+    "agent_versions": {
+        "api": "GET /api/2.1/unity-catalog/models + /api/2.1/unity-catalog/models/{name}/versions"},
+    "agent_sp_attribution": {
+        "api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway config on agent-like endpoints)"},
     "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
@@ -1697,6 +1706,181 @@ def t_external_provider_routing() -> TestResult:
     return _ok(summary, external_like=external[:25], total_endpoints=len(all_names))
 
 
+def t_provider_secret_readiness() -> TestResult:
+    """Provider credentials belong in Databricks secrets, never inline in endpoint config.
+
+    Lists the secret scopes present and inspects external-model endpoints for how their provider
+    API key is supplied. Databricks stores an external model's key as a secret reference
+    (`{{secrets/scope/key}}`); this reports which endpoints reference a secret. Read-only, and it
+    never reads a secret value. Never raises.
+    """
+    w = get_workspace_client()
+    try:
+        scopes = [s.name for s in w.secrets.list_scopes()]
+        scopes_err = None
+    except Exception as e:  # noqa: BLE001
+        scopes, scopes_err = [], str(e)[:200]
+    external = []
+    try:
+        for e in w.serving_endpoints.list():
+            try:
+                ep = w.serving_endpoints.get(e.name)
+            except Exception:  # noqa: BLE001
+                continue
+            for se in (getattr(getattr(ep, "config", None), "served_entities", None) or []):
+                em = getattr(se, "external_model", None)
+                if not em:
+                    continue
+                d = em.as_dict() if hasattr(em, "as_dict") else {}
+                keyvals = [str(v) for k, v in d.items() if "api_key" in k.lower() and v]
+                ref = (any("{{secrets/" in v for v in keyvals) if keyvals else None)
+                external.append({"endpoint": e.name, "provider": d.get("provider"),
+                                 "api_key_is_secret_reference": ref})
+    except Exception as e:  # noqa: BLE001
+        return _fail("Could not inspect serving endpoints.", error=str(e)[:400],
+                     secret_scopes=scopes)
+    detail = {
+        "secret_scopes": scopes, "secret_scopes_error": scopes_err,
+        "external_model_endpoints": external,
+        "how_to": ("databricks secrets create-scope <scope>; databricks secrets put-secret "
+                   "<scope> <key>; reference it as {{secrets/<scope>/<key>}} in the endpoint."),
+        "note": ("A read never returns the key value — a reference shows as {{secrets/...}}. "
+                 "Where a reference is not visible, confirm the key was supplied as a secret "
+                 "reference rather than pasted in."),
+    }
+    if not external:
+        return _todo("No external-model endpoints found. When you add one (Bedrock/OpenAI/"
+                     "Anthropic), supply the provider key as a secret reference, never inline.",
+                     **detail)
+    unconfirmed = [x for x in external if not x["api_key_is_secret_reference"]]
+    if unconfirmed:
+        return _todo(f"{len(external)} external-model endpoint(s); {len(unconfirmed)} without a "
+                     "visible secret reference for the provider key — confirm each was supplied "
+                     "as {{secrets/...}}.", **detail)
+    return _ok(f"{len(external)} external-model endpoint(s), all referencing a secret for the "
+               f"provider key; {len(scopes)} secret scope(s) present.", **detail)
+
+
+def t_workspace_binding_check() -> TestResult:
+    """Is the catalog of approved models bound ISOLATED, or open to every workspace?
+
+    Without `isolation_mode = ISOLATED` plus explicit workspace bindings, "approved models" is
+    advisory — any workspace on the metastore can bind the catalog and use what is in it. Reports
+    the configured catalog's isolation mode and, when ISOLATED, its bindings. Read-only.
+    """
+    catalog = get_config().get("catalog", {}).get("name")
+    if not catalog:
+        return _fail("No catalog configured (catalog.name).")
+    w = get_workspace_client()
+    try:
+        c = w.catalogs.get(catalog)
+    except Exception as e:  # noqa: BLE001
+        return _fail(f"Could not read catalog `{catalog}`.", error=str(e)[:300])
+    mode = str(getattr(c, "isolation_mode", "") or "")
+    isolated = "ISOLATED" in mode.upper()
+    bindings = []
+    if isolated:
+        try:
+            resp = w.api_client.do("GET",
+                                   f"/api/2.1/unity-catalog/bindings/catalog/{catalog}")
+            bindings = (resp or {}).get("bindings", []) or []
+        except Exception:  # noqa: BLE001
+            pass
+    detail = {"catalog": catalog, "isolation_mode": mode or "OPEN",
+              "workspace_bindings": bindings,
+              "why_this_matters": ("ISOLATED + explicit bindings is what makes approved-model "
+                    "access enforceable — otherwise any workspace on the metastore can bind the "
+                    "catalog and use what is in it.")}
+    if isolated:
+        return _ok(f"`{catalog}` is ISOLATED and bound to {len(bindings)} workspace(s) — access "
+                   "is enforced, not advisory.", **detail)
+    return _todo(f"`{catalog}` isolation is `{mode or 'OPEN'}` — open to every workspace on the "
+                 "metastore. Set isolation_mode=ISOLATED and bind the workspaces that may use it "
+                 "to make approved-model access enforceable.", **detail)
+
+
+def t_agent_versions() -> TestResult:
+    """A registered agent should be versioned and owned — not a one-off deploy.
+
+    Lists the registered models (agents) in the workshop schema with their version count and
+    owner. The pattern to repeat across the fleet: every agent is a UC model with an owner and a
+    version history, so it is reproducible and rollback-able.
+    """
+    cat, sch = _fq_schema()
+    w = get_workspace_client()
+    try:
+        models = list(w.registered_models.list(catalog_name=cat, schema_name=sch))
+    except Exception as e:  # noqa: BLE001
+        return _fail(f"Could not list registered models in `{cat}.{sch}`.", error=str(e)[:300])
+    if not models:
+        return _todo(f"No registered models in `{cat}.{sch}` yet. Register a representative agent "
+                     "as a UC model (previous step), then re-run.", schema=f"{cat}.{sch}")
+    out = []
+    for m in models[:20]:
+        try:
+            versions = len(list(w.model_versions.list(full_name=m.full_name)))
+        except Exception:  # noqa: BLE001
+            versions = 0
+        out.append({"model": m.full_name, "owner": getattr(m, "owner", None),
+                    "versions": versions})
+    versioned = [x for x in out if x["versions"] > 0]
+    detail = {"schema": f"{cat}.{sch}", "agents": out}
+    if not versioned:
+        return _todo(f"{len(out)} registered agent(s), but none have a logged version yet. Log a "
+                     "version (MLflow → UC model) so the agent is reproducible and rollback-able.",
+                     **detail)
+    return _ok(f"{len(versioned)}/{len(out)} registered agent(s) in `{cat}.{sch}` have version "
+               "history and an owner.", **detail)
+
+
+def t_agent_sp_attribution() -> TestResult:
+    """The agent-identity gap: do custom agent endpoints carry limits, guardrails, usage tracking?
+
+    Custom agent endpoints deployed on the gateway may lack the AI Gateway controls a model
+    endpoint has — rate limits, guardrails, usage tracking — and an agent's service principal may
+    not even be selectable in the rate-limit UI. Inspects agent-like serving endpoints (matched
+    by name) and reports which controls each has configured. Never raises.
+    """
+    w = get_workspace_client()
+    rows = []
+    try:
+        for e in w.serving_endpoints.list():
+            n = e.name or ""
+            if not any(k in n.lower() for k in ("agent", "assistant", "bot", "rag", "chain")):
+                continue
+            try:
+                ep = w.serving_endpoints.get(n)
+            except Exception:  # noqa: BLE001
+                continue
+            gw = getattr(ep, "ai_gateway", None)
+            rows.append({
+                "endpoint": n,
+                "usage_tracking": bool(getattr(gw, "usage_tracking_config", None)) if gw else False,
+                "rate_limits": bool(getattr(gw, "rate_limits", None)) if gw else False,
+                "guardrails": bool(getattr(gw, "guardrails", None)) if gw else False,
+                "inference_table": bool(getattr(gw, "inference_table_config", None)) if gw else False,
+            })
+    except Exception as e:  # noqa: BLE001
+        return _fail("Could not inspect serving endpoints.", error=str(e)[:300])
+    detail = {
+        "agent_like_endpoints": rows,
+        "why_this_matters": ("Where a control is missing, that agent's traffic is ungoverned — "
+                             "no per-user limit, no guardrail, no attribution."),
+        "note": ("Matched by name (agent/assistant/bot/rag/chain) — adjust for your naming. An "
+                 "agent's service principal may also not be selectable in the rate-limit UI yet."),
+    }
+    if not rows:
+        return _todo("No agent-like serving endpoints found by name. If your agent endpoints use "
+                     "a different naming scheme, check their AI Gateway config (rate limits, "
+                     "guardrails, usage tracking) directly.", **detail)
+    gaps = [r for r in rows if not (r["usage_tracking"] and r["rate_limits"])]
+    if gaps:
+        return _todo(f"{len(gaps)}/{len(rows)} agent-like endpoint(s) are missing rate limits "
+                     "and/or usage tracking — that traffic is not fully governed.", **detail)
+    return _ok(f"All {len(rows)} agent-like endpoint(s) have usage tracking and rate limits "
+               "configured.", **detail)
+
+
 def t_pii_safety_readiness() -> TestResult:
     """Confirm the sources a PII-leakage judge and red-team review read from."""
     cfg = get_config()
@@ -1865,6 +2049,10 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "rate_limit_429_demo": t_rate_limit_429_demo,
     "telemetry_readiness": t_telemetry_readiness,
     "external_provider_routing": t_external_provider_routing,
+    "provider_secret_readiness": t_provider_secret_readiness,
+    "workspace_binding_check": t_workspace_binding_check,
+    "agent_versions": t_agent_versions,
+    "agent_sp_attribution": t_agent_sp_attribution,
     "pii_safety_readiness": t_pii_safety_readiness,
     "pii_mask_vs_block": t_pii_mask_vs_block,
     "guardrail_block_shape": t_guardrail_block_shape,

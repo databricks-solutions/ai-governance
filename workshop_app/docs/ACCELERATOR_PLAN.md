@@ -89,11 +89,13 @@ for coding agents, and observability-as-control-plane.
   smuggled into metadata (the top MCP supply-chain risk). Test: `mcp_tool_metadata_scan`.
 
 ### Tier 2 — deepen after Tier 1
-**D. External Providers** *(not started)* — secret handling (`databricks secrets put`),
-`ISOLATED` workspace-catalog binding, and the provider OAuth-relay path.
-**E. Agent Registry** *(not started)* — actually register + version an agent, emit traces, run
-one eval scorer, and address the agent-SP identity gap (limits/guardrails on custom agent
-endpoints).
+**D. External Providers** *(done — 3 → 5 steps)* — added credentials-in-secrets check
+(`provider_secret_readiness`), `ISOLATED` catalog/workspace-binding check
+(`workspace_binding_check`), and the Anthropic OAuth-relay path in the route step's concept.
+**E. Agent Registry** *(done — 3 → 5 steps)* — added versioning + ownership check
+(`agent_versions`) and the agent-endpoint identity gap (`agent_sp_attribution`:
+limits/guardrails/usage-tracking on custom agent endpoints). An eval-scorer step is a good
+future add (needs an eval run, not just a readiness check).
 
 ### Optional net-new accelerator
 A dedicated **FinOps / cost-control** accelerator (budgets, hard caps, per-user limits, smart

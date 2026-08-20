@@ -226,7 +226,7 @@ accelerators:
 
   - id: acc_agent_registry
     title: Agent Registry
-    tagline: Register, version, and own a representative agent end to end.
+    tagline: Make agents first-class UC assets — registered, versioned, owned, traced, and governed like any endpoint.
     steps:
       - id: acc_agent_inventory
         title: Inventory registered agents & tools
@@ -244,14 +244,33 @@ accelerators:
         manual:
           label: Register the agent in Unity Catalog (MLflow → UC model)
           deep_link: experiment
+      - id: acc_agent_versions
+        title: Confirm versioning & ownership
+        concept: |
+          A one-off deploy is not a registered agent. Each agent should be a UC model with an
+          owner and a version history, so it is reproducible and rollback-able. This lists the
+          registered agents with their version count and owner.
+        action:
+          label: Check agent versions & owners
+          test: agent_versions
       - id: acc_agent_trace
-        title: Confirm traces & ownership
+        title: Confirm traces & telemetry
         concept: |
           A registered agent should emit MLflow traces (tool calls, responses, latency) and
           carry a clear UC owner. Confirm the telemetry tables that back this are populated.
         verify:
           label: Check AI telemetry tables
           test: telemetry_readiness
+      - id: acc_agent_sp
+        title: Govern the agent endpoint itself
+        concept: |
+          A custom agent endpoint deployed on the gateway may lack the controls a model endpoint
+          has — rate limits, guardrails, usage tracking — and its service principal may not even
+          be selectable in the rate-limit UI. Where a control is missing, that agent's traffic is
+          ungoverned. This inspects agent-like endpoints and reports which controls each carries.
+        action:
+          label: Check limits/guardrails/usage tracking on agent endpoints
+          test: agent_sp_attribution
 
   - id: acc_coding_agent
     title: Coding Agents
@@ -349,7 +368,7 @@ accelerators:
 
   - id: acc_external_provider
     title: External Providers
-    tagline: Route Bedrock, OpenAI, and Anthropic through the Gateway; migrate one shadow workload.
+    tagline: Route Bedrock, OpenAI, and Anthropic through the gateway with credentials in secrets and access bound to approved workspaces.
     steps:
       - id: acc_ext_inventory
         title: Inventory current provider access
@@ -364,12 +383,37 @@ accelerators:
         concept: |
           Register Bedrock / OpenAI / Anthropic as external models behind a governed endpoint,
           with business-relevant tags, so they inherit the same limits, guardrails, and logging.
+
+          For Anthropic specifically, the newer **OAuth-relay** path lets you connect a
+          Claude subscription without storing a long-lived key — the gateway relays a
+          short-lived token. Prefer it where available; otherwise the key goes in a secret
+          (next step).
         manual:
           label: Add an external-model endpoint in the workspace
           deep_link: serving_endpoint
         verify:
           label: Find external-provider routes on this workspace
           test: external_provider_routing
+      - id: acc_ext_secrets
+        title: Credentials in secrets, never inline
+        concept: |
+          A provider key pasted into config is the pitfall the guide calls out first. Store it
+          in a Databricks secret scope and reference it as `{{secrets/<scope>/<key>}}` — a read
+          of the endpoint then returns the reference, never the value. This lists the secret
+          scopes present and checks which external-model endpoints reference a secret.
+        action:
+          label: Check provider keys are stored as secrets
+          test: provider_secret_readiness
+      - id: acc_ext_binding
+        title: Bind approved models to approved workspaces
+        concept: |
+          "Approved models" is only advisory until the catalog holding them is
+          `isolation_mode = ISOLATED` with explicit workspace bindings — otherwise any workspace
+          on the metastore can bind the catalog and use what is in it. This reports the catalog's
+          isolation mode and its bindings.
+        action:
+          label: Check catalog isolation & workspace bindings
+          test: workspace_binding_check
       - id: acc_ext_migrate
         title: Migrate one shadow workload as proof
         concept: |
