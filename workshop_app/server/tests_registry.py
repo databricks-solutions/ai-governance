@@ -1706,6 +1706,25 @@ def t_external_provider_routing() -> TestResult:
     return _ok(summary, external_like=external[:25], total_endpoints=len(all_names))
 
 
+def _find_key_values(obj: Any) -> list[str]:
+    """Recursively collect string values held under credential-shaped keys (api_key / *_key /
+    secret). External-model configs nest the key under a provider block, so a top-level scan
+    misses it."""
+    out: list[str] = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            kl = str(k).lower()
+            if isinstance(v, str) and v and ("api_key" in kl or kl.endswith("_key")
+                                             or "secret" in kl):
+                out.append(v)
+            else:
+                out += _find_key_values(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            out += _find_key_values(v)
+    return out
+
+
 def t_provider_secret_readiness() -> TestResult:
     """Provider credentials belong in Databricks secrets, never inline in endpoint config.
 
@@ -1732,7 +1751,10 @@ def t_provider_secret_readiness() -> TestResult:
                 if not em:
                     continue
                 d = em.as_dict() if hasattr(em, "as_dict") else {}
-                keyvals = [str(v) for k, v in d.items() if "api_key" in k.lower() and v]
+                # The key is nested under a provider config (openai_config.openai_api_key,
+                # amazon_bedrock_config.aws_secret_access_key, ...), so scan recursively rather
+                # than only the top level.
+                keyvals = _find_key_values(d)
                 ref = (any("{{secrets/" in v for v in keyvals) if keyvals else None)
                 external.append({"endpoint": e.name, "provider": d.get("provider"),
                                  "api_key_is_secret_reference": ref})
