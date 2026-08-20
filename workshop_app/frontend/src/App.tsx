@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle, ListChecks } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { AccountProvider, useAccount } from "@/lib/account";
 import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
@@ -14,15 +13,10 @@ const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, cost: Doll
 const REPO_URL = "https://github.com/databricks-solutions/ai-governance";
 
 export default function App() {
-  return (
-    <AccountProvider>
-      <Shell />
-    </AccountProvider>
-  );
+  return <Shell />;
 }
 
 function Shell() {
-  const { sfid } = useAccount();
   const [route, setRoute] = useState<string>("intro");
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [accel, setAccel] = useState<Accelerators | null>(null);
@@ -34,10 +28,9 @@ function Shell() {
   }, []);
 
   function refreshProgress() {
-    if (!sfid) { setProgress({}); return; }
-    api.progress(sfid).then(setProgress).catch(() => setProgress({}));
+    api.progress().then(setProgress).catch(() => setProgress({}));
   }
-  useEffect(refreshProgress, [sfid]);
+  useEffect(refreshProgress, []);
 
   function groupProgress(steps: { id: string }[]): { done: number; total: number } {
     const done = steps.filter((s) => progress[s.id]?.status === "done").length;
@@ -102,13 +95,6 @@ function Shell() {
         </nav>
 
         <div className="mt-auto text-xs text-white/40">
-          <button
-            onClick={() => setRoute("intro")}
-            className="mb-3 block w-full rounded-lg bg-white/5 px-3 py-2 text-left hover:bg-white/10"
-          >
-            <div className="text-[10px] uppercase tracking-wide text-white/40">Active account</div>
-            <div className="truncate text-sm font-semibold text-white/90">{sfid || "Set on Walkthrough →"}</div>
-          </button>
           <div className="flex flex-col gap-1.5">
             <a href={REPO_URL} target="_blank" rel="noreferrer" className="hover:text-white/80">
               Repository ↗

@@ -137,8 +137,8 @@ downstream, but they're not demonstrable in-app — they're prerequisites. They 
 
 **The POC leave-behind itself.** No longer a doc in this repo. The workshop app *generates*
 it: `GET /api/export/report` (Markdown, per-step complete/incomplete) and
-`GET /api/export/outcomes` (JSON, `schema_version` 1) — both keyed to the Account ID and both
-including the accelerators. Writing a static template alongside a generator that already
+`GET /api/export/outcomes` (JSON, `schema_version` 2) — both including the accelerators.
+Writing a static template alongside a generator that already
 produces the real thing was duplication, and the static version drifted immediately.
 The Confluence page for part 04 documents what those exports contain.
 
