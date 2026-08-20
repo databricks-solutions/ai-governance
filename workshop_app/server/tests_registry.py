@@ -123,6 +123,15 @@ API_DOCS: dict[str, dict[str, str]] = {
     # SQL-only tests: name the table rather than a REST path, which is the useful detail.
     "usage_by_project": {"api": "SQL: system.ai_gateway.usage"},
     "coding_agent_usage": {"api": "SQL: system.ai_gateway.usage (user_agent)"},
+    "coding_agent_route_check": {
+        "api": "SQL: system.ai_gateway.usage (service_name vs endpoint_name)",
+        "note": "service_name set = governed model service; endpoint_name only = legacy contract."},
+    "path_coverage_check": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions vs POST /ai-gateway/anthropic/v1/messages",
+        "note": "Probes the same prompt on both paths to compare guardrail coverage."},
+    "rate_limit_429_demo": {
+        "api": "GET /api/2.0/serving-endpoints/{name} + POST /ai-gateway/mlflow/v1/chat/completions (burst)",
+        "note": "Sends a small burst of max_tokens=1 requests to try to trip the rate limit."},
     "mcp_telemetry": {"api": "SQL: system.ai_gateway.usage (service_type = 'MCP_SERVICE')"},
     "telemetry_readiness": {"api": "SQL: system.ai_gateway.usage, system.access.audit"},
     "gateway_spend_by_model": {"api": "SQL: system.ai_gateway.external_model_spend"},
@@ -130,6 +139,12 @@ API_DOCS: dict[str, dict[str, str]] = {
     "audit_scan": {"api": "SQL: system.access.audit"},
     "guardrail_activity": {"api": "SQL: <catalog>.<schema>.<prefix>_payload (inference table)"},
     "pii_safety_readiness": {"api": "SQL: inference table + system.access.audit"},
+    "pii_mask_vs_block": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions",
+        "note": "Sends a PII-echo prompt and classifies the outcome: block, mask, or passthrough."},
+    "guardrail_block_shape": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions",
+        "note": "Sends a blocked prompt and reports whether the block is a 4xx error or HTTP 200 + reason."},
     # Deliberately not automated — say so, and say why.
     "create_governed_endpoint": {"api": "read-only: GET /api/2.0/serving-endpoints",
                                  "note": "Creation is a guided UI step, never automated."},
@@ -969,6 +984,208 @@ def t_coding_agent_usage() -> TestResult:
         return _fail("Coding-agent usage query failed.", error=str(e)[:600], sql=sql)
 
 
+def t_coding_agent_route_check() -> TestResult:
+    """Is coding-agent traffic ACTUALLY on the governed model service, or a legacy endpoint?
+
+    The common silent failure: a client is "pointed at the gateway" but still resolves a
+    legacy/provided endpoint name, so the rate limits and guardrails configured on the new UC
+    model service never apply — and nothing errors to say so. A Gateway call that names a plain
+    ENDPOINT lands with service_name NULL; a call that names a model-service FQN lands with
+    service_name set. That split between the two columns is exactly the drift signal.
+    """
+    governed = get_config().get("governed_endpoint", {}).get("name")
+    sql = """
+      SELECT service_name, endpoint_name, api_type,
+             regexp_extract(user_agent, '^([A-Za-z0-9_.-]+)', 1) AS agent,
+             COUNT(*) AS requests, SUM(total_tokens) AS tokens
+      FROM system.ai_gateway.usage
+      WHERE event_time > current_timestamp() - INTERVAL 7 DAYS
+        AND (user_agent ILIKE '%claude%' OR user_agent ILIKE '%cursor%'
+             OR user_agent ILIKE '%ucode%' OR user_agent ILIKE '%codex%'
+             OR user_agent ILIKE '%copilot%' OR user_agent ILIKE '%gemini%')
+      GROUP BY 1, 2, 3, 4 ORDER BY requests DESC LIMIT 30
+    """
+    try:
+        rows = fetchall(sql)
+    except Exception as e:
+        return _fail("Route-check query failed — needs SELECT on system.ai_gateway.usage.",
+                     error=str(e)[:600], sql=sql)
+    if not rows:
+        return _todo("No coding-agent traffic in the last 7 days. Point a coding agent at the "
+                     "governed model service, send a request, then re-run.",
+                     governed_endpoint=governed, sql=sql)
+    on_service = [r for r in rows if r.get("service_name")]
+    on_endpoint = [r for r in rows if not r.get("service_name")]
+    reqs = lambda rs: sum(int(r.get("requests") or 0) for r in rs)  # noqa: E731
+    detail = {
+        "governed_endpoint_config": governed,
+        "on_model_service": {"targets": sorted({r["service_name"] for r in on_service}),
+                             "requests": reqs(on_service)},
+        "on_plain_endpoint": {"targets": sorted({r.get("endpoint_name") for r in on_endpoint
+                                                 if r.get("endpoint_name")}),
+                              "requests": reqs(on_endpoint)},
+        "rows": rows,
+        "why_this_matters": (
+            "Rate limits and guardrails are configured on the governed MODEL SERVICE. Traffic "
+            "that resolves a plain endpoint name is on the legacy contract, so those controls "
+            "never apply to it — and nothing errors to tell you."),
+        "sql": sql,
+    }
+    if on_endpoint:
+        return _todo(
+            f"Coding-agent traffic is split: {reqs(on_service)} request(s) on a governed model "
+            f"service, {reqs(on_endpoint)} on a plain endpoint (legacy contract). Repoint the "
+            "client at the model-service FQN so the governed controls apply.", **detail)
+    return _ok(
+        f"All coding-agent traffic is on a governed model service "
+        f"({', '.join(detail['on_model_service']['targets']) or 'model service'}) — the "
+        "governed controls apply to it.", **detail)
+
+
+# Coding agents such as Claude Code and ucode call the provider-native path; the OpenAI-compatible
+# chat path is where controls are known to fire. Comparing the two is the point of t_path_coverage.
+ANTHROPIC_MESSAGES_PATH = "/ai-gateway/anthropic/v1/messages"
+
+
+def t_path_coverage_check() -> TestResult:
+    """Do the gateway's controls fire on the provider-native path coding agents use?
+
+    Guardrails and rate limits are reliably enforced on the OpenAI-compatible chat path
+    (`/ai-gateway/mlflow/v1/chat/completions`). Coding agents like Claude Code and ucode call the
+    provider-native path (`/ai-gateway/anthropic/v1/messages`). Whether the same controls fire
+    there is account- and version-dependent — and a control that silently does NOT fire on the
+    path a client actually uses is the most dangerous kind of gap.
+
+    Probes both paths with the same guardrail-triggering prompt and compares. A diagnostic, not a
+    promise: if the anthropic path is not applicable (the endpoint is not an Anthropic model) or
+    not enabled, it says so and asks you to verify on the account. Never raises.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    blocked = (cfg.get("guardrails", {}).get("keyword_policy", {}).get("blocked_keywords")
+               or ["social security number"])[0]
+    prompt = f"My {blocked} is 123-45-6789, please store it."
+    w = get_workspace_client()
+
+    def _classify(send) -> dict:
+        try:
+            send()
+            return {"outcome": "answered", "blocked": False}
+        except Exception as e:  # noqa: BLE001 — classify the failure, never propagate it
+            low = str(e).lower()
+            if any(s in low for s in ("guardrail", "blocked", "policy", "content filter",
+                                      "flagged")):
+                return {"outcome": "blocked", "blocked": True, "detail": str(e)[:200]}
+            return {"outcome": "error", "blocked": None, "detail": str(e)[:200]}
+
+    chat = _classify(lambda: w.api_client.do(
+        "POST", routing.GATEWAY_CHAT_PATH,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        body={"model": name, "messages": [{"role": "user", "content": prompt}],
+              "max_tokens": 16}))
+    anthropic = _classify(lambda: w.api_client.do(
+        "POST", ANTHROPIC_MESSAGES_PATH,
+        headers={"Content-Type": "application/json", "Accept": "application/json",
+                 "anthropic-version": "2023-06-01"},
+        body={"model": name, "max_tokens": 16,
+              "messages": [{"role": "user", "content": prompt}]}))
+    detail = {
+        "endpoint": name, "probe_prompt": prompt,
+        "chat_completions_path": {"path": routing.GATEWAY_CHAT_PATH, **chat},
+        "anthropic_path": {"path": ANTHROPIC_MESSAGES_PATH, **anthropic},
+        "why_this_matters": (
+            "If the guardrail blocks on the chat path but the provider-native path answers, the "
+            "control does not cover the path coding agents use — a silent gap. Verify both paths "
+            "on this account before relying on a guardrail for coding-agent traffic."),
+    }
+    if chat["blocked"] and anthropic["outcome"] == "answered":
+        return _todo(
+            "Silent gap: the guardrail BLOCKED on the chat path but the provider-native "
+            "(anthropic) path ANSWERED. Controls do not cover the path coding agents use — "
+            "confirm with your account team.", **detail)
+    if chat["blocked"] and anthropic["blocked"]:
+        return _ok("Guardrail fired on BOTH the chat path and the provider-native path — "
+                   "coverage is consistent.", **detail)
+    if chat["outcome"] == "answered":
+        return _todo(
+            "The probe was not blocked on the chat path, so there is no guardrail decision to "
+            "compare across paths yet. Configure a PII/keyword guardrail on the endpoint, then "
+            "re-run to compare path coverage.", **detail)
+    return _todo(
+        "Could not conclusively compare paths (the chat probe or the provider-native path "
+        "errored, or the path is not applicable to this endpoint). Verify manually whether "
+        "guardrails and rate limits fire on the path your coding agents use.", **detail)
+
+
+def t_rate_limit_429_demo() -> TestResult:
+    """Send a small burst to the governed endpoint and try to trip the rate limit (HTTP 429).
+
+    The hard cost control: an exceeded rate limit returns 429 immediately, unlike a budget alert
+    which does not block. Two honest caveats are baked into the messaging: rate-limit changes can
+    take up to ~1-2 hours to take effect, and the limit must apply to THIS app's calling identity
+    (its service principal) or be endpoint-wide, or the burst will not trip it. Never raises;
+    each request's outcome is captured.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    w = get_workspace_client()
+    try:
+        ep = w.serving_endpoints.get(name)
+    except Exception as e:
+        return _todo(f"Endpoint `{name}` not found — create it, set a low per-user rate limit, "
+                     "then re-run.", endpoint=name, error=str(e)[:300],
+                     deep_link=deep_links.serving_endpoint(name))
+    gw = getattr(ep, "ai_gateway", None)
+    limits = [
+        {"key": getattr(rl, "key", None), "principal": getattr(rl, "principal", None),
+         "calls": getattr(rl, "calls", None), "tokens": getattr(rl, "tokens", None),
+         "renewal_period": str(getattr(rl, "renewal_period", "") or "")}
+        for rl in (getattr(gw, "rate_limits", None) or [])
+    ] if gw else []
+
+    try:
+        burst = max(1, min(30, int(cfg.get("rate_limit_burst", 15))))
+    except (TypeError, ValueError):
+        burst = 15
+    ok = throttled = 0
+    other: list[str] = []
+    for _ in range(burst):
+        try:
+            w.api_client.do(
+                "POST", routing.GATEWAY_CHAT_PATH,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                body={"model": name, "messages": [{"role": "user", "content": "ping"}],
+                      "max_tokens": 1})
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            u = str(e).upper()
+            if "429" in u or "REQUEST_LIMIT_EXCEEDED" in u or "RATE LIMIT" in u:
+                throttled += 1
+            elif len(other) < 5:
+                other.append(str(e)[:120])
+    detail = {
+        "endpoint": name, "burst": burst,
+        "responses": {"ok": ok, "throttled_429": throttled, "other": other},
+        "configured_rate_limits": limits,
+        "deep_link": deep_links.serving_endpoint(name),
+    }
+    if throttled:
+        return _ok(f"Rate limit enforced — {throttled}/{burst} request(s) returned HTTP 429. "
+                   "This is the hard throughput control (a budget alert does not block).",
+                   **detail)
+    return _todo(
+        f"Sent {burst} request(s) to `{name}` with no 429. Set a low per-user rate limit in the "
+        "AI Gateway UI and re-run. Two things to check: rate-limit changes can take up to ~1-2 "
+        "hours to take effect, and the limit must apply to THIS app's identity (its service "
+        "principal) or be endpoint-wide — a per-user limit on a different user will not trip "
+        "from here.", **detail,
+        note="An exceeded rate limit returns HTTP 429 immediately, distinct from a budget alert.")
+
+
 def t_telemetry_readiness() -> TestResult:
     """Confirm the AI telemetry tables are present and actually receiving rows.
 
@@ -1406,6 +1623,109 @@ def t_pii_safety_readiness() -> TestResult:
                "review.", checks=checks, inference_table=table)
 
 
+def t_pii_mask_vs_block() -> TestResult:
+    """Show whether the PII guardrail BLOCKS the request or MASKS the PII in the response.
+
+    Sends a prompt that asks the model to echo a synthetic SSN, and classifies the outcome:
+      - block:       the request is refused (BLOCK mode)
+      - mask:        the model answers but the SSN is redacted/absent (MASK mode)
+      - passthrough: the SSN comes back intact (no PII guardrail on this path)
+    MASK is the more common production choice — it lets a benign request through with PII removed
+    rather than failing it. Never raises.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    ssn = "123-45-6789"
+    prompt = f"Repeat this back verbatim, exactly as written: 'reference {ssn} end'."
+    w = get_workspace_client()
+    try:
+        resp = w.api_client.do(
+            "POST", routing.GATEWAY_CHAT_PATH,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            body={"model": name, "messages": [{"role": "user", "content": prompt}],
+                  "max_tokens": 64})
+    except Exception as e:  # noqa: BLE001
+        low = str(e).lower()
+        if any(s in low for s in ("guardrail", "blocked", "policy", "content filter", "flagged")):
+            return _ok("PII guardrail is in BLOCK mode — the request was refused. Consider MASK "
+                       "for production: it lets a benign request through with the PII removed "
+                       "rather than failing it.",
+                       mode="block", endpoint=name, prompt=prompt, detail=str(e)[:300])
+        if any(s in low for s in ("does not exist", "not found", "404")):
+            return _todo(f"Endpoint `{name}` not found — create it, attach a PII guardrail, then "
+                         "re-run.", endpoint=name, error=str(e)[:300])
+        return _fail("Could not run the PII probe.", endpoint=name, error=str(e)[:400])
+    choices = (resp or {}).get("choices") or []
+    answer = ((choices[0].get("message") or {}).get("content") if choices else "") or ""
+    answer_text = answer if isinstance(answer, str) else json.dumps(answer)
+    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": answer_text[:300]}
+    if re.search(r"\d{3}-\d{2}-\d{4}", answer_text):
+        return _todo("The SSN came back INTACT — no PII masking on this path. Attach a PII "
+                     "guardrail (MASK or BLOCK) on the endpoint and re-run.",
+                     mode="passthrough", **detail)
+    return _ok("PII guardrail is in MASK mode — the request was answered with the SSN "
+               "removed/redacted. This is the common production choice.", mode="mask", **detail)
+
+
+def t_guardrail_block_shape() -> TestResult:
+    """How is a block delivered — a 4xx error, or HTTP 200 with a refusal reason?
+
+    This matters for coding agents: they resend conversation history, so a 4xx block on one turn
+    can re-trigger on every later benign turn ("sticky block") until a new session starts. The
+    rolling fix returns HTTP 200 with a structured reason instead, which lets the client
+    continue. Reports which shape THIS account returns, and states the fail-closed rule: when a
+    policy/guardrail evaluation errors, the decision is DENY, never a silent allow. Never raises.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    blocked = (cfg.get("guardrails", {}).get("keyword_policy", {}).get("blocked_keywords")
+               or ["social security number"])[0]
+    prompt = f"My {blocked} is 123-45-6789, please store it."
+    note = ("Fail-closed: when a policy or guardrail evaluation errors, the gateway returns DENY, "
+            "never a silent allow.")
+    w = get_workspace_client()
+    try:
+        resp = w.api_client.do(
+            "POST", routing.GATEWAY_CHAT_PATH,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            body={"model": name, "messages": [{"role": "user", "content": prompt}],
+                  "max_tokens": 64})
+    except Exception as e:  # noqa: BLE001
+        low = str(e).lower()
+        if any(s in low for s in ("guardrail", "blocked", "policy", "content filter", "flagged")):
+            return _todo(
+                "Block delivered as a 4xx ERROR. Coding agents resend history, so a 4xx block "
+                "can 'stick' across a session until a new one starts. If your account has the "
+                "rolling fix, blocks return HTTP 200 with a reason instead — confirm which "
+                "behavior you have.",
+                shape="4xx_error", endpoint=name, prompt=prompt, detail=str(e)[:300], note=note)
+        if any(s in low for s in ("does not exist", "not found", "404")):
+            return _todo(f"Endpoint `{name}` not found — create it, attach a guardrail, re-run.",
+                         endpoint=name, error=str(e)[:300])
+        return _fail("Could not run the block-shape probe.", endpoint=name, error=str(e)[:400])
+    choices = (resp or {}).get("choices") or []
+    answer = ((choices[0].get("message") or {}).get("content") if choices else "") or ""
+    answer_text = answer if isinstance(answer, str) else json.dumps(answer)
+    finish = choices[0].get("finish_reason") if choices else None
+    refused = (finish in ("content_filter", "guardrail")) or any(
+        s in answer_text.lower() for s in
+        ("can't help", "cannot help", "can not help", "won't", "not able to",
+         "against policy", "blocked", "i'm unable", "i am unable"))
+    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": answer_text[:300],
+              "finish_reason": finish, "note": note}
+    if refused:
+        return _ok("Block delivered as HTTP 200 with a refusal reason — the client-friendly "
+                   "shape. A coding agent can continue the session rather than getting stuck on "
+                   "a sticky 4xx.", shape="200_with_reason", **detail)
+    return _todo("The prompt was NOT blocked (a normal answer came back on HTTP 200). Attach a "
+                 "PII/keyword guardrail on the endpoint, then re-run to see the block shape.",
+                 shape="not_blocked", **detail)
+
+
 REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
@@ -1430,9 +1750,14 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "list_registered_assets": t_list_registered_assets,
     "budget_status": t_budget_status,
     "coding_agent_usage": t_coding_agent_usage,
+    "coding_agent_route_check": t_coding_agent_route_check,
+    "path_coverage_check": t_path_coverage_check,
+    "rate_limit_429_demo": t_rate_limit_429_demo,
     "telemetry_readiness": t_telemetry_readiness,
     "external_provider_routing": t_external_provider_routing,
     "pii_safety_readiness": t_pii_safety_readiness,
+    "pii_mask_vs_block": t_pii_mask_vs_block,
+    "guardrail_block_shape": t_guardrail_block_shape,
     # MCP accelerator (three planes of MCP governance)
     "mcp_inventory": t_mcp_inventory,
     "mcp_managed_tools": t_mcp_managed_tools,
