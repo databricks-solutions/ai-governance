@@ -123,6 +123,14 @@ labs/                   models · guardrails · tools · agents · zero-to-produ
                         (each lab folder = README.md + notebook.py)
 ```
 
+## Maintainers
+
+Maintained by the Databricks Field Engineering team. For questions or issues, open a GitHub
+issue (below) or reach a maintainer:
+
+- Scott McKean — scott.mckean@databricks.com
+- Tim Lortz — tim.lortz@databricks.com
+
 ## How to get help
 
 Databricks support doesn't cover this content. For questions or bugs, please open a
@@ -141,3 +149,6 @@ All included or referenced third party libraries are subject to their respective
 | openai | OpenAI Python client | Apache 2.0 | https://github.com/openai/openai-python |
 | requests | HTTP client | Apache 2.0 | https://github.com/psf/requests |
 | polars | DataFrame library | MIT | https://github.com/pola-rs/polars |
+
+A full third-party dependency audit for the workshop app and labs — versions, licenses,
+and purpose — is in [DEPENDENCIES.md](DEPENDENCIES.md).
