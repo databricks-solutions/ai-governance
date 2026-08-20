@@ -1,11 +1,11 @@
-"""Executable governance tests, ported from the l200_demo pages.
+"""Executable governance tests.
 
 Each test is a function returning a TestResult. They exercise real controls against the
 connected workspace (list endpoints, create a governed endpoint, run guardrail/MCP policy
 checks, query system tables). Steps in config/steps.yaml reference these by name.
 
 A test result is intentionally simple and JSON-serializable so the UI can render it and
-db.py can persist it as `last_result`.
+the progress store can persist it as `last_result`.
 """
 from __future__ import annotations
 
@@ -549,8 +549,8 @@ def t_gateway_spend_by_model() -> TestResult:
 def t_create_governed_endpoint() -> TestResult:
     """Create/verify the governed endpoint with usage tracking + inference table.
 
-    Mirrors l200 page 2: PUT the endpoint config idempotently. Guardrails/rate-limits
-    beyond what the API supports are applied via the UI (see the step's manual action).
+    PUT the endpoint config idempotently. Guardrails/rate-limits beyond what the API
+    supports are applied via the UI (see the step's manual action).
     """
     cfg = get_config().get("governed_endpoint", {})
     name = cfg.get("name")

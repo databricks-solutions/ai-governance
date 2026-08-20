@@ -15,7 +15,7 @@ const VISUALS: Record<string, ReactNode> = {
   mcp_planes: <McpDiagram />,
 };
 
-// Color-coded kind badges — same taxonomy as the l200 demo (concept/try-it/manual/verify).
+// Color-coded kind badges (concept/try-it/manual/verify).
 const BADGES = {
   concept: { label: "CONCEPT", cls: "bg-[#E7F1FC] text-[#0B5FA5]" },
   action: { label: "TRY IT", cls: "bg-[#E6F4EA] text-[#1E7E34]" },

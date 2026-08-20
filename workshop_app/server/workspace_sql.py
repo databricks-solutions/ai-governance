@@ -1,4 +1,4 @@
-"""Workspace SQL execution + REST helpers (ported from l200_demo/lib/db.py)."""
+"""Workspace SQL execution + REST helpers."""
 import time
 from typing import Any
 

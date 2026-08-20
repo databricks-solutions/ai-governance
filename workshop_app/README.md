@@ -18,7 +18,7 @@ workshop_app/
     workshop.yaml     ← the ONE file a customer edits (warehouse, catalog, endpoints, mcp, project)
     steps.yaml        ← the guidebook: intro + pillars/steps (concept / try-it / verify)
   server/             FastAPI backend
-    tests_registry.py ← the executable governance tests (ported from l200_demo)
+    tests_registry.py ← the executable governance tests
     workspace_sql.py  ← SQL against the workspace warehouse (system tables, inference tables)
     store.py          ← progress store: one JSON file on a UC volume (in-memory + write-through)
     deep_links.py     ← links into the workspace UI for manual steps
@@ -39,9 +39,9 @@ workshop_app/
   govern coding-agent traffic, and get end-to-end observability — scan the audit log for denied
   calls and leaked secrets, and open traces.
 
-The governance tests are ported from the `l200_demo` Streamlit app into FastAPI endpoints, so
-each step's **Try It** button runs a real check (list endpoints, create/verify a governed
-endpoint, query system/inference tables, create an MCP policy function, etc.).
+The governance tests run as FastAPI endpoints, so each step's **Try It** button runs a real
+check (list endpoints, create/verify a governed endpoint, query system/inference tables, create
+an MCP policy function, etc.).
 
 ## Accelerators (optional add-ons)
 
