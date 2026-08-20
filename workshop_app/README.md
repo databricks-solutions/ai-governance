@@ -18,7 +18,7 @@ workshop_app/
     workshop.yaml     ← the ONE file a customer edits (warehouse, catalog, endpoints, mcp, project)
     steps.yaml        ← the guidebook: intro + pillars/steps (concept / try-it / verify)
   server/             FastAPI backend
-    tests_registry.py ← the executable governance tests (ported from l200_demo)
+    tests_registry.py ← the executable governance tests
     workspace_sql.py  ← SQL against the workspace warehouse (system tables, inference tables)
     store.py          ← progress store: one JSON file on a UC volume (in-memory + write-through)
     deep_links.py     ← links into the workspace UI for manual steps
@@ -39,9 +39,9 @@ workshop_app/
   govern coding-agent traffic, and get end-to-end observability — scan the audit log for denied
   calls and leaked secrets, and open traces.
 
-The governance tests are ported from the `l200_demo` Streamlit app into FastAPI endpoints, so
-each step's **Try It** button runs a real check (list endpoints, create/verify a governed
-endpoint, query system/inference tables, create an MCP policy function, etc.).
+The governance tests run as FastAPI endpoints, so each step's **Try It** button runs a real
+check (list endpoints, create/verify a governed endpoint, query system/inference tables, create
+an MCP policy function, etc.).
 
 ## Accelerators (optional add-ons)
 
@@ -59,7 +59,7 @@ concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
 Run the one that matches the customer's priority (the accelerator overview and links live on
 the in-app **Walkthrough** page). Accelerator progress is tracked in the same volume-backed
-store and included in the exported outcomes, so anything you run shows up in the Databricks account-tracking system.
+store and included in the exported outcomes, so anything you run shows up in the report.
 
 ## Deploy on a customer workspace
 
@@ -180,24 +180,21 @@ cd frontend && npm ci && npm run build
 ## Progress tracking (UC volume)
 
 Progress is stored in a single JSON file on the bundle's Unity Catalog volume
-(`/Volumes/<catalog>/<schema>/workshop_state/progress.json`), keyed by `customer_sfid` then
-`step_id`: each entry carries `status` (not_started / in_progress / action_required / done /
-failed), the last Try-It/Verify `last_result` (JSON), notes, and a timestamp. The app reads the
-file into memory at startup (`server/store.py`) and rewrites it write-through on every update —
-there is no database to provision, wait on, or grant CONNECT to. The whole workshop is keyed to
-the Account ID set on the Walkthrough page, so progress and the outcomes export flow straight
-into the Databricks account-tracking system.
+(`/Volumes/<catalog>/<schema>/workshop_state/progress.json`), keyed by `step_id`: each entry
+carries `status` (not_started / in_progress / action_required / done / failed), the last
+Try-It/Verify `last_result` (JSON), notes, and a timestamp. The app reads the file into memory
+at startup (`server/store.py`) and rewrites it write-through on every update — there is no
+database to provision, wait on, or grant CONNECT to. The app is deployed once per workshop, so
+there is a single set of progress and no account identifier to set.
 
-## Export → the Databricks account-tracking system
+## Export → outcomes files
 
-The Intro page's **Export workshop outcomes** panel produces two files (the deliverer confirms
-the Salesforce account id first):
+The Intro page's **Export workshop outcomes** panel produces:
 
-- **`<sfid>_workshop_report.md`** — a per-step complete/incomplete report grouped by pillar, for
-  the customer leave-behind (`GET /api/export/report`).
-- **`<sfid>_workshop_outcomes.json`** — the machine-readable outcomes (`schema_version` 1) the
-  Databricks AI Governance account-tracking system ingests to track the account and drive next steps
-  (`GET /api/export/outcomes`). Load it in that app's **Account Journey → Workshop handoff**.
+- **`workshop_report.md`** — a per-step complete/incomplete report grouped by pillar, for the
+  customer leave-behind (`GET /api/export/report`).
+- **`workshop_outcomes.json`** — the machine-readable outcomes (`schema_version` 2), every step
+  with its status plus the incomplete items as next steps (`GET /api/export/outcomes`).
 
 ## Extending
 

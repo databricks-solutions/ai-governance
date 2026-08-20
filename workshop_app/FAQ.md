@@ -59,9 +59,9 @@ them before the day so the room isn't blocked.
 
 ## How is my progress tracked?
 
-Progress is stored per account (by the **Account ID** set on the Walkthrough page) in a JSON
-file on a Unity Catalog volume on the deployment — no database required. You can pause and
-resume; nothing is lost between sessions.
+Progress is stored in a JSON file on a Unity Catalog volume on the deployment — no database
+required. The app is deployed once per workshop, so there is a single set of progress and
+nothing to identify. You can pause and resume; nothing is lost between sessions.
 
 A step can end in one of three states, and the distinction is deliberate: **done** (proved),
 **action needed** (the step ran, but nothing is proven yet — a guided UI action, or a
@@ -95,9 +95,9 @@ Export the outcomes from the Walkthrough page:
 
 - a per-step **report** (`.md`) — every step with its status and notes, grouped by pillar,
   with the incomplete items listed as next steps. This is the leave-behind.
-- an **outcomes.json** — the same data machine-readable, which the Databricks account-tracking system ingests to track the account and drive follow-up.
+- an **outcomes.json** — the same data machine-readable (`schema_version` 2), for follow-up.
 
-Both include the accelerators, and both are keyed to the Account ID. The incomplete items are
+Both include the accelerators. The incomplete items are
 the follow-up list: they become the 1–2 weeks of work after the workshop, and they are the
 reason the app distinguishes "action needed" from "done".
 

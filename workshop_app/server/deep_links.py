@@ -1,4 +1,4 @@
-"""Deep links into the Databricks workspace UI (subset ported from l200_demo)."""
+"""Deep links into the Databricks workspace UI."""
 from .config import get_config, get_workspace_client
 
 

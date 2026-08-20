@@ -28,10 +28,58 @@ intro:
 
     Each step has a concept, a **Try It** action that exercises the control on this workspace,
     and a **Verify** step that checks the result. Results show the API called and any SQL run.
-    Progress is saved per Account ID.
+    Progress is saved automatically as you go.
 
     Begin with **Prerequisites** if you have not: two `system` grants require an account admin
     and gate 8 of the 20 steps.
+
+  # Step-by-step deploy guide shown on the Walkthrough. Structured (not one markdown blob) so
+  # each step renders as a numbered "do this / ensure this" card. `do` and `ensure` accept
+  # inline markdown (**bold**, `code`, *italics*, links); `cmd` is shown verbatim in a code box.
+  deploy:
+    title: Deploy this workshop in your own workspace
+    intro: >-
+      You run this in your own Databricks workspace to try the capabilities first-hand. It is a
+      standard Databricks Asset Bundle — no scripts, about ten minutes end to end.
+    steps:
+      - do: >-
+          **Install the Databricks CLI and log in.** This creates a named profile you reuse in
+          the commands below.
+        cmd: |
+          databricks auth login --host https://<your-workspace>.cloud.databricks.com
+        ensure: "`databricks current-user me -p <profile>` prints your username."
+      - do: "**Get the code and open the app folder.**"
+        cmd: |
+          git clone https://github.com/databricks-solutions/ai-governance
+          cd ai-governance/workshop_app
+      - do: >-
+          **Choose a catalog and a SQL warehouse.** The app deploys into a catalog you already
+          have and runs every live check through the warehouse.
+        cmd: |
+          databricks warehouses list -p <profile>
+        ensure: >-
+          The catalog already exists (the app creates only its own schema inside it) and the
+          warehouse is running — a serverless warehouse starts fastest.
+      - do: >-
+          **Deploy the bundle.** This builds the UI and creates the schema, the progress volume,
+          and the app — and grants the app's own service principal on them in one pass.
+        cmd: |
+          databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<catalog>"
+        ensure: "It finishes with `Deployment complete!` and no errors."
+      - do: >-
+          **Start the app.** A deploy alone does not start app compute, so this second command
+          is required.
+        cmd: |
+          databricks bundle run ai_governance_workshop_app -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<catalog>"
+        ensure: >-
+          Open the URL it prints, then check `GET /api/health` returns
+          `{"status":"ok","config_problems":[]}`. If it lists a problem, that is exactly what
+          still needs setting.
+      - do: >-
+          **(Optional) Grant the two `system` schemas.** An account admin runs the GRANTs shown
+          in *What the app needs from your workspace*, just below. The workshop runs without them
+          — the eight telemetry steps show "action needed" until they are in place.
+    footer: "Made a change and want it live? Re-run the last two commands — deploy, then run."
 
 pillars:
   - id: choice

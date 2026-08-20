@@ -138,7 +138,7 @@ curl -s -H "Authorization: Bearer $(databricks auth token -p <profile> | jq -r .
 
 Then, in the app itself:
 
-- [ ] Walkthrough page loads; set an **Account ID**
+- [ ] Walkthrough page loads
 - [ ] **Choice → Test connection** passes
 - [ ] **Cost → Show the model panel** lists three models that exist on this workspace
 - [ ] **Cost → Route a prompt** returns a real saving (this is the ROI moment — never

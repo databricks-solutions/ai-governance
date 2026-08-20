@@ -390,8 +390,6 @@ def report_pdf(o: dict) -> bytes:
         Paragraph("AI Governance Workshop", S["title"]),
         Paragraph("Outcomes report", S["h2"]),
         Paragraph(
-            f"Account: <b>{_esc(o.get('customer_name') or o.get('customer_sfid'))}</b> · "
-            f"Account ID: <font face='Courier'>{_esc(o.get('customer_sfid'))}</font> · "
             f"Generated {_esc((o.get('generated_at') or '')[:19])}",
             S["subtitle"]),
     ]

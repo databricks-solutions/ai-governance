@@ -46,9 +46,10 @@ groups:
         item: Grant the app read access to two `system` schemas (`system.ai_gateway` and `system.access`)
         why: >-
           These let the app read the telemetry that proves cost and control actually fired — spend
-          by model, budgets, per-team attribution, and the audit trail. The deploy script prints the
-          exact GRANT statements with the app's identity filled in. If they are not ready in time the
-          workshop still runs; those specific steps simply show "action needed" instead of a result.
+          by model, budgets, per-team attribution, and the audit trail. The app's Walkthrough page
+          lists the exact GRANT statements; fill in the app's service principal (get it with
+          `databricks apps get ai-governance-workshop`). If they are not ready in time the workshop
+          still runs; those specific steps simply show "action needed" instead of a result.
         who: Account admin
       - id: catalog_and_warehouse
         item: Provide a Unity Catalog catalog and a running SQL warehouse the app can use
