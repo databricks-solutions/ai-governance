@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle } from "lucide-react";
 import { api, type Prerequisites as Prereqs } from "@/lib/api";
-import { useAccount } from "@/lib/account";
 import PageHeader from "@/components/PageHeader";
 import { cn } from "@/lib/cn";
 
@@ -24,7 +23,6 @@ function loadChecked(): Record<string, boolean> {
 }
 
 export default function Prerequisites() {
-  const { sfid } = useAccount();
   const [data, setData] = useState<Prereqs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>(loadChecked);
@@ -97,7 +95,7 @@ export default function Prerequisites() {
               <FileText className="h-4 w-4" /> Workshop brochure (PDF)
             </a>
             <a
-              href={api.prerequisitesPdfUrl(sfid.trim() || undefined)}
+              href={api.prerequisitesPdfUrl()}
               className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
             >
               <FileDown className="h-4 w-4" /> Download checklist (PDF)

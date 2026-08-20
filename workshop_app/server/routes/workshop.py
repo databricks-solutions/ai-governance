@@ -11,8 +11,10 @@ from ..tests_registry import run_test
 
 router = APIRouter()
 
-# Version of the outcomes-JSON contract the Databricks account-tracking system ingests.
-OUTCOMES_SCHEMA_VERSION = 1
+# Version of the outcomes-JSON contract. Bumped to 2 when the account/Salesforce identifiers
+# were removed: the workshop is deployed once per engagement, so the export no longer carries a
+# customer_sfid or customer_name.
+OUTCOMES_SCHEMA_VERSION = 2
 
 
 def _resolve_group(group: dict) -> dict:
@@ -92,7 +94,6 @@ def routing_route(body: RoutingPrompt):
 
 class RunTest(BaseModel):
     test: str
-    customer_sfid: str
     step_id: str
     pillar_id: str
     kind: str = "action"          # 'action' | 'verify'
@@ -101,28 +102,22 @@ class RunTest(BaseModel):
 
 @router.post("/test")
 def run_and_record(body: RunTest):
-    # Validate BEFORE running: several tests mutate the workspace or call paid endpoints
-    # (create_mcp_policy, the routing tests, SQL steps). Running one with no Account ID would
-    # incur that cost/change and then 400 on the save — so gate on the id up front.
-    if not body.customer_sfid:
-        raise HTTPException(400, "customer_sfid is required — set the Account ID before running steps.")
     result = run_test(body.test)
     # A test can come back three ways, and collapsing them would overstate progress:
     # ok + action_required means "ran fine, but nothing is proven yet" (a guided step, or
     # telemetry with no data). Recording that as `done` would inflate the progress bar and
-    # the outcomes JSON the sales app ingests.
+    # the outcomes JSON.
     if result.get("status") == "action_required":
         status = "action_required"
     elif result.get("ok"):
         status = "done"
     else:
         status = "failed"
-    _save_progress(body.customer_sfid, body.step_id, body.pillar_id, status, result, body.updated_by)
+    _save_progress(body.step_id, body.pillar_id, status, result, body.updated_by)
     return result
 
 
 class Progress(BaseModel):
-    customer_sfid: str
     step_id: str
     pillar_id: str
     status: str
@@ -132,37 +127,33 @@ class Progress(BaseModel):
 
 @router.post("/progress")
 def set_progress(body: Progress):
-    _save_progress(body.customer_sfid, body.step_id, body.pillar_id, body.status, None, body.updated_by, body.notes)
+    _save_progress(body.step_id, body.pillar_id, body.status, None, body.updated_by, body.notes)
     return {"ok": True}
 
 
-@router.get("/progress/{customer_sfid}")
-def get_progress(customer_sfid: str):
+@router.get("/progress")
+def get_progress():
     return {
         step_id: {"pillar_id": r.get("pillar_id"), "status": r.get("status"),
                   "last_result": r.get("last_result"), "notes": r.get("notes"),
                   "updated_at": r.get("updated_at")}
-        for step_id, r in store.get(customer_sfid).items()
+        for step_id, r in store.get().items()
     }
 
 
-def _save_progress(customer_sfid, step_id, pillar_id, status, result, updated_by, notes=None):
-    if not customer_sfid:
-        raise HTTPException(400, "customer_sfid is required")
-    store.save(customer_sfid, step_id, pillar_id, status, result, updated_by, notes)
+def _save_progress(step_id, pillar_id, status, result, updated_by, notes=None):
+    store.save(step_id, pillar_id, status, result, updated_by, notes)
 
 
 # --------------------------------------------------------------------------- Export
-def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
-    """Assemble the workshop outcomes: every step with its status, keyed to the Account ID.
+def _build_outcomes() -> dict:
+    """Assemble the workshop outcomes: every step with its status.
 
-    The wire field stays `customer_sfid` — it is the contract the Databricks account-tracking system ingests,
-    so renaming it would break that consumer. Only the user-visible label changed.
-
-    This is the contract the Databricks account-tracking system ingests (schema_version). It merges the
-    workshop definition (so every step appears, even untouched ones) with saved progress.
+    A versioned JSON document (schema_version) that merges the workshop definition (so every
+    step appears, even untouched ones) with saved progress. It carries no account or Salesforce
+    identifier — the app is deployed once per workshop.
     """
-    progress = get_progress(customer_sfid)  # {step_id: {status, last_result, notes, ...}}
+    progress = get_progress()  # {step_id: {status, last_result, notes, ...}}
     totals = {"total": 0, "done": 0}
 
     def _group_out(group: dict) -> dict:
@@ -188,7 +179,7 @@ def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
     pillars_out = [_group_out(p) for p in workshop_content()["pillars"]]
     accelerators_out = [_group_out(a) for a in accelerators_content()["accelerators"]]
 
-    # Next steps = anything not complete, so the sales app can drive follow-up.
+    # Next steps = anything not complete, to drive follow-up.
     next_steps = [
         {"pillar_id": g["pillar_id"], "step_id": st["step_id"], "title": st["title"], "status": st["status"]}
         for g in pillars_out + accelerators_out for st in g["steps"] if not st["complete"]
@@ -199,8 +190,6 @@ def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
         "schema_version": OUTCOMES_SCHEMA_VERSION,
         "source": "ai-governance-workshop",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "customer_sfid": customer_sfid,
-        "customer_name": customer_name,
         "summary": {"total": totals["total"], "done": totals["done"], "pct": pct},
         "pillars": pillars_out,
         "accelerators": accelerators_out,
@@ -209,24 +198,18 @@ def _build_outcomes(customer_sfid: str, customer_name: str | None) -> dict:
 
 
 @router.get("/export/outcomes")
-def export_outcomes(customer_sfid: str, customer_name: str | None = None):
-    """The JSON the Databricks account-tracking system loads to track workshop outcomes + next steps."""
-    if not customer_sfid:
-        raise HTTPException(400, "customer_sfid is required")
-    return _build_outcomes(customer_sfid, customer_name)
+def export_outcomes():
+    """The machine-readable workshop outcomes + next steps (JSON, schema_version)."""
+    return _build_outcomes()
 
 
 @router.get("/export/report", response_class=PlainTextResponse)
-def export_report(customer_sfid: str, customer_name: str | None = None):
+def export_report():
     """A human-readable per-step report (complete / incomplete) as Markdown."""
-    if not customer_sfid:
-        raise HTTPException(400, "customer_sfid is required")
-    o = _build_outcomes(customer_sfid, customer_name)
+    o = _build_outcomes()
     lines = [
         "# AI Governance Workshop — Outcomes Report",
         "",
-        f"**Account:** {o['customer_name'] or o['customer_sfid']}  ",
-        f"**Account ID:** {o['customer_sfid']}  ",
         f"**Generated:** {o['generated_at']}  ",
         f"**Progress:** {o['summary']['done']}/{o['summary']['total']} steps complete "
         f"({o['summary']['pct']}%)",
@@ -289,7 +272,7 @@ def export_brochure_pdf(customer_name: str | None = None):
     """The one-page workshop brochure as a PDF — the leave-ahead an account team sends to book
     the session (cost/choice/control, 4-hour format, target personas, accelerators).
 
-    Needs no customer_sfid: it exists before any workshop does.
+    Exists before any workshop does, so it needs no progress.
     """
     _require_pdf()
     return _pdf_response(
@@ -302,9 +285,8 @@ def export_brochure_pdf(customer_name: str | None = None):
 def export_prerequisites_pdf(customer_name: str | None = None):
     """The prerequisites checklist as a printable PDF with tickable checkboxes.
 
-    Needs no customer_sfid: this is pre-workshop material that exists before any progress
-    does, which is exactly why it is on the Walkthrough page rather than behind the export
-    panel.
+    This is pre-workshop material that exists before any progress does, which is exactly why
+    it is on the Walkthrough page rather than behind the export panel.
     """
     _require_pdf()
     return _pdf_response(
@@ -314,11 +296,8 @@ def export_prerequisites_pdf(customer_name: str | None = None):
 
 
 @router.get("/export/report.pdf")
-def export_report_pdf(customer_sfid: str, customer_name: str | None = None):
+def export_report_pdf():
     """The outcomes report as a PDF — the leave-behind that replaced the POC DOC."""
-    if not customer_sfid:
-        raise HTTPException(400, "customer_sfid is required")
     _require_pdf()
-    o = _build_outcomes(customer_sfid, customer_name)
-    safe = "".join(c if c.isalnum() or c in "-_" else "-" for c in customer_sfid)[:40]
-    return _pdf_response(pdf.report_pdf(o), f"ai-governance-outcomes-{safe}.pdf")
+    o = _build_outcomes()
+    return _pdf_response(pdf.report_pdf(o), "ai-governance-workshop-outcomes.pdf")

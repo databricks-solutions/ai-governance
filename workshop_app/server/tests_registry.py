@@ -1,11 +1,11 @@
-"""Executable governance tests, ported from the l200_demo pages.
+"""Executable governance tests.
 
 Each test is a function returning a TestResult. They exercise real controls against the
 connected workspace (list endpoints, create a governed endpoint, run guardrail/MCP policy
 checks, query system tables). Steps in config/steps.yaml reference these by name.
 
 A test result is intentionally simple and JSON-serializable so the UI can render it and
-db.py can persist it as `last_result`.
+the progress store can persist it as `last_result`.
 """
 from __future__ import annotations
 
@@ -98,6 +98,15 @@ API_DOCS: dict[str, dict[str, str]] = {
                       "note": "Prices are config, not a live API."},
     "test_mcp_policy": {"api": "POST /api/2.0/sql/statements (evaluate the policy function)"},
     "external_provider_routing": {"api": "GET /api/2.0/serving-endpoints"},
+    "provider_secret_readiness": {
+        "api": "GET /api/2.0/secrets/scopes/list + GET /api/2.0/serving-endpoints/{name}",
+        "note": "Read-only; never reads a secret value — checks for {{secrets/...}} references."},
+    "workspace_binding_check": {
+        "api": "GET /api/2.1/unity-catalog/catalogs/{name} + /api/2.1/unity-catalog/bindings/catalog/{name}"},
+    "agent_versions": {
+        "api": "GET /api/2.1/unity-catalog/models + /api/2.1/unity-catalog/models/{name}/versions"},
+    "agent_sp_attribution": {
+        "api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway config on agent-like endpoints)"},
     "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
@@ -120,9 +129,24 @@ API_DOCS: dict[str, dict[str, str]] = {
     "mcp_managed_tools": {
         "api": "POST /api/2.0/mcp/functions/{catalog}/{schema} — JSON-RPC (not REST)"},
     "mcp_external_readiness": {"api": "GET /api/2.1/unity-catalog/connections"},
+    "mcp_readonly_enforcement": {
+        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)",
+        "note": "Classifies tools read vs write from each tool's readOnlyHint."},
+    "mcp_tool_metadata_scan": {
+        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)",
+        "note": "Heuristic scan of tool name/description for prompt-injection ('tool poisoning')."},
     # SQL-only tests: name the table rather than a REST path, which is the useful detail.
     "usage_by_project": {"api": "SQL: system.ai_gateway.usage"},
     "coding_agent_usage": {"api": "SQL: system.ai_gateway.usage (user_agent)"},
+    "coding_agent_route_check": {
+        "api": "SQL: system.ai_gateway.usage (service_name vs endpoint_name)",
+        "note": "service_name set = governed model service; endpoint_name only = legacy contract."},
+    "path_coverage_check": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions vs POST /ai-gateway/anthropic/v1/messages",
+        "note": "Probes the same prompt on both paths to compare guardrail coverage."},
+    "rate_limit_429_demo": {
+        "api": "GET /api/2.0/serving-endpoints/{name} + POST /ai-gateway/mlflow/v1/chat/completions (burst)",
+        "note": "Sends a small burst of max_tokens=1 requests to try to trip the rate limit."},
     "mcp_telemetry": {"api": "SQL: system.ai_gateway.usage (service_type = 'MCP_SERVICE')"},
     "telemetry_readiness": {"api": "SQL: system.ai_gateway.usage, system.access.audit"},
     "gateway_spend_by_model": {"api": "SQL: system.ai_gateway.external_model_spend"},
@@ -130,6 +154,12 @@ API_DOCS: dict[str, dict[str, str]] = {
     "audit_scan": {"api": "SQL: system.access.audit"},
     "guardrail_activity": {"api": "SQL: <catalog>.<schema>.<prefix>_payload (inference table)"},
     "pii_safety_readiness": {"api": "SQL: inference table + system.access.audit"},
+    "pii_mask_vs_block": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions",
+        "note": "Sends a PII-echo prompt and classifies the outcome: block, mask, or passthrough."},
+    "guardrail_block_shape": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions",
+        "note": "Sends a blocked prompt and reports whether the block is a 4xx error or HTTP 200 + reason."},
     # Deliberately not automated — say so, and say why.
     "create_governed_endpoint": {"api": "read-only: GET /api/2.0/serving-endpoints",
                                  "note": "Creation is a guided UI step, never automated."},
@@ -519,8 +549,8 @@ def t_gateway_spend_by_model() -> TestResult:
 def t_create_governed_endpoint() -> TestResult:
     """Create/verify the governed endpoint with usage tracking + inference table.
 
-    Mirrors l200 page 2: PUT the endpoint config idempotently. Guardrails/rate-limits
-    beyond what the API supports are applied via the UI (see the step's manual action).
+    PUT the endpoint config idempotently. Guardrails/rate-limits beyond what the API
+    supports are applied via the UI (see the step's manual action).
     """
     cfg = get_config().get("governed_endpoint", {})
     name = cfg.get("name")
@@ -559,6 +589,56 @@ def t_verify_governed_endpoint() -> TestResult:
     )
 
 
+# A guardrail/policy block surfaces two ways, and the probe tests must classify them the SAME
+# way or they contradict each other: a 4xx EXCEPTION carrying guardrail wording, or an HTTP 200
+# whose body is a structured refusal (finish_reason marks a filter). One signal list, one
+# classifier, so every test agrees.
+_GUARDRAIL_SIGNALS = ("guardrail", "blocked", "policy", "content filter", "content_filter",
+                      "invalid_keywords", "flagged")
+_BLOCK_FINISH_REASONS = ("content_filter", "content_filtered", "guardrail")
+
+
+def _msg_is_guardrail(text: str) -> bool:
+    low = (text or "").lower()
+    return any(s in low for s in _GUARDRAIL_SIGNALS)
+
+
+def _msg_is_missing(text: str) -> bool:
+    low = (text or "").lower()
+    return any(s in low for s in ("does not exist", "not found", "404",
+                                  "resource_does_not_exist"))
+
+
+def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
+    """Classify a model-call outcome for guardrail probes, consistently across tests.
+
+    Returns {outcome, blocked, via, text, finish_reason} where outcome is one of
+    'blocked' | 'answered' | 'error' | 'not_found'. A block is recognized ONLY from a 4xx
+    exception carrying guardrail wording, or a 200 whose finish_reason marks a filter — never by
+    guessing from refusal-sounding words in the answer text, which yields false positives.
+    """
+    if exc is not None:
+        if _msg_is_missing(str(exc)):
+            return {"outcome": "not_found", "blocked": None, "via": None,
+                    "text": str(exc)[:300], "finish_reason": None}
+        if _msg_is_guardrail(str(exc)):
+            return {"outcome": "blocked", "blocked": True, "via": "exception",
+                    "text": str(exc)[:300], "finish_reason": None}
+        return {"outcome": "error", "blocked": None, "via": None,
+                "text": str(exc)[:300], "finish_reason": None}
+    choices = (resp or {}).get("choices") or []
+    message = (choices[0].get("message") or {}) if choices else {}
+    content = message.get("content")
+    text = (content if isinstance(content, str)
+            else json.dumps(content) if content is not None else "")
+    finish = choices[0].get("finish_reason") if choices else None
+    if finish and str(finish).lower() in _BLOCK_FINISH_REASONS:
+        return {"outcome": "blocked", "blocked": True, "via": "http_200",
+                "text": text[:300], "finish_reason": finish}
+    return {"outcome": "answered", "blocked": False, "via": "http_200",
+            "text": text[:300], "finish_reason": finish}
+
+
 def t_test_guardrail() -> TestResult:
     """Send a prompt containing a blocked keyword to the governed endpoint; expect a block.
 
@@ -590,12 +670,10 @@ def t_test_guardrail() -> TestResult:
     except Exception as e:
         msg = str(e)
         low = msg.lower()
-        if any(s in low for s in ("guardrail", "blocked", "policy", "content filter",
-                                  "invalid_keywords", "flagged")):
+        if _msg_is_guardrail(low):
             return _ok("Guardrail fired — the request was blocked as expected.",
                        endpoint=name, prompt=prompt, error=msg[:400])
-        if any(s in low for s in ("does not exist", "not found", "404",
-                                  "resource_does_not_exist")):
+        if _msg_is_missing(low):
             return _todo(f"Endpoint `{name}` does not exist yet — create it, attach the "
                          "guardrail, then re-run.", endpoint=name, error=msg[:400])
         return _fail("Could not run the guardrail test.", endpoint=name, error=msg[:600])
@@ -967,6 +1045,202 @@ def t_coding_agent_usage() -> TestResult:
                    rows=rows, developers=devs, agents=agents, sql=sql)
     except Exception as e:
         return _fail("Coding-agent usage query failed.", error=str(e)[:600], sql=sql)
+
+
+def t_coding_agent_route_check() -> TestResult:
+    """Is coding-agent traffic ACTUALLY on the governed model service, or a legacy endpoint?
+
+    The common silent failure: a client is "pointed at the gateway" but still resolves a
+    legacy/provided endpoint name, so the rate limits and guardrails configured on the new UC
+    model service never apply — and nothing errors to say so. A Gateway call that names a plain
+    ENDPOINT lands with service_name NULL; a call that names a model-service FQN lands with
+    service_name set. That split between the two columns is exactly the drift signal.
+    """
+    governed = get_config().get("governed_endpoint", {}).get("name")
+    sql = """
+      SELECT service_name, endpoint_name, api_type,
+             regexp_extract(user_agent, '^([A-Za-z0-9_.-]+)', 1) AS agent,
+             COUNT(*) AS requests, SUM(total_tokens) AS tokens
+      FROM system.ai_gateway.usage
+      WHERE event_time > current_timestamp() - INTERVAL 7 DAYS
+        AND (user_agent ILIKE '%claude%' OR user_agent ILIKE '%cursor%'
+             OR user_agent ILIKE '%ucode%' OR user_agent ILIKE '%codex%'
+             OR user_agent ILIKE '%copilot%' OR user_agent ILIKE '%gemini%')
+      GROUP BY 1, 2, 3, 4 ORDER BY requests DESC LIMIT 30
+    """
+    try:
+        rows = fetchall(sql)
+    except Exception as e:
+        return _fail("Route-check query failed — needs SELECT on system.ai_gateway.usage.",
+                     error=str(e)[:600], sql=sql)
+    if not rows:
+        return _todo("No coding-agent traffic in the last 7 days. Point a coding agent at the "
+                     "governed model service, send a request, then re-run.",
+                     governed_endpoint=governed, sql=sql)
+    on_service = [r for r in rows if r.get("service_name")]
+    on_endpoint = [r for r in rows if not r.get("service_name")]
+    reqs = lambda rs: sum(int(r.get("requests") or 0) for r in rs)  # noqa: E731
+    detail = {
+        "governed_endpoint_config": governed,
+        "on_model_service": {"targets": sorted({r["service_name"] for r in on_service}),
+                             "requests": reqs(on_service)},
+        "on_plain_endpoint": {"targets": sorted({r.get("endpoint_name") for r in on_endpoint
+                                                 if r.get("endpoint_name")}),
+                              "requests": reqs(on_endpoint)},
+        "rows": rows,
+        "why_this_matters": (
+            "Rate limits and guardrails are configured on the governed MODEL SERVICE. Traffic "
+            "that resolves a plain endpoint name is on the legacy contract, so those controls "
+            "never apply to it — and nothing errors to tell you."),
+        "sql": sql,
+    }
+    if on_endpoint:
+        return _todo(
+            f"Coding-agent traffic is split: {reqs(on_service)} request(s) on a governed model "
+            f"service, {reqs(on_endpoint)} on a plain endpoint (legacy contract). Repoint the "
+            "client at the model-service FQN so the governed controls apply.", **detail)
+    return _ok(
+        f"All coding-agent traffic is on a governed model service "
+        f"({', '.join(detail['on_model_service']['targets']) or 'model service'}) — the "
+        "governed controls apply to it.", **detail)
+
+
+# Coding agents such as Claude Code and ucode call the provider-native path; the OpenAI-compatible
+# chat path is where controls are known to fire. Comparing the two is the point of t_path_coverage.
+ANTHROPIC_MESSAGES_PATH = "/ai-gateway/anthropic/v1/messages"
+
+
+def t_path_coverage_check() -> TestResult:
+    """Do the gateway's controls fire on the provider-native path coding agents use?
+
+    Guardrails and rate limits are reliably enforced on the OpenAI-compatible chat path
+    (`/ai-gateway/mlflow/v1/chat/completions`). Coding agents like Claude Code and ucode call the
+    provider-native path (`/ai-gateway/anthropic/v1/messages`). Whether the same controls fire
+    there is account- and version-dependent — and a control that silently does NOT fire on the
+    path a client actually uses is the most dangerous kind of gap.
+
+    Probes both paths with the same guardrail-triggering prompt and compares. A diagnostic, not a
+    promise: if the anthropic path is not applicable (the endpoint is not an Anthropic model) or
+    not enabled, it says so and asks you to verify on the account. Never raises.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    blocked = (cfg.get("guardrails", {}).get("keyword_policy", {}).get("blocked_keywords")
+               or ["social security number"])[0]
+    prompt = f"My {blocked} is 123-45-6789, please store it."
+    w = get_workspace_client()
+
+    def _probe(path: str, body: dict, extra_headers: dict | None = None) -> dict:
+        headers = {"Content-Type": "application/json", "Accept": "application/json",
+                   **(extra_headers or {})}
+        try:
+            return _classify_call(None, w.api_client.do("POST", path, headers=headers, body=body))
+        except Exception as e:  # noqa: BLE001 — classify the failure, never propagate it
+            return _classify_call(e, None)
+
+    chat = _probe(routing.GATEWAY_CHAT_PATH,
+                  {"model": name, "messages": [{"role": "user", "content": prompt}],
+                   "max_tokens": 16})
+    anthropic = _probe(ANTHROPIC_MESSAGES_PATH,
+                       {"model": name, "max_tokens": 16,
+                        "messages": [{"role": "user", "content": prompt}]},
+                       {"anthropic-version": "2023-06-01"})
+    detail = {
+        "endpoint": name, "probe_prompt": prompt,
+        "chat_completions_path": {"path": routing.GATEWAY_CHAT_PATH, **chat},
+        "anthropic_path": {"path": ANTHROPIC_MESSAGES_PATH, **anthropic},
+        "why_this_matters": (
+            "If the guardrail blocks on the chat path but the provider-native path answers, the "
+            "control does not cover the path coding agents use — a silent gap. Verify both paths "
+            "on this account before relying on a guardrail for coding-agent traffic."),
+    }
+    if chat["blocked"] and anthropic["outcome"] == "answered":
+        return _todo(
+            "Possible silent gap: the guardrail BLOCKED on the chat path, but the "
+            "provider-native (anthropic) path returned an ANSWER (no filter finish_reason). That "
+            "suggests the control does not cover the path coding agents use — confirm on this "
+            "account before relying on it.", **detail)
+    if chat["blocked"] and anthropic["blocked"]:
+        return _ok("Guardrail fired on BOTH the chat path and the provider-native path — "
+                   "coverage is consistent.", **detail)
+    if chat["outcome"] == "answered":
+        return _todo(
+            "The probe was not blocked on the chat path, so there is no guardrail decision to "
+            "compare across paths yet. Configure a PII/keyword guardrail on the endpoint, then "
+            "re-run to compare path coverage.", **detail)
+    return _todo(
+        "Could not conclusively compare paths (the chat probe or the provider-native path "
+        "errored, or the path is not applicable to this endpoint). Verify manually whether "
+        "guardrails and rate limits fire on the path your coding agents use.", **detail)
+
+
+def t_rate_limit_429_demo() -> TestResult:
+    """Send a small burst to the governed endpoint and try to trip the rate limit (HTTP 429).
+
+    The hard cost control: an exceeded rate limit returns 429 immediately, unlike a budget alert
+    which does not block. Two honest caveats are baked into the messaging: rate-limit changes can
+    take up to ~1-2 hours to take effect, and the limit must apply to THIS app's calling identity
+    (its service principal) or be endpoint-wide, or the burst will not trip it. Never raises;
+    each request's outcome is captured.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    w = get_workspace_client()
+    try:
+        ep = w.serving_endpoints.get(name)
+    except Exception as e:
+        return _todo(f"Endpoint `{name}` not found — create it, set a low per-user rate limit, "
+                     "then re-run.", endpoint=name, error=str(e)[:300],
+                     deep_link=deep_links.serving_endpoint(name))
+    gw = getattr(ep, "ai_gateway", None)
+    limits = [
+        {"key": getattr(rl, "key", None), "principal": getattr(rl, "principal", None),
+         "calls": getattr(rl, "calls", None), "tokens": getattr(rl, "tokens", None),
+         "renewal_period": str(getattr(rl, "renewal_period", "") or "")}
+        for rl in (getattr(gw, "rate_limits", None) or [])
+    ] if gw else []
+
+    try:
+        burst = max(1, min(30, int(cfg.get("rate_limit_burst", 15))))
+    except (TypeError, ValueError):
+        burst = 15
+    ok = throttled = 0
+    other: list[str] = []
+    for _ in range(burst):
+        try:
+            w.api_client.do(
+                "POST", routing.GATEWAY_CHAT_PATH,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                body={"model": name, "messages": [{"role": "user", "content": "ping"}],
+                      "max_tokens": 1})
+            ok += 1
+        except Exception as e:  # noqa: BLE001
+            u = str(e).upper()
+            if "429" in u or "REQUEST_LIMIT_EXCEEDED" in u or "RATE LIMIT" in u:
+                throttled += 1
+            elif len(other) < 5:
+                other.append(str(e)[:120])
+    detail = {
+        "endpoint": name, "burst": burst,
+        "responses": {"ok": ok, "throttled_429": throttled, "other": other},
+        "configured_rate_limits": limits,
+        "deep_link": deep_links.serving_endpoint(name),
+    }
+    if throttled:
+        return _ok(f"Rate limit enforced — {throttled}/{burst} request(s) returned HTTP 429. "
+                   "This is the hard throughput control (a budget alert does not block).",
+                   **detail)
+    return _todo(
+        f"Sent {burst} request(s) to `{name}` with no 429. Set a low per-user rate limit in the "
+        "AI Gateway UI and re-run. Two things to check: rate-limit changes can take up to ~1-2 "
+        "hours to take effect, and the limit must apply to THIS app's identity (its service "
+        "principal) or be endpoint-wide — a per-user limit on a different user will not trip "
+        "from here.", **detail,
+        note="An exceeded rate limit returns HTTP 429 immediately, distinct from a budget alert.")
 
 
 def t_telemetry_readiness() -> TestResult:
@@ -1352,6 +1626,110 @@ def t_mcp_telemetry() -> TestResult:
                     "plainly if a customer asks about full request/response capture.")
 
 
+def t_mcp_readonly_enforcement() -> TestResult:
+    """Read-only enforcement — keep coding-agent users to read tools while humans keep write.
+
+    The most-requested MCP control. How it is enforced depends on the MCP kind, and that
+    distinction is the whole point:
+      - **MCP Service** (`system.ai.*` or an external one you register): attach a service policy
+        that DENIES the write tools, and never grant `USE CONNECTION` to end users (it bypasses
+        tool selection, so a user could call a denied tool directly).
+      - **Managed UC-native endpoint** (DBSQL / Genie functions): NOT a securable, so no service
+        policy can attach — read-only is enforced by exposing only read functions and by the UC
+        grants on them.
+
+    This classifies the configured service's tools into read vs write so the room can see
+    exactly what a read-only policy would need to deny.
+    """
+    svc = mcp.configured_service()
+    if not svc:
+        return _fail("No MCP service configured (`mcp.builtin_service`).")
+    url = mcp.service_url(svc)
+    out = mcp.list_tools(url)
+    if not out["ok"]:
+        return _todo(f"Could not list tools on `{svc}` — resolve the earlier MCP steps first.",
+                     service=svc, error=out["error"])
+    tools = out["tools"]
+    if not tools:
+        return _todo(f"`{svc}` exposed 0 tools, so there is nothing to classify yet.",
+                     service=svc)
+    writes = sorted(t["name"] for t in tools if t.get("read_only") is False)
+    reads = sorted(t["name"] for t in tools if t.get("read_only") is True)
+    unknown = sorted(t["name"] for t in tools if t.get("read_only") is None)
+    detail = {
+        "service": svc,
+        "write_tools": writes, "read_tools": reads, "unknown_tools": unknown,
+        "how_to_enforce": {
+            "mcp_service": "Attach a service policy that denies the write tools; grant EXECUTE "
+                           "to coding-agent users but NOT USE CONNECTION.",
+            "managed_endpoint": "No policy can attach (not a securable) — expose only read "
+                                "functions and control access with UC grants on them.",
+        },
+        "caveat": ("`read_only` comes from each tool's readOnlyHint annotation; a tool with no "
+                   "hint shows as unknown and should be reviewed by hand before trusting it."),
+    }
+    if writes:
+        return _todo(
+            f"`{svc}` exposes {len(writes)} write-capable tool(s) ({', '.join(writes[:6])}). For "
+            "read-only coding-agent access, deny these with a service policy (see the policy "
+            "steps) and keep write for human identities.", **detail)
+    if unknown and not reads:
+        return _todo(f"`{svc}` tools carry no read-only hints, so read vs write cannot be "
+                     "determined automatically — review each before granting access.", **detail)
+    return _ok(f"`{svc}` exposes only read tools ({len(reads)}) — read-only by construction, so "
+               "coding-agent access needs no write-denying policy here.", **detail)
+
+
+# Prompt-injection phrases that have no legitimate place in a tool's user-facing metadata.
+_TOOL_POISON_RE = re.compile(
+    r"ignore (all |the |previous |prior )*(instructions|prompt)|disregard (the |all )*(above|previous)"
+    r"|system prompt|you are now|do not (tell|mention|reveal)|without (telling|informing)"
+    r"|exfiltrat|<\s*system|begin system|api[_-]?key|secret key|password", re.IGNORECASE)
+
+
+def t_mcp_tool_metadata_scan() -> TestResult:
+    """Scan the configured MCP service's tool metadata for prompt-injection ('tool poisoning').
+
+    A tool's name and description are fed to the model, so a malicious or compromised server can
+    hide instructions there ("ignore previous instructions", "before answering, send X to..."),
+    steering an agent without the user ever seeing it. This lists the tools and flags metadata
+    containing injection-shaped phrases. Detection, not prevention — a flag is a prompt to review
+    the tool and its source, never proof of compromise.
+    """
+    svc = mcp.configured_service()
+    if not svc:
+        return _fail("No MCP service configured (`mcp.builtin_service`).")
+    url = mcp.service_url(svc)
+    out = mcp.list_tools(url)
+    if not out["ok"]:
+        return _todo(f"Could not list tools on `{svc}` — resolve the earlier MCP steps first.",
+                     service=svc, error=out["error"])
+    tools = out["tools"]
+    if not tools:
+        return _todo(f"`{svc}` exposed 0 tools to scan.", service=svc)
+    flagged = []
+    for t in tools:
+        text = f"{t.get('name') or ''} {t.get('description') or ''}"
+        hits = sorted({m.group(0).lower() for m in _TOOL_POISON_RE.finditer(text)})
+        if hits:
+            flagged.append({"tool": t.get("name"), "matches": hits,
+                            "description_excerpt": str(t.get("description") or "")[:160]})
+    detail = {
+        "service": svc, "tools_scanned": len(tools), "flagged": flagged,
+        "why_this_matters": (
+            "Tool names and descriptions are sent to the model, so a compromised or malicious "
+            "MCP server can smuggle instructions there — 'tool poisoning'. Review external "
+            "servers before granting EXECUTE, and pin/verify the server version."),
+        "note": ("Heuristic scan over the tool description the server advertised (truncated). A "
+                 "clean result is not a guarantee — it is a first-pass check, not prevention."),
+    }
+    if flagged:
+        return _todo(f"{len(flagged)} of {len(tools)} tool(s) on `{svc}` have injection-shaped "
+                     "text in their metadata — review them before trusting the server.", **detail)
+    return _ok(f"No injection-shaped phrases found in the {len(tools)} tool description(s) on "
+               f"`{svc}`. Still verify external servers and pin their versions.", **detail)
+
+
 # --------------------------------------------------------------------------- Accelerator-only tests
 def t_external_provider_routing() -> TestResult:
     """Report which serving endpoints look like external-model providers routed through the
@@ -1368,6 +1746,212 @@ def t_external_provider_routing() -> TestResult:
                else "No external-provider-shaped endpoints found — add one behind a governed "
                     "endpoint to route Bedrock/OpenAI/Anthropic through the Gateway.")
     return _ok(summary, external_like=external[:25], total_endpoints=len(all_names))
+
+
+def _find_key_values(obj: Any) -> list[str]:
+    """Recursively collect string values held under credential-shaped keys (api_key / *_key /
+    secret). External-model configs nest the key under a provider block, so a top-level scan
+    misses it."""
+    out: list[str] = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            kl = str(k).lower()
+            if isinstance(v, str) and v and ("api_key" in kl or kl.endswith("_key")
+                                             or "secret" in kl):
+                out.append(v)
+            else:
+                out += _find_key_values(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            out += _find_key_values(v)
+    return out
+
+
+def t_provider_secret_readiness() -> TestResult:
+    """Provider credentials belong in Databricks secrets, never inline in endpoint config.
+
+    Lists the secret scopes present and inspects external-model endpoints for how their provider
+    API key is supplied. Databricks stores an external model's key as a secret reference
+    (`{{secrets/scope/key}}`); this reports which endpoints reference a secret. Read-only, and it
+    never reads a secret value. Never raises.
+    """
+    w = get_workspace_client()
+    try:
+        scopes = [s.name for s in w.secrets.list_scopes()]
+        scopes_err = None
+    except Exception as e:  # noqa: BLE001
+        scopes, scopes_err = [], str(e)[:200]
+    external = []
+    scanned = 0
+    truncated = False
+    SCAN_CAP = 75  # bound the per-endpoint GET fan-out on workspaces with many endpoints
+    try:
+        for e in w.serving_endpoints.list():
+            if scanned >= SCAN_CAP:
+                truncated = True
+                break
+            scanned += 1
+            try:
+                ep = w.serving_endpoints.get(e.name)
+            except Exception:  # noqa: BLE001
+                continue
+            for se in (getattr(getattr(ep, "config", None), "served_entities", None) or []):
+                em = getattr(se, "external_model", None)
+                if not em:
+                    continue
+                d = em.as_dict() if hasattr(em, "as_dict") else {}
+                # The key is nested under a provider config (openai_config.openai_api_key,
+                # amazon_bedrock_config.aws_secret_access_key, ...), so scan recursively rather
+                # than only the top level.
+                keyvals = _find_key_values(d)
+                ref = (any("{{secrets/" in v for v in keyvals) if keyvals else None)
+                external.append({"endpoint": e.name, "provider": d.get("provider"),
+                                 "api_key_is_secret_reference": ref})
+    except Exception as e:  # noqa: BLE001
+        return _fail("Could not inspect serving endpoints.", error=str(e)[:400],
+                     secret_scopes=scopes)
+    detail = {
+        "secret_scopes": scopes, "secret_scopes_error": scopes_err,
+        "external_model_endpoints": external,
+        "endpoints_scanned": scanned,
+        "scan_truncated": (f"stopped after {SCAN_CAP} endpoints" if truncated else False),
+        "how_to": ("databricks secrets create-scope <scope>; databricks secrets put-secret "
+                   "<scope> <key>; reference it as {{secrets/<scope>/<key>}} in the endpoint."),
+        "note": ("A read never returns the key value — a reference shows as {{secrets/...}}. "
+                 "Where a reference is not visible, confirm the key was supplied as a secret "
+                 "reference rather than pasted in."),
+    }
+    if not external:
+        return _todo("No external-model endpoints found. When you add one (Bedrock/OpenAI/"
+                     "Anthropic), supply the provider key as a secret reference, never inline.",
+                     **detail)
+    unconfirmed = [x for x in external if not x["api_key_is_secret_reference"]]
+    if unconfirmed:
+        return _todo(f"{len(external)} external-model endpoint(s); {len(unconfirmed)} without a "
+                     "visible secret reference for the provider key — confirm each was supplied "
+                     "as {{secrets/...}}.", **detail)
+    return _ok(f"{len(external)} external-model endpoint(s), all referencing a secret for the "
+               f"provider key; {len(scopes)} secret scope(s) present.", **detail)
+
+
+def t_workspace_binding_check() -> TestResult:
+    """Is the catalog of approved models bound ISOLATED, or open to every workspace?
+
+    Without `isolation_mode = ISOLATED` plus explicit workspace bindings, "approved models" is
+    advisory — any workspace on the metastore can bind the catalog and use what is in it. Reports
+    the configured catalog's isolation mode and, when ISOLATED, its bindings. Read-only.
+    """
+    catalog = get_config().get("catalog", {}).get("name")
+    if not catalog:
+        return _fail("No catalog configured (catalog.name).")
+    w = get_workspace_client()
+    try:
+        c = w.catalogs.get(catalog)
+    except Exception as e:  # noqa: BLE001
+        return _fail(f"Could not read catalog `{catalog}`.", error=str(e)[:300])
+    mode = str(getattr(c, "isolation_mode", "") or "")
+    isolated = "ISOLATED" in mode.upper()
+    bindings = []
+    if isolated:
+        try:
+            resp = w.api_client.do("GET",
+                                   f"/api/2.1/unity-catalog/bindings/catalog/{catalog}")
+            bindings = (resp or {}).get("bindings", []) or []
+        except Exception:  # noqa: BLE001
+            pass
+    detail = {"catalog": catalog, "isolation_mode": mode or "OPEN",
+              "workspace_bindings": bindings,
+              "why_this_matters": ("ISOLATED + explicit bindings is what makes approved-model "
+                    "access enforceable — otherwise any workspace on the metastore can bind the "
+                    "catalog and use what is in it.")}
+    if isolated:
+        return _ok(f"`{catalog}` is ISOLATED and bound to {len(bindings)} workspace(s) — access "
+                   "is enforced, not advisory.", **detail)
+    return _todo(f"`{catalog}` isolation is `{mode or 'OPEN'}` — open to every workspace on the "
+                 "metastore. Set isolation_mode=ISOLATED and bind the workspaces that may use it "
+                 "to make approved-model access enforceable.", **detail)
+
+
+def t_agent_versions() -> TestResult:
+    """A registered agent should be versioned and owned — not a one-off deploy.
+
+    Lists the registered models (agents) in the workshop schema with their version count and
+    owner. The pattern to repeat across the fleet: every agent is a UC model with an owner and a
+    version history, so it is reproducible and rollback-able.
+    """
+    cat, sch = _fq_schema()
+    w = get_workspace_client()
+    try:
+        models = list(w.registered_models.list(catalog_name=cat, schema_name=sch))
+    except Exception as e:  # noqa: BLE001
+        return _fail(f"Could not list registered models in `{cat}.{sch}`.", error=str(e)[:300])
+    if not models:
+        return _todo(f"No registered models in `{cat}.{sch}` yet. Register a representative agent "
+                     "as a UC model (previous step), then re-run.", schema=f"{cat}.{sch}")
+    out = []
+    for m in models[:20]:
+        try:
+            versions = len(list(w.model_versions.list(full_name=m.full_name)))
+        except Exception:  # noqa: BLE001
+            versions = 0
+        out.append({"model": m.full_name, "owner": getattr(m, "owner", None),
+                    "versions": versions})
+    versioned = [x for x in out if x["versions"] > 0]
+    detail = {"schema": f"{cat}.{sch}", "agents": out}
+    if not versioned:
+        return _todo(f"{len(out)} registered agent(s), but none have a logged version yet. Log a "
+                     "version (MLflow → UC model) so the agent is reproducible and rollback-able.",
+                     **detail)
+    return _ok(f"{len(versioned)}/{len(out)} registered agent(s) in `{cat}.{sch}` have version "
+               "history and an owner.", **detail)
+
+
+def t_agent_sp_attribution() -> TestResult:
+    """The agent-identity gap: do custom agent endpoints carry limits, guardrails, usage tracking?
+
+    Custom agent endpoints deployed on the gateway may lack the AI Gateway controls a model
+    endpoint has — rate limits, guardrails, usage tracking — and an agent's service principal may
+    not even be selectable in the rate-limit UI. Inspects agent-like serving endpoints (matched
+    by name) and reports which controls each has configured. Never raises.
+    """
+    w = get_workspace_client()
+    rows = []
+    try:
+        for e in w.serving_endpoints.list():
+            n = e.name or ""
+            if not any(k in n.lower() for k in ("agent", "assistant", "bot", "rag", "chain")):
+                continue
+            try:
+                ep = w.serving_endpoints.get(n)
+            except Exception:  # noqa: BLE001
+                continue
+            gw = getattr(ep, "ai_gateway", None)
+            rows.append({
+                "endpoint": n,
+                "usage_tracking": bool(getattr(gw, "usage_tracking_config", None)) if gw else False,
+                "rate_limits": bool(getattr(gw, "rate_limits", None)) if gw else False,
+                "guardrails": bool(getattr(gw, "guardrails", None)) if gw else False,
+                "inference_table": bool(getattr(gw, "inference_table_config", None)) if gw else False,
+            })
+    except Exception as e:  # noqa: BLE001
+        return _fail("Could not inspect serving endpoints.", error=str(e)[:300])
+    detail = {
+        "agent_like_endpoints": rows,
+        "why_this_matters": ("Where a control is missing, that agent's traffic is ungoverned — "
+                             "no per-user limit, no guardrail, no attribution."),
+        "note": ("Matched by name (agent/assistant/bot/rag/chain) — adjust for your naming. An "
+                 "agent's service principal may also not be selectable in the rate-limit UI yet."),
+    }
+    if not rows:
+        return _todo("No agent-like serving endpoints found by name. If your agent endpoints use "
+                     "a different naming scheme, check their AI Gateway config (rate limits, "
+                     "guardrails, usage tracking) directly.", **detail)
+    gaps = [r for r in rows if not (r["usage_tracking"] and r["rate_limits"])]
+    if gaps:
+        return _todo(f"{len(gaps)}/{len(rows)} agent-like endpoint(s) are missing rate limits "
+                     "and/or usage tracking — that traffic is not fully governed.", **detail)
+    return _ok(f"All {len(rows)} agent-like endpoint(s) have usage tracking and rate limits "
+               "configured.", **detail)
 
 
 def t_pii_safety_readiness() -> TestResult:
@@ -1406,6 +1990,109 @@ def t_pii_safety_readiness() -> TestResult:
                "review.", checks=checks, inference_table=table)
 
 
+def t_pii_mask_vs_block() -> TestResult:
+    """Show whether the PII guardrail BLOCKS the request or MASKS the PII in the response.
+
+    Sends a prompt that asks the model to echo a synthetic SSN, and classifies the outcome:
+      - block:       the request is refused (BLOCK mode)
+      - mask:        the model answers but the SSN is redacted/absent (MASK mode)
+      - passthrough: the SSN comes back intact (no PII guardrail on this path)
+    MASK is the more common production choice — it lets a benign request through with PII removed
+    rather than failing it. Never raises.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    ssn = "123-45-6789"
+    prompt = f"Repeat this back verbatim, exactly as written: 'reference {ssn} end'."
+    w = get_workspace_client()
+    try:
+        r = _classify_call(None, w.api_client.do(
+            "POST", routing.GATEWAY_CHAT_PATH,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            body={"model": name, "messages": [{"role": "user", "content": prompt}],
+                  "max_tokens": 64}))
+    except Exception as e:  # noqa: BLE001
+        r = _classify_call(e, None)
+    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": r["text"],
+              "finish_reason": r.get("finish_reason")}
+    if r["outcome"] == "not_found":
+        return _todo(f"Endpoint `{name}` not found — create it, attach a PII guardrail, then "
+                     "re-run.", endpoint=name, error=r["text"])
+    if r["outcome"] == "error":
+        return _fail("Could not run the PII probe.", endpoint=name, error=r["text"])
+    if r["blocked"]:
+        return _ok("PII guardrail is in BLOCK mode — the request was refused. Consider MASK for "
+                   "production: it lets a benign request through with the PII removed rather than "
+                   "failing it.", mode="block", **detail)
+    # Answered on HTTP 200. Only three things are certain enough to report as a pass or a fail:
+    if re.search(r"\d{3}-\d{2}-\d{4}", r["text"]):
+        return _todo("The SSN came back INTACT — no PII masking on this path. Attach a PII "
+                     "guardrail (MASK or BLOCK) on the endpoint and re-run.",
+                     mode="passthrough", **detail)
+    if re.search(r"(?i)redact|\bmask(ed)?\b|\bx{3,}\b|\*{3,}|#{3,}|\[(redacted|pii|ssn|removed|masked)\]",
+                 r["text"]):
+        return _ok("PII guardrail appears to be in MASK mode — the answer came back with the SSN "
+                   "redacted. Confirm the mask configuration on the endpoint.", mode="mask",
+                   **detail)
+    return _todo("The answer came back on HTTP 200 without the SSN and without an obvious "
+                 "redaction marker. This may be MASK, or the model simply declined to echo the "
+                 "SSN — confirm the PII guardrail (mask vs block) is configured on the endpoint "
+                 "rather than inferring it from the model's behavior.", mode="inconclusive",
+                 **detail)
+
+
+def t_guardrail_block_shape() -> TestResult:
+    """How is a block delivered — a 4xx error, or HTTP 200 with a refusal reason?
+
+    This matters for coding agents: they resend conversation history, so a 4xx block on one turn
+    can re-trigger on every later benign turn ("sticky block") until a new session starts. The
+    rolling fix returns HTTP 200 with a structured reason instead, which lets the client
+    continue. Reports which shape THIS account returns, and states the fail-closed rule: when a
+    policy/guardrail evaluation errors, the decision is DENY, never a silent allow. Never raises.
+    """
+    cfg = get_config().get("governed_endpoint", {})
+    name = cfg.get("name")
+    if not name:
+        return _fail("No governed_endpoint.name configured.")
+    blocked = (cfg.get("guardrails", {}).get("keyword_policy", {}).get("blocked_keywords")
+               or ["social security number"])[0]
+    prompt = f"My {blocked} is 123-45-6789, please store it."
+    note = ("Fail-closed: when a policy or guardrail evaluation errors, the gateway returns DENY, "
+            "never a silent allow.")
+    w = get_workspace_client()
+    try:
+        r = _classify_call(None, w.api_client.do(
+            "POST", routing.GATEWAY_CHAT_PATH,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            body={"model": name, "messages": [{"role": "user", "content": prompt}],
+                  "max_tokens": 64}))
+    except Exception as e:  # noqa: BLE001
+        r = _classify_call(e, None)
+    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": r["text"],
+              "finish_reason": r.get("finish_reason"), "note": note}
+    if r["outcome"] == "not_found":
+        return _todo(f"Endpoint `{name}` not found — create it, attach a guardrail, re-run.",
+                     endpoint=name, error=r["text"])
+    if r["outcome"] == "error":
+        return _fail("Could not run the block-shape probe.", endpoint=name, error=r["text"])
+    if r["blocked"] and r["via"] == "exception":
+        return _todo(
+            "Block delivered as a 4xx ERROR. Coding agents resend history, so a 4xx block can "
+            "'stick' across a session until a new one starts. If your account has the rolling "
+            "fix, blocks return HTTP 200 with a reason instead — confirm which behavior you have.",
+            shape="4xx_error", **detail)
+    if r["blocked"] and r["via"] == "http_200":
+        return _ok("Block delivered as HTTP 200 with a structured reason "
+                   f"(finish_reason={r.get('finish_reason')}) — the client-friendly shape. A "
+                   "coding agent can continue the session rather than getting stuck on a sticky "
+                   "4xx.", shape="200_with_reason", **detail)
+    return _todo("The prompt was NOT blocked (a normal answer on HTTP 200 with no filter "
+                 "finish_reason). Attach a PII/keyword guardrail on the endpoint, then re-run to "
+                 "see the block shape.", shape="not_blocked", **detail)
+
+
 REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
@@ -1430,9 +2117,18 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "list_registered_assets": t_list_registered_assets,
     "budget_status": t_budget_status,
     "coding_agent_usage": t_coding_agent_usage,
+    "coding_agent_route_check": t_coding_agent_route_check,
+    "path_coverage_check": t_path_coverage_check,
+    "rate_limit_429_demo": t_rate_limit_429_demo,
     "telemetry_readiness": t_telemetry_readiness,
     "external_provider_routing": t_external_provider_routing,
+    "provider_secret_readiness": t_provider_secret_readiness,
+    "workspace_binding_check": t_workspace_binding_check,
+    "agent_versions": t_agent_versions,
+    "agent_sp_attribution": t_agent_sp_attribution,
     "pii_safety_readiness": t_pii_safety_readiness,
+    "pii_mask_vs_block": t_pii_mask_vs_block,
+    "guardrail_block_shape": t_guardrail_block_shape,
     # MCP accelerator (three planes of MCP governance)
     "mcp_inventory": t_mcp_inventory,
     "mcp_managed_tools": t_mcp_managed_tools,
@@ -1443,6 +2139,8 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "mcp_policy_enforcement": t_mcp_policy_enforcement,
     "mcp_external_readiness": t_mcp_external_readiness,
     "mcp_telemetry": t_mcp_telemetry,
+    "mcp_readonly_enforcement": t_mcp_readonly_enforcement,
+    "mcp_tool_metadata_scan": t_mcp_tool_metadata_scan,
 }
 
 

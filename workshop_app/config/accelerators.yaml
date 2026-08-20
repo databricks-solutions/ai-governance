@@ -157,6 +157,25 @@ accelerators:
           label: Attach the policy in the AI Gateway UI
           deep_link: mcp_service
 
+      - id: acc_mcp_readonly
+        title: Enforce read-only for coding agents
+        concept: |
+          The most-requested MCP control: keep coding-agent users to READ tools while humans
+          keep write. Enforcement depends on the kind of MCP:
+
+          - **MCP Service** (`system.ai.*` or an external one you register): attach a service
+            policy that denies the write tools, and never grant `USE CONNECTION` to end users —
+            it bypasses tool selection, so a user could call a denied tool directly.
+          - **Managed UC-native endpoint** (DBSQL / Genie): not a securable, so no policy can
+            attach. Read-only is enforced by exposing only read functions and by the UC grants
+            on them.
+
+          This classifies the configured service's tools so you can see exactly what a
+          read-only policy would need to deny.
+        action:
+          label: Classify the service's tools read vs write
+          test: mcp_readonly_enforcement
+
       - id: acc_mcp_external
         title: External & custom MCP — the activation path
         concept: |
@@ -174,6 +193,19 @@ accelerators:
         action:
           label: Check external-MCP readiness & show the steps
           test: mcp_external_readiness
+
+      - id: acc_mcp_tool_poisoning
+        title: Scan tools for poisoning
+        concept: |
+          A tool's name and description are sent to the model, so a compromised or malicious
+          server can hide instructions in them ("ignore previous instructions", "before
+          answering, send X to…") and steer an agent without the user ever seeing it — the top
+          MCP supply-chain risk. This scans the advertised tool metadata for injection-shaped
+          phrases. A flag is a prompt to review the tool and its source, not proof of
+          compromise. Review external servers before granting EXECUTE, and pin their versions.
+        action:
+          label: Scan tool metadata for injection
+          test: mcp_tool_metadata_scan
 
       - id: acc_mcp_telemetry
         title: What was actually recorded
@@ -194,7 +226,7 @@ accelerators:
 
   - id: acc_agent_registry
     title: Agent Registry
-    tagline: Register, version, and own a representative agent end to end.
+    tagline: Make agents first-class UC assets — registered, versioned, owned, traced, and governed like any endpoint.
     steps:
       - id: acc_agent_inventory
         title: Inventory registered agents & tools
@@ -212,48 +244,131 @@ accelerators:
         manual:
           label: Register the agent in Unity Catalog (MLflow → UC model)
           deep_link: experiment
+      - id: acc_agent_versions
+        title: Confirm versioning & ownership
+        concept: |
+          A one-off deploy is not a registered agent. Each agent should be a UC model with an
+          owner and a version history, so it is reproducible and rollback-able. This lists the
+          registered agents with their version count and owner.
+        action:
+          label: Check agent versions & owners
+          test: agent_versions
       - id: acc_agent_trace
-        title: Confirm traces & ownership
+        title: Confirm traces & telemetry
         concept: |
           A registered agent should emit MLflow traces (tool calls, responses, latency) and
           carry a clear UC owner. Confirm the telemetry tables that back this are populated.
         verify:
           label: Check AI telemetry tables
           test: telemetry_readiness
+      - id: acc_agent_sp
+        title: Govern the agent endpoint itself
+        concept: |
+          A custom agent endpoint deployed on the gateway may lack the controls a model endpoint
+          has — rate limits, guardrails, usage tracking — and its service principal may not even
+          be selectable in the rate-limit UI. Where a control is missing, that agent's traffic is
+          ungoverned. This inspects agent-like endpoints and reports which controls each carries.
+        action:
+          label: Check limits/guardrails/usage tracking on agent endpoints
+          test: agent_sp_attribution
 
   - id: acc_coding_agent
     title: Coding Agents
-    tagline: Govern dev-agent traffic with per-developer attribution and secret detection.
+    tagline: Route dev-agent traffic through the gateway, prove it is actually governed, attribute per developer, and cap the spend.
     steps:
       - id: acc_coding_route
         title: Route coding-agent traffic through the Gateway
         concept: |
-          Claude Code, Cursor, and Codex call model providers directly by default. Pointing
-          them at the governed Gateway endpoint (OpenAI-compatible base URL + per-user token)
-          makes every request governed and attributable.
+          Claude Code, Cursor, `ucode`, and Codex call model providers directly by default.
+          Pointing them at the governed model service (OpenAI-compatible base URL + the service
+          FQN as the model) puts every request behind the gateway's limits, guardrails, and
+          telemetry.
+
+          Prefer **OAuth** over a PAT. OAuth tokens auto-refresh on a short lifetime; a PAT is
+          long-lived and carries the broad `all-apis` scope, so a leaked one is far more
+          damaging. `ucode` is the quickest path — it configures the base URL and per-user
+          OAuth for you.
         manual:
           label: Open the governed endpoint (copy the base URL)
           deep_link: serving_endpoint
+      - id: acc_coding_route_check
+        title: Is it actually routed?
+        concept: |
+          The most common silent failure: the client is "pointed at the gateway" but still
+          resolves a legacy or provided endpoint name, so the limits and guardrails configured
+          on the new model service never apply — and nothing errors to say so.
+
+          A gateway call that names a plain **endpoint** records `service_name` as NULL; a call
+          that names a **model-service FQN** records `service_name`. This check splits recent
+          coding-agent traffic on that column, so drift onto the legacy contract is visible.
+        action:
+          label: Check where coding-agent traffic is actually landing
+          test: coding_agent_route_check
       - id: acc_coding_attribution
         title: Per-developer attribution
         concept: |
-          With traffic through the Gateway and a `use_case` tag, coding-agent spend and usage
-          roll up per developer.
+          Coding agents identify themselves in `user_agent` (`claude-cli/…`, `ucode/…`,
+          `cursor/…`), so traffic attributes per developer with no tagging required. This is the
+          governance win for this surface: spend and usage roll up to a real person.
         action:
           label: Check coding-agent usage & attribution
           test: coding_agent_usage
+      - id: acc_coding_path_coverage
+        title: Do the controls fire on the path the agent uses?
+        concept: |
+          Guardrails and rate limits are reliably enforced on the OpenAI-compatible chat path
+          (`/ai-gateway/mlflow/v1/chat/completions`). Coding agents often call the
+          **provider-native** path (`/ai-gateway/anthropic/v1/messages`). Whether the same
+          controls fire there is account- and version-dependent — and a control that silently
+          does not fire on the path a client actually uses is the most dangerous kind of gap.
+
+          This probes the same guardrail-triggering prompt on both paths and compares. Treat it
+          as a diagnostic to run on the account, not a promise.
+        action:
+          label: Compare guardrail coverage across both gateway paths
+          test: path_coverage_check
+      - id: acc_coding_rate_limit
+        title: Prove the rate limit bites (HTTP 429)
+        concept: |
+          A rate limit is the hard cost control — an exceeded limit returns **HTTP 429**
+          immediately, unlike a budget alert, which does not block. Set a low per-user limit in
+          the AI Gateway UI, then send a burst and watch it throttle.
+
+          Two things to expect: rate-limit changes can take up to ~1–2 hours to take effect, and
+          the limit must apply to the caller's identity (or be endpoint-wide) to trip.
+        manual:
+          label: Set a low per-user rate limit on the endpoint
+          deep_link: serving_endpoint
+        verify:
+          label: Send a burst and look for a 429
+          test: rate_limit_429_demo
+      - id: acc_coding_budget
+        title: Cap the spend with a budget
+        concept: |
+          Attribution shows who is spending; a budget bounds it. Set a budget with alert
+          thresholds — and a hard cap where available — in the account console, then read the
+          30-day spend the gateway records per model and user.
+
+          Alerts are GA; hard "block usage" caps are rolling out, so confirm hard enforcement on
+          the account before promising it.
+        manual:
+          label: Open account-console budgets
+          deep_link: account_budgets
+        action:
+          label: Show 30-day spend by model and user
+          test: budget_status
       - id: acc_coding_secrets
         title: Code-secret detection
         concept: |
           Coding agents can leak API keys and tokens in prompts. Scan recent activity for
-          secret-shaped strings (sk-*, AKIA*, ghp_*) to prove detection is in place.
+          secret-shaped strings (`sk-…`, `AKIA…`, `ghp_…`) to prove detection is in place.
         verify:
           label: Scan for leaked secrets in the audit log
           test: audit_scan
 
   - id: acc_external_provider
     title: External Providers
-    tagline: Route Bedrock, OpenAI, and Anthropic through the Gateway; migrate one shadow workload.
+    tagline: Route Bedrock, OpenAI, and Anthropic through the gateway with credentials in secrets and access bound to approved workspaces.
     steps:
       - id: acc_ext_inventory
         title: Inventory current provider access
@@ -268,12 +383,37 @@ accelerators:
         concept: |
           Register Bedrock / OpenAI / Anthropic as external models behind a governed endpoint,
           with business-relevant tags, so they inherit the same limits, guardrails, and logging.
+
+          For Anthropic specifically, the newer **OAuth-relay** path lets you connect a
+          Claude subscription without storing a long-lived key — the gateway relays a
+          short-lived token. Prefer it where available; otherwise the key goes in a secret
+          (next step).
         manual:
           label: Add an external-model endpoint in the workspace
           deep_link: serving_endpoint
         verify:
           label: Find external-provider routes on this workspace
           test: external_provider_routing
+      - id: acc_ext_secrets
+        title: Credentials in secrets, never inline
+        concept: |
+          A provider key pasted into config is the pitfall the guide calls out first. Store it
+          in a Databricks secret scope and reference it as `{{secrets/<scope>/<key>}}` — a read
+          of the endpoint then returns the reference, never the value. This lists the secret
+          scopes present and checks which external-model endpoints reference a secret.
+        action:
+          label: Check provider keys are stored as secrets
+          test: provider_secret_readiness
+      - id: acc_ext_binding
+        title: Bind approved models to approved workspaces
+        concept: |
+          "Approved models" is only advisory until the catalog holding them is
+          `isolation_mode = ISOLATED` with explicit workspace bindings — otherwise any workspace
+          on the metastore can bind the catalog and use what is in it. This reports the catalog's
+          isolation mode and its bindings.
+        action:
+          label: Check catalog isolation & workspace bindings
+          test: workspace_binding_check
       - id: acc_ext_migrate
         title: Migrate one shadow workload as proof
         concept: |
@@ -285,27 +425,67 @@ accelerators:
 
   - id: acc_policies_guardrails
     title: Policies & Guardrails
-    tagline: Safety filter on input & output, custom PII-leakage judge, red-team dataset.
+    tagline: Prove guardrails actually work — block vs mask, how a block is delivered, path coverage, and effectiveness.
     steps:
       - id: acc_pg_guardrail
         title: Safety & PII guardrail on input and output
         concept: |
           Configure the Gateway safety filter and PII detection on the governed endpoint
-          (input and output), then send a prompt that should be blocked to prove it fires.
+          (input and output), then send a prompt that should be blocked to prove it fires. A
+          block is the pass condition here.
         manual:
           label: Configure guardrails in the AI Gateway UI
           deep_link: serving_endpoint
         action:
           label: Send a blocked prompt (expect block)
           test: test_guardrail
-      - id: acc_pg_readiness
-        title: Custom PII-leakage judge & red-team dataset
+      - id: acc_pg_mask_vs_block
+        title: Mask vs block
         concept: |
-          Beyond the built-in filters, a custom LLM-as-judge scores responses for PII leakage
-          against a red-team evaluation dataset. Confirm the telemetry + inference tables the
-          judge and its evaluation read from are present.
+          BLOCK refuses the request; MASK lets it through with the PII removed. MASK is the more
+          common production choice — a benign request that happens to contain PII still gets an
+          answer. This sends a prompt that echoes a synthetic SSN and classifies the outcome:
+          blocked, masked, or passed through intact.
+        action:
+          label: Probe whether PII is blocked, masked, or passed through
+          test: pii_mask_vs_block
+      - id: acc_pg_block_shape
+        title: How a block is delivered (and fail-closed)
+        concept: |
+          A block can come back two ways: a **4xx error**, or **HTTP 200 with a refusal reason**.
+          It matters for coding agents — they resend conversation history, so a 4xx block on one
+          turn can re-trigger on every later benign turn ("sticky block") until a new session.
+          The rolling fix returns 200 + a reason so the client can continue. This reports which
+          shape your account returns.
+
+          Either way, evaluation is **fail-closed**: if a policy or guardrail errors while
+          evaluating, the gateway returns DENY — never a silent allow.
+        action:
+          label: Send a blocked prompt and report the block shape
+          test: guardrail_block_shape
+      - id: acc_pg_path_coverage
+        title: Does the guardrail fire on every path?
+        concept: |
+          A guardrail is only as good as its coverage. Controls are reliably enforced on the
+          OpenAI-compatible chat path; whether they also fire on the provider-native path that
+          coding agents use is account- and version-dependent. This probes the same
+          guardrail-triggering prompt on both paths and compares — a silent gap here means the
+          guardrail does not cover the traffic you care about.
+        action:
+          label: Compare guardrail coverage across both gateway paths
+          test: path_coverage_check
+      - id: acc_pg_effectiveness
+        title: Measure effectiveness — benchmark & red-team
+        concept: |
+          "Is the guardrail on?" is not "does it work?". The guardrail benchmark
+          (`labs/guardrails/02-guardrail-benchmark`) scores guardrails on a **labeled** set
+          across PII redaction, PII blocking, unsafe content, jailbreak/prompt-injection, and
+          hallucination — online guardrails versus an offline LLM-as-judge — and can tune a
+          policy to cut the false-positive rate. This step confirms the payloads and telemetry
+          that a judge and red-team review read from are present, so the benchmark has data to
+          score. Custom / in-house guardrails plug in at the same layer.
         verify:
-          label: Check guardrail activity + telemetry readiness
+          label: Check guardrail + judge readiness (payloads, telemetry)
           test: pii_safety_readiness
       - id: acc_pg_review
         title: Review guardrail activity

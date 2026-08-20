@@ -24,8 +24,19 @@ export interface Pillar {
   tagline: string;
   steps: Step[];
 }
+export interface DeployStep {
+  do: string;
+  cmd?: string;
+  ensure?: string;
+}
+export interface DeployGuide {
+  title: string;
+  intro?: string;
+  steps: DeployStep[];
+  footer?: string;
+}
 export interface Workshop {
-  intro: { title: string; body: string };
+  intro: { title: string; body: string; deploy?: DeployGuide };
   pillars: Pillar[];
 }
 
@@ -86,10 +97,9 @@ export const api = {
   workshop: () => fetch("/api/workshop").then((r) => j<Workshop>(r)),
   accelerators: () => fetch("/api/accelerators").then((r) => j<Accelerators>(r)),
   faq: () => fetch("/api/faq").then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))),
-  progress: (sfid: string) => fetch(`/api/progress/${encodeURIComponent(sfid)}`).then((r) => j<ProgressMap>(r)),
+  progress: () => fetch("/api/progress").then((r) => j<ProgressMap>(r)),
   runTest: (body: {
     test: string;
-    customer_sfid: string;
     step_id: string;
     pillar_id: string;
     kind?: string;
@@ -99,7 +109,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => j<TestResult>(r)),
-  setProgress: (body: { customer_sfid: string; step_id: string; pillar_id: string; status: string; notes?: string }) =>
+  setProgress: (body: { step_id: string; pillar_id: string; status: string; notes?: string }) =>
     fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -108,16 +118,12 @@ export const api = {
 
   prerequisites: () => fetch("/api/prerequisites").then((r) => j<Prerequisites>(r)),
 
-  // Export — build the URLs the browser downloads (outcomes JSON + Markdown report).
-  exportUrl: (kind: "outcomes" | "report", sfid: string) => {
-    const q = new URLSearchParams({ customer_sfid: sfid });
-    return `/api/export/${kind}?${q.toString()}`;
-  },
+  // Export — the URLs the browser downloads (outcomes JSON + Markdown report).
+  exportUrl: (kind: "outcomes" | "report") => `/api/export/${kind}`,
 
   // PDFs are generated server-side and set their own Content-Disposition filename, so these
   // URLs are navigated to rather than fetched.
-  reportPdfUrl: (sfid: string) =>
-    `/api/export/report.pdf?${new URLSearchParams({ customer_sfid: sfid }).toString()}`,
+  reportPdfUrl: () => "/api/export/report.pdf",
   prerequisitesPdfUrl: (customerName?: string) =>
     "/api/export/prerequisites.pdf" +
     (customerName ? `?${new URLSearchParams({ customer_name: customerName }).toString()}` : ""),

@@ -1,8 +1,9 @@
 """Progress store — a static JSON file on a Unity Catalog volume.
 
-Replaces the old Lakebase (Postgres) store. A workshop tracks a handful of steps against one
-Account ID; that does not need a database. Progress lives in a single JSON file on a UC volume
-(created by the asset bundle), read into memory at startup and rewritten on every update.
+Replaces the old Lakebase (Postgres) store. The app is deployed once per workshop and tracks a
+handful of steps for that one deployment; that does not need a database. Progress lives in a
+single JSON file on a UC volume (created by the asset bundle), read into memory at startup and
+rewritten on every update.
 
 Why a volume, not a database: the customer ships this in their OWN workspace to try the
 platform out, and a Postgres instance to provision — wait for AVAILABLE, grant CONNECT on,
@@ -11,7 +12,7 @@ carries the same Unity Catalog grants as the workshop schema, and has no separat
 
 Durability model: single-writer, write-through. A Databricks App runs as one process, so an
 in-memory dict is the source of truth for reads; every write updates it and rewrites the whole
-file (it is tiny — one object per account per step). If the volume is briefly unreachable the
+file (it is tiny — one object per step). If the volume is briefly unreachable the
 workshop keeps running on the in-memory copy and the next write retries the persist. Losing
 saved progress is recoverable; losing the app is not — so nothing here ever raises to a caller.
 """
@@ -32,8 +33,8 @@ log = logging.getLogger("uvicorn.error")
 # attendees can never interleave a half-serialized file.
 _LOCK = threading.RLock()
 
-# {customer_sfid: {step_id: {pillar_id, status, last_result, notes, updated_by, updated_at}}}
-_MEM: dict[str, dict[str, dict[str, Any]]] = {}
+# {step_id: {pillar_id, status, last_result, notes, updated_by, updated_at}}
+_MEM: dict[str, dict[str, Any]] = {}
 
 
 def _vol_cfg() -> dict:
@@ -71,8 +72,19 @@ def load() -> None:
             data = json.loads(raw) if raw else {}
             _MEM.clear()
             if isinstance(data, dict):
-                _MEM.update(data)
-            log.info("Progress store loaded from %s (%d account(s)).", path, len(_MEM))
+                # New format is flat: {step_id: {status, pillar_id, ...}}. An older file may be
+                # nested by account ({account_id: {step_id: {...}}}); flatten it (merge all
+                # accounts, last writer wins) so an in-place upgrade does not lose progress.
+                is_flat = all(isinstance(v, dict) and "status" in v for v in data.values())
+                if is_flat:
+                    _MEM.update(data)
+                else:
+                    for acct in data.values():
+                        if isinstance(acct, dict):
+                            for step_id, rec in acct.items():
+                                if isinstance(rec, dict):
+                                    _MEM[step_id] = rec
+            log.info("Progress store loaded from %s (%d step(s)).", path, len(_MEM))
         except Exception as e:  # noqa: BLE001 — any failure just means we start empty
             log.info("Progress store starting empty (%s).", str(e)[:200])
 
@@ -88,14 +100,13 @@ def _persist() -> None:
         log.warning("Could not persist progress to the volume (kept in memory): %s", str(e)[:200])
 
 
-def get(customer_sfid: str) -> dict[str, dict[str, Any]]:
-    """{step_id: record} for one account. A copy, so callers cannot mutate the store."""
+def get() -> dict[str, dict[str, Any]]:
+    """{step_id: record} for this workshop. A copy, so callers cannot mutate the store."""
     with _LOCK:
-        return json.loads(json.dumps(_MEM.get(customer_sfid, {})))
+        return json.loads(json.dumps(_MEM))
 
 
 def save(
-    customer_sfid: str,
     step_id: str,
     pillar_id: str,
     status: str,
@@ -103,15 +114,14 @@ def save(
     updated_by: str | None = None,
     notes: str | None = None,
 ) -> None:
-    """Upsert one (account, step). Write-through: update memory, then rewrite the file.
+    """Upsert one step. Write-through: update memory, then rewrite the file.
 
     COALESCE semantics match the old SQL: a progress-only update (result/notes = None) keeps
     the previous Try-It result and notes rather than clearing them.
     """
     with _LOCK:
-        acct = _MEM.setdefault(customer_sfid, {})
-        prev = acct.get(step_id, {})
-        acct[step_id] = {
+        prev = _MEM.get(step_id, {})
+        _MEM[step_id] = {
             "pillar_id": pillar_id,
             "status": status,
             "last_result": result if result is not None else prev.get("last_result"),

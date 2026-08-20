@@ -2,9 +2,8 @@ import { Layers, Lock, DollarSign, ArrowRight, Rocket, FileDown } from "lucide-r
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
 import ExportPanel from "@/components/ExportPanel";
-import Markdown from "@/components/Markdown";
-import { api, type Pillar, type ProgressMap } from "@/lib/api";
-import { useAccount } from "@/lib/account";
+import Markdown, { inline } from "@/components/Markdown";
+import { api, type Pillar, type ProgressMap, type DeployGuide } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 const ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
@@ -17,36 +16,19 @@ export default function Intro({
   progress,
   go,
 }: {
-  intro: { title: string; body: string };
+  intro: { title: string; body: string; deploy?: DeployGuide };
   pillars: Pillar[];
   accelOverview?: { title: string; body: string };
   accelerators?: Pillar[];
   progress: ProgressMap;
   go: (r: string) => void;
 }) {
-  const { sfid, setSfid } = useAccount();
   return (
     <>
-      <PageHeader title={intro.title}>
-        <div className="mt-6">
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Account ID</span>
-            <input
-              value={sfid}
-              onChange={(e) => setSfid(e.target.value)}
-              placeholder="0016100001Qcv4uAAB"
-              className="mt-1.5 block w-72 rounded-xl border border-navy/15 bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-navy"
-            />
-          </label>
-          <p className="mt-2 max-w-xl text-xs text-muted">
-            The whole workshop is tracked against this account, and progress and the outcomes export are keyed
-            to it. {!sfid && <span className="text-lava">Set it before running steps.</span>}
-          </p>
-        </div>
-      </PageHeader>
+      <PageHeader title={intro.title} />
       <div className="mx-auto max-w-4xl space-y-12 px-8 py-12 lg:px-14">
         {/* The invite artifact: a one-page overview to share with people BEFORE they open the
-            app — hence it lives at the top of the landing page and needs no Account ID. */}
+            app — hence it lives at the top of the landing page. */}
         <section className="flex flex-col gap-4 rounded-2xl border border-lava/20 bg-oat p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-navy">Inviting people to the workshop?</h2>
@@ -137,6 +119,13 @@ export default function Intro({
           </section>
         )}
 
+        {intro.deploy && (
+          <section>
+            <Eyebrow>Deploy</Eyebrow>
+            <DeploySection guide={intro.deploy} />
+          </section>
+        )}
+
         <section>
           <Eyebrow>What the app needs from your workspace</Eyebrow>
           <GrantsExplainer go={go} />
@@ -148,6 +137,46 @@ export default function Intro({
         </section>
       </div>
     </>
+  );
+}
+
+// The deploy guide: a numbered "do this / ensure this" walkthrough driven by config
+// (steps.yaml → intro.deploy). `do` and `ensure` render inline markdown; `cmd` is verbatim.
+function DeploySection({ guide }: { guide: DeployGuide }) {
+  return (
+    <div className="rounded-2xl border border-navy/10 bg-white p-6">
+      <h3 className="font-semibold text-navy">{guide.title}</h3>
+      {guide.intro && (
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">{guide.intro}</p>
+      )}
+      <ol className="mt-5 space-y-5">
+        {guide.steps.map((s, i) => (
+          <li key={i} className="flex gap-3.5">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-semibold text-white">
+              {i + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div
+                className="text-sm leading-relaxed text-navy"
+                dangerouslySetInnerHTML={{ __html: inline(s.do) }}
+              />
+              {s.cmd && (
+                <pre className="mt-2 overflow-x-auto rounded-lg bg-navy/[0.04] p-3 text-[11.5px] leading-relaxed text-navy/85">
+                  {s.cmd.trimEnd()}
+                </pre>
+              )}
+              {s.ensure && (
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  <span className="font-semibold text-navy">Ensure: </span>
+                  <span dangerouslySetInnerHTML={{ __html: inline(s.ensure) }} />
+                </p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+      {guide.footer && <p className="mt-5 text-xs leading-relaxed text-muted">{guide.footer}</p>}
+    </div>
   );
 }
 
