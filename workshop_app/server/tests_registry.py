@@ -589,6 +589,56 @@ def t_verify_governed_endpoint() -> TestResult:
     )
 
 
+# A guardrail/policy block surfaces two ways, and the probe tests must classify them the SAME
+# way or they contradict each other: a 4xx EXCEPTION carrying guardrail wording, or an HTTP 200
+# whose body is a structured refusal (finish_reason marks a filter). One signal list, one
+# classifier, so every test agrees.
+_GUARDRAIL_SIGNALS = ("guardrail", "blocked", "policy", "content filter", "content_filter",
+                      "invalid_keywords", "flagged")
+_BLOCK_FINISH_REASONS = ("content_filter", "content_filtered", "guardrail")
+
+
+def _msg_is_guardrail(text: str) -> bool:
+    low = (text or "").lower()
+    return any(s in low for s in _GUARDRAIL_SIGNALS)
+
+
+def _msg_is_missing(text: str) -> bool:
+    low = (text or "").lower()
+    return any(s in low for s in ("does not exist", "not found", "404",
+                                  "resource_does_not_exist"))
+
+
+def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
+    """Classify a model-call outcome for guardrail probes, consistently across tests.
+
+    Returns {outcome, blocked, via, text, finish_reason} where outcome is one of
+    'blocked' | 'answered' | 'error' | 'not_found'. A block is recognized ONLY from a 4xx
+    exception carrying guardrail wording, or a 200 whose finish_reason marks a filter — never by
+    guessing from refusal-sounding words in the answer text, which yields false positives.
+    """
+    if exc is not None:
+        if _msg_is_missing(str(exc)):
+            return {"outcome": "not_found", "blocked": None, "via": None,
+                    "text": str(exc)[:300], "finish_reason": None}
+        if _msg_is_guardrail(str(exc)):
+            return {"outcome": "blocked", "blocked": True, "via": "exception",
+                    "text": str(exc)[:300], "finish_reason": None}
+        return {"outcome": "error", "blocked": None, "via": None,
+                "text": str(exc)[:300], "finish_reason": None}
+    choices = (resp or {}).get("choices") or []
+    message = (choices[0].get("message") or {}) if choices else {}
+    content = message.get("content")
+    text = (content if isinstance(content, str)
+            else json.dumps(content) if content is not None else "")
+    finish = choices[0].get("finish_reason") if choices else None
+    if finish and str(finish).lower() in _BLOCK_FINISH_REASONS:
+        return {"outcome": "blocked", "blocked": True, "via": "http_200",
+                "text": text[:300], "finish_reason": finish}
+    return {"outcome": "answered", "blocked": False, "via": "http_200",
+            "text": text[:300], "finish_reason": finish}
+
+
 def t_test_guardrail() -> TestResult:
     """Send a prompt containing a blocked keyword to the governed endpoint; expect a block.
 
@@ -620,12 +670,10 @@ def t_test_guardrail() -> TestResult:
     except Exception as e:
         msg = str(e)
         low = msg.lower()
-        if any(s in low for s in ("guardrail", "blocked", "policy", "content filter",
-                                  "invalid_keywords", "flagged")):
+        if _msg_is_guardrail(low):
             return _ok("Guardrail fired — the request was blocked as expected.",
                        endpoint=name, prompt=prompt, error=msg[:400])
-        if any(s in low for s in ("does not exist", "not found", "404",
-                                  "resource_does_not_exist")):
+        if _msg_is_missing(low):
             return _todo(f"Endpoint `{name}` does not exist yet — create it, attach the "
                          "guardrail, then re-run.", endpoint=name, error=msg[:400])
         return _fail("Could not run the guardrail test.", endpoint=name, error=msg[:600])
@@ -1084,28 +1132,21 @@ def t_path_coverage_check() -> TestResult:
     prompt = f"My {blocked} is 123-45-6789, please store it."
     w = get_workspace_client()
 
-    def _classify(send) -> dict:
+    def _probe(path: str, body: dict, extra_headers: dict | None = None) -> dict:
+        headers = {"Content-Type": "application/json", "Accept": "application/json",
+                   **(extra_headers or {})}
         try:
-            send()
-            return {"outcome": "answered", "blocked": False}
+            return _classify_call(None, w.api_client.do("POST", path, headers=headers, body=body))
         except Exception as e:  # noqa: BLE001 — classify the failure, never propagate it
-            low = str(e).lower()
-            if any(s in low for s in ("guardrail", "blocked", "policy", "content filter",
-                                      "flagged")):
-                return {"outcome": "blocked", "blocked": True, "detail": str(e)[:200]}
-            return {"outcome": "error", "blocked": None, "detail": str(e)[:200]}
+            return _classify_call(e, None)
 
-    chat = _classify(lambda: w.api_client.do(
-        "POST", routing.GATEWAY_CHAT_PATH,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
-        body={"model": name, "messages": [{"role": "user", "content": prompt}],
-              "max_tokens": 16}))
-    anthropic = _classify(lambda: w.api_client.do(
-        "POST", ANTHROPIC_MESSAGES_PATH,
-        headers={"Content-Type": "application/json", "Accept": "application/json",
-                 "anthropic-version": "2023-06-01"},
-        body={"model": name, "max_tokens": 16,
-              "messages": [{"role": "user", "content": prompt}]}))
+    chat = _probe(routing.GATEWAY_CHAT_PATH,
+                  {"model": name, "messages": [{"role": "user", "content": prompt}],
+                   "max_tokens": 16})
+    anthropic = _probe(ANTHROPIC_MESSAGES_PATH,
+                       {"model": name, "max_tokens": 16,
+                        "messages": [{"role": "user", "content": prompt}]},
+                       {"anthropic-version": "2023-06-01"})
     detail = {
         "endpoint": name, "probe_prompt": prompt,
         "chat_completions_path": {"path": routing.GATEWAY_CHAT_PATH, **chat},
@@ -1117,9 +1158,10 @@ def t_path_coverage_check() -> TestResult:
     }
     if chat["blocked"] and anthropic["outcome"] == "answered":
         return _todo(
-            "Silent gap: the guardrail BLOCKED on the chat path but the provider-native "
-            "(anthropic) path ANSWERED. Controls do not cover the path coding agents use — "
-            "confirm with your account team.", **detail)
+            "Possible silent gap: the guardrail BLOCKED on the chat path, but the "
+            "provider-native (anthropic) path returned an ANSWER (no filter finish_reason). That "
+            "suggests the control does not cover the path coding agents use — confirm on this "
+            "account before relying on it.", **detail)
     if chat["blocked"] and anthropic["blocked"]:
         return _ok("Guardrail fired on BOTH the chat path and the provider-native path — "
                    "coverage is consistent.", **detail)
@@ -1740,8 +1782,15 @@ def t_provider_secret_readiness() -> TestResult:
     except Exception as e:  # noqa: BLE001
         scopes, scopes_err = [], str(e)[:200]
     external = []
+    scanned = 0
+    truncated = False
+    SCAN_CAP = 75  # bound the per-endpoint GET fan-out on workspaces with many endpoints
     try:
         for e in w.serving_endpoints.list():
+            if scanned >= SCAN_CAP:
+                truncated = True
+                break
+            scanned += 1
             try:
                 ep = w.serving_endpoints.get(e.name)
             except Exception:  # noqa: BLE001
@@ -1764,6 +1813,8 @@ def t_provider_secret_readiness() -> TestResult:
     detail = {
         "secret_scopes": scopes, "secret_scopes_error": scopes_err,
         "external_model_endpoints": external,
+        "endpoints_scanned": scanned,
+        "scan_truncated": (f"stopped after {SCAN_CAP} endpoints" if truncated else False),
         "how_to": ("databricks secrets create-scope <scope>; databricks secrets put-secret "
                    "<scope> <key>; reference it as {{secrets/<scope>/<key>}} in the endpoint."),
         "note": ("A read never returns the key value — a reference shows as {{secrets/...}}. "
@@ -1957,32 +2008,39 @@ def t_pii_mask_vs_block() -> TestResult:
     prompt = f"Repeat this back verbatim, exactly as written: 'reference {ssn} end'."
     w = get_workspace_client()
     try:
-        resp = w.api_client.do(
+        r = _classify_call(None, w.api_client.do(
             "POST", routing.GATEWAY_CHAT_PATH,
             headers={"Content-Type": "application/json", "Accept": "application/json"},
             body={"model": name, "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": 64})
+                  "max_tokens": 64}))
     except Exception as e:  # noqa: BLE001
-        low = str(e).lower()
-        if any(s in low for s in ("guardrail", "blocked", "policy", "content filter", "flagged")):
-            return _ok("PII guardrail is in BLOCK mode — the request was refused. Consider MASK "
-                       "for production: it lets a benign request through with the PII removed "
-                       "rather than failing it.",
-                       mode="block", endpoint=name, prompt=prompt, detail=str(e)[:300])
-        if any(s in low for s in ("does not exist", "not found", "404")):
-            return _todo(f"Endpoint `{name}` not found — create it, attach a PII guardrail, then "
-                         "re-run.", endpoint=name, error=str(e)[:300])
-        return _fail("Could not run the PII probe.", endpoint=name, error=str(e)[:400])
-    choices = (resp or {}).get("choices") or []
-    answer = ((choices[0].get("message") or {}).get("content") if choices else "") or ""
-    answer_text = answer if isinstance(answer, str) else json.dumps(answer)
-    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": answer_text[:300]}
-    if re.search(r"\d{3}-\d{2}-\d{4}", answer_text):
+        r = _classify_call(e, None)
+    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": r["text"],
+              "finish_reason": r.get("finish_reason")}
+    if r["outcome"] == "not_found":
+        return _todo(f"Endpoint `{name}` not found — create it, attach a PII guardrail, then "
+                     "re-run.", endpoint=name, error=r["text"])
+    if r["outcome"] == "error":
+        return _fail("Could not run the PII probe.", endpoint=name, error=r["text"])
+    if r["blocked"]:
+        return _ok("PII guardrail is in BLOCK mode — the request was refused. Consider MASK for "
+                   "production: it lets a benign request through with the PII removed rather than "
+                   "failing it.", mode="block", **detail)
+    # Answered on HTTP 200. Only three things are certain enough to report as a pass or a fail:
+    if re.search(r"\d{3}-\d{2}-\d{4}", r["text"]):
         return _todo("The SSN came back INTACT — no PII masking on this path. Attach a PII "
                      "guardrail (MASK or BLOCK) on the endpoint and re-run.",
                      mode="passthrough", **detail)
-    return _ok("PII guardrail is in MASK mode — the request was answered with the SSN "
-               "removed/redacted. This is the common production choice.", mode="mask", **detail)
+    if re.search(r"(?i)redact|\bmask(ed)?\b|\bx{3,}\b|\*{3,}|#{3,}|\[(redacted|pii|ssn|removed|masked)\]",
+                 r["text"]):
+        return _ok("PII guardrail appears to be in MASK mode — the answer came back with the SSN "
+                   "redacted. Confirm the mask configuration on the endpoint.", mode="mask",
+                   **detail)
+    return _todo("The answer came back on HTTP 200 without the SSN and without an obvious "
+                 "redaction marker. This may be MASK, or the model simply declined to echo the "
+                 "SSN — confirm the PII guardrail (mask vs block) is configured on the endpoint "
+                 "rather than inferring it from the model's behavior.", mode="inconclusive",
+                 **detail)
 
 
 def t_guardrail_block_shape() -> TestResult:
@@ -2005,41 +2063,34 @@ def t_guardrail_block_shape() -> TestResult:
             "never a silent allow.")
     w = get_workspace_client()
     try:
-        resp = w.api_client.do(
+        r = _classify_call(None, w.api_client.do(
             "POST", routing.GATEWAY_CHAT_PATH,
             headers={"Content-Type": "application/json", "Accept": "application/json"},
             body={"model": name, "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": 64})
+                  "max_tokens": 64}))
     except Exception as e:  # noqa: BLE001
-        low = str(e).lower()
-        if any(s in low for s in ("guardrail", "blocked", "policy", "content filter", "flagged")):
-            return _todo(
-                "Block delivered as a 4xx ERROR. Coding agents resend history, so a 4xx block "
-                "can 'stick' across a session until a new one starts. If your account has the "
-                "rolling fix, blocks return HTTP 200 with a reason instead — confirm which "
-                "behavior you have.",
-                shape="4xx_error", endpoint=name, prompt=prompt, detail=str(e)[:300], note=note)
-        if any(s in low for s in ("does not exist", "not found", "404")):
-            return _todo(f"Endpoint `{name}` not found — create it, attach a guardrail, re-run.",
-                         endpoint=name, error=str(e)[:300])
-        return _fail("Could not run the block-shape probe.", endpoint=name, error=str(e)[:400])
-    choices = (resp or {}).get("choices") or []
-    answer = ((choices[0].get("message") or {}).get("content") if choices else "") or ""
-    answer_text = answer if isinstance(answer, str) else json.dumps(answer)
-    finish = choices[0].get("finish_reason") if choices else None
-    refused = (finish in ("content_filter", "guardrail")) or any(
-        s in answer_text.lower() for s in
-        ("can't help", "cannot help", "can not help", "won't", "not able to",
-         "against policy", "blocked", "i'm unable", "i am unable"))
-    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": answer_text[:300],
-              "finish_reason": finish, "note": note}
-    if refused:
-        return _ok("Block delivered as HTTP 200 with a refusal reason — the client-friendly "
-                   "shape. A coding agent can continue the session rather than getting stuck on "
-                   "a sticky 4xx.", shape="200_with_reason", **detail)
-    return _todo("The prompt was NOT blocked (a normal answer came back on HTTP 200). Attach a "
-                 "PII/keyword guardrail on the endpoint, then re-run to see the block shape.",
-                 shape="not_blocked", **detail)
+        r = _classify_call(e, None)
+    detail = {"endpoint": name, "prompt": prompt, "response_excerpt": r["text"],
+              "finish_reason": r.get("finish_reason"), "note": note}
+    if r["outcome"] == "not_found":
+        return _todo(f"Endpoint `{name}` not found — create it, attach a guardrail, re-run.",
+                     endpoint=name, error=r["text"])
+    if r["outcome"] == "error":
+        return _fail("Could not run the block-shape probe.", endpoint=name, error=r["text"])
+    if r["blocked"] and r["via"] == "exception":
+        return _todo(
+            "Block delivered as a 4xx ERROR. Coding agents resend history, so a 4xx block can "
+            "'stick' across a session until a new one starts. If your account has the rolling "
+            "fix, blocks return HTTP 200 with a reason instead — confirm which behavior you have.",
+            shape="4xx_error", **detail)
+    if r["blocked"] and r["via"] == "http_200":
+        return _ok("Block delivered as HTTP 200 with a structured reason "
+                   f"(finish_reason={r.get('finish_reason')}) — the client-friendly shape. A "
+                   "coding agent can continue the session rather than getting stuck on a sticky "
+                   "4xx.", shape="200_with_reason", **detail)
+    return _todo("The prompt was NOT blocked (a normal answer on HTTP 200 with no filter "
+                 "finish_reason). Attach a PII/keyword guardrail on the endpoint, then re-run to "
+                 "see the block shape.", shape="not_blocked", **detail)
 
 
 REGISTRY: dict[str, Callable[[], TestResult]] = {
