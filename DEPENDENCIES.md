@@ -4,9 +4,9 @@ This repository ships two distributables, each with its own dependency set:
 
 - **`workshop_app/`** — the customer-facing AI Governance Workshop app (FastAPI backend +
   React/Vite frontend).
-- **`labs/`** — Databricks notebooks. Each notebook `%pip install`s its own dependencies at
-  runtime, so the repo pins no lab runtime dependencies; the top-level `pyproject.toml` only
-  configures `ruff` for local linting.
+- **`accelerators/`** — Databricks reference notebooks. Each notebook `%pip install`s its own
+  dependencies at runtime, so the repo pins no notebook runtime dependencies; the top-level
+  `pyproject.toml` only configures `ruff` for local linting.
 
 Every dependency below is released under a permissive OSS license
 (**MIT / BSD-3-Clause / ISC / Apache-2.0**). There are **no copyleft (GPL/LGPL/AGPL) and no
@@ -61,15 +61,16 @@ served bundle; used only to build `frontend/dist`.
 | @types/react | 19.2.7 | MIT | React type definitions | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/react-dom | 19.2.3 | MIT | React DOM type definitions | https://github.com/DefinitelyTyped/DefinitelyTyped |
 
-## labs — notebooks
+## accelerators — reference notebooks
 
-The labs pin no runtime dependencies in the repo — each notebook `%pip install`s what it needs
-so it runs standalone on Databricks. The libraries the labs commonly install, all
-permissively licensed:
+The accelerator notebooks pin no runtime dependencies in the repo — each notebook `%pip
+install`s what it needs so it runs standalone on Databricks. The libraries they commonly
+install, all permissively licensed:
 
 | Library | License | Purpose | Source |
 |---|---|---|---|
 | databricks-sdk | Apache-2.0 | Databricks SDK for Python | https://github.com/databricks/databricks-sdk-py |
+| databricks-mcp | Apache-2.0 | Databricks MCP client (tools/list, tools/call) | https://github.com/databricks/databricks-mcp |
 | mlflow | Apache-2.0 | ML lifecycle platform | https://github.com/mlflow/mlflow |
 | openai | Apache-2.0 | OpenAI-compatible client (Gateway calls) | https://github.com/openai/openai-python |
 | requests | Apache-2.0 | HTTP client | https://github.com/psf/requests |

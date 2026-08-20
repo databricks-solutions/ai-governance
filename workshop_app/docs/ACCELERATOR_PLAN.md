@@ -74,7 +74,7 @@ for coding agents, and observability-as-control-plane.
   `guardrail_block_shape`.
 - [x] **Path coverage** — does the guardrail fire on the provider-native path too? Reuses
   `path_coverage_check`.
-- [x] **Effectiveness** — references the in-repo `labs/guardrails/02-guardrail-benchmark`
+- [x] **Effectiveness** — references the in-repo `accelerators/policies-and-guardrails/guardrail_benchmark.py`
   (labeled scoring across PII/unsafe/jailbreak/hallucination, online vs offline judge, DSPy
   false-positive tuning) and confirms the payloads/telemetry a judge reads from. Custom/in-house
   guardrails plug in at the same layer. Test: `pii_safety_readiness`.

@@ -478,7 +478,7 @@ accelerators:
         title: Measure effectiveness — benchmark & red-team
         concept: |
           "Is the guardrail on?" is not "does it work?". The guardrail benchmark
-          (`labs/guardrails/02-guardrail-benchmark`) scores guardrails on a **labeled** set
+          (`accelerators/policies-and-guardrails/guardrail_benchmark.py`) scores guardrails on a **labeled** set
           across PII redaction, PII blocking, unsafe content, jailbreak/prompt-injection, and
           hallucination — online guardrails versus an offline LLM-as-judge — and can tune a
           policy to cut the false-positive rate. This step confirms the payloads and telemetry
