@@ -98,10 +98,13 @@ def external_entity(name: str, target_endpoint: str, task: str = "llm/v1/chat") 
 
 
 def primary_target(endpoint_name: str = None) -> str:
-    """Return the target endpoint that the current `primary` served entity wraps."""
+    """Return the target the current `primary` served entity wraps: its external-model name,
+    or the served-entity/entity name when the primary is a native (non-external) model."""
     name = endpoint_name or ENDPOINT_NAME
-    ep = w.serving_endpoints.get(name)
-    return ep.config.served_entities[0].external_model.name
+    se = w.serving_endpoints.get(name).config.served_entities[0]
+    if se.external_model is not None:
+        return se.external_model.name
+    return se.entity_name or se.name
 
 
 def update_config(served_entities: list, traffic_config: dict = None, endpoint_name: str = None) -> dict:
@@ -153,7 +156,7 @@ def show_json(obj) -> None:
 # MAGIC %md
 # MAGIC ## 1. Config
 # MAGIC `ENDPOINT_NAME`, `CATALOG`, `SCHEMA` and the helpers (`invoke`, `put_ai_gateway`,
-# MAGIC `get_ai_gateway`) come from `shared/setup`. The two judges are separate endpoints.
+# MAGIC `get_ai_gateway`) are defined in the setup cell above. The two judges are separate endpoints.
 
 # COMMAND ----------
 

@@ -99,10 +99,13 @@ def external_entity(name: str, target_endpoint: str, task: str = "llm/v1/chat") 
 
 
 def primary_target(endpoint_name: str = None) -> str:
-    """Return the target endpoint that the current `primary` served entity wraps."""
+    """Return the target the current `primary` served entity wraps: its external-model name,
+    or the served-entity/entity name when the primary is a native (non-external) model."""
     name = endpoint_name or ENDPOINT_NAME
-    ep = w.serving_endpoints.get(name)
-    return ep.config.served_entities[0].external_model.name
+    se = w.serving_endpoints.get(name).config.served_entities[0]
+    if se.external_model is not None:
+        return se.external_model.name
+    return se.entity_name or se.name
 
 
 def update_config(served_entities: list, traffic_config: dict = None, endpoint_name: str = None) -> dict:
@@ -148,7 +151,7 @@ def show_json(obj) -> None:
 # COMMAND ----------
 
 # Both entities wrap Databricks Foundation Models as external models (see Lab 03).
-# `external_entity` / `primary_target` / `update_config` come from `shared/setup`.
+# `external_entity` / `primary_target` / `update_config` are defined in the setup cell above.
 CHAMPION_TARGET = primary_target()  # keep whatever the endpoint currently fronts
 CHALLENGER_TARGET = "databricks-gpt-oss-120b"
 print(f"Champion wraps:   {CHAMPION_TARGET}")
@@ -178,13 +181,19 @@ print("50/50 split is live.")
 
 from collections import Counter
 
+# The /invocations response echoes the *underlying* model id, not the served-model route name
+# (champion/challenger). That's enough to see the split HERE only because champion and
+# challenger wrap different base models. If both wrapped the same base model, read the split
+# from the endpoint's served-entity metrics or the inference table instead.
 served = Counter()
 for i in range(20):
     body = invoke(f"Reply with the single word: pong ({i}).", max_tokens=5)["body"]
     served[body.get("model", "unknown")] += 1
 
 show_json(dict(served))
-print("Routing roughly matches the 50/50 traffic config (variance is expected over 20 calls).")
+print(f"Champion base model:   {CHAMPION_TARGET}")
+print(f"Challenger base model: {CHALLENGER_TARGET}")
+print("Counts key on the underlying model id; roughly 50/50 over 20 calls (variance expected).")
 
 # COMMAND ----------
 

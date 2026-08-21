@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
@@ -618,11 +619,14 @@ def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
     guessing from refusal-sounding words in the answer text, which yields false positives.
     """
     if exc is not None:
-        if _msg_is_missing(str(exc)):
-            return {"outcome": "not_found", "blocked": None, "via": None,
-                    "text": str(exc)[:300], "finish_reason": None}
+        # Check guardrail wording BEFORE "missing": a real block message can also contain
+        # phrases like "not found"/"404" (e.g. a keyword "not found in the allowlist"), and
+        # misreading a fired guardrail as a missing endpoint hides a working control.
         if _msg_is_guardrail(str(exc)):
             return {"outcome": "blocked", "blocked": True, "via": "exception",
+                    "text": str(exc)[:300], "finish_reason": None}
+        if _msg_is_missing(str(exc)):
+            return {"outcome": "not_found", "blocked": None, "via": None,
                     "text": str(exc)[:300], "finish_reason": None}
         return {"outcome": "error", "blocked": None, "via": None,
                 "text": str(exc)[:300], "finish_reason": None}
@@ -1782,31 +1786,41 @@ def t_provider_secret_readiness() -> TestResult:
     except Exception as e:  # noqa: BLE001
         scopes, scopes_err = [], str(e)[:200]
     external = []
-    scanned = 0
     truncated = False
     SCAN_CAP = 75  # bound the per-endpoint GET fan-out on workspaces with many endpoints
     try:
+        names = []
         for e in w.serving_endpoints.list():
-            if scanned >= SCAN_CAP:
+            if len(names) >= SCAN_CAP:
                 truncated = True
                 break
-            scanned += 1
+            names.append(e.name)
+        scanned = len(names)
+
+        def _describe(nm: str):
             try:
-                ep = w.serving_endpoints.get(e.name)
+                return nm, w.serving_endpoints.get(nm)
             except Exception:  # noqa: BLE001
-                continue
-            for se in (getattr(getattr(ep, "config", None), "served_entities", None) or []):
-                em = getattr(se, "external_model", None)
-                if not em:
+                return nm, None
+
+        # Fetch per-endpoint detail concurrently so the fan-out doesn't block the request
+        # thread serially on endpoint-heavy workspaces.
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for nm, ep in pool.map(_describe, names):
+                if ep is None:
                     continue
-                d = em.as_dict() if hasattr(em, "as_dict") else {}
-                # The key is nested under a provider config (openai_config.openai_api_key,
-                # amazon_bedrock_config.aws_secret_access_key, ...), so scan recursively rather
-                # than only the top level.
-                keyvals = _find_key_values(d)
-                ref = (any("{{secrets/" in v for v in keyvals) if keyvals else None)
-                external.append({"endpoint": e.name, "provider": d.get("provider"),
-                                 "api_key_is_secret_reference": ref})
+                for se in (getattr(getattr(ep, "config", None), "served_entities", None) or []):
+                    em = getattr(se, "external_model", None)
+                    if not em:
+                        continue
+                    d = em.as_dict() if hasattr(em, "as_dict") else {}
+                    # The key is nested under a provider config (openai_config.openai_api_key,
+                    # amazon_bedrock_config.aws_secret_access_key, ...), so scan recursively
+                    # rather than only the top level.
+                    keyvals = _find_key_values(d)
+                    ref = (any("{{secrets/" in v for v in keyvals) if keyvals else None)
+                    external.append({"endpoint": nm, "provider": d.get("provider"),
+                                     "api_key_is_secret_reference": ref})
     except Exception as e:  # noqa: BLE001
         return _fail("Could not inspect serving endpoints.", error=str(e)[:400],
                      secret_scopes=scopes)
@@ -2031,7 +2045,11 @@ def t_pii_mask_vs_block() -> TestResult:
         return _todo("The SSN came back INTACT — no PII masking on this path. Attach a PII "
                      "guardrail (MASK or BLOCK) on the endpoint and re-run.",
                      mode="passthrough", **detail)
-    if re.search(r"(?i)redact|\bmask(ed)?\b|\bx{3,}\b|\*{3,}|#{3,}|\[(redacted|pii|ssn|removed|masked)\]",
+    # MASK is inferred only from an explicit redaction word/token or a masked-SSN shape
+    # (e.g. XXX-XX-XXXX, ***-**-****, XXX-XX-6789) — never from bare `***`/`xxxx`/`###`, which
+    # are common markdown/filler and would falsely report MASK when no PII guardrail is set.
+    if re.search(r"(?i)\bredact(ed|ion)?\b|\bmask(ed|ing)?\b|\[(redacted|pii|ssn|removed|masked)\]"
+                 r"|[X*#]{3}[- ]?[X*#]{2}[- ]?[X*#\d]{2,4}",
                  r["text"]):
         return _ok("PII guardrail appears to be in MASK mode — the answer came back with the SSN "
                    "redacted. Confirm the mask configuration on the endpoint.", mode="mask",
