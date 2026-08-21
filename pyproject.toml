@@ -1,10 +1,10 @@
-# The labs run as Databricks notebooks and each `%pip install`s its own dependencies, so
-# there are no project runtime dependencies. This file only configures ruff for linting
-# the notebook sources locally (`uvx ruff check` or `ruff check`).
+# The accelerator notebooks run as Databricks notebooks and each `%pip install`s its own
+# dependencies, so there are no project runtime dependencies. This file only configures ruff
+# for linting the notebook sources locally (`uvx ruff check` or `ruff check`).
 [project]
 name = "ai-governance"
 version = "0.1.0"
-description = "Hands-on labs for running a proof of concept with Databricks Unity AI Gateway."
+description = "Databricks AI Governance Workshop — customer app + accelerator reference notebooks."
 readme = "README.md"
 requires-python = ">=3.10"
 

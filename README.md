@@ -1,21 +1,22 @@
-# Databricks Unity AI Gateway — POC Labs
+# Databricks AI Governance Workshop
 
 ```
-Hands-on labs for running a proof of concept with the Databricks Unity AI Gateway.
-Each lab is a self-contained Databricks notebook that applies one production
-governance control — rate limiting, guardrails, usage/cost tracking, fallbacks,
-traffic routing — to a real Model Serving endpoint, and proves it works.
+A customer-facing, guided workshop for standing up a governed AI control plane on a
+Databricks workspace — and proving it works live. Organized around three pillars —
+Choice · Cost · Control — where every step has a concept, a "Try It" action that
+exercises a real control against the connected workspace, and a "Verify" step that
+proves it fired. Runs in four hours, with optional ~4-hour accelerators for deeper dives.
 ```
 
-The Unity AI Gateway puts a single, governed control plane in front of the models,
-tools, and agents your organization uses. This repo shows how to stand that up as a
-proof of concept: deploy one endpoint, then layer on each control and watch it take
-effect. Labs are organized exactly the way you'd evaluate the platform — **Models**,
-**Guardrails**, **Tools**, and **Agents** — and the whole workshop deploys from a single
-Databricks Asset Bundle.
+The workshop puts the **Unity AI Gateway** — a single, governed control plane in front of the
+models, tools, and agents your organization uses — in front of a room of cloud admins, AI
+governance leaders, and principal developers. It ships as a **React + FastAPI Databricks App**
+([`workshop_app/`](workshop_app)), driven entirely by one config file so it runs on any customer
+workspace, deployed from a single Databricks Asset Bundle.
 
-> The Unity AI Gateway is in Beta. Feature availability and API shapes may change; the
-> labs use the documented REST/SDK surfaces and are easy to adjust.
+> The Unity AI Gateway is in Beta. Feature availability and API shapes may change; the workshop
+> uses the documented REST/SDK surfaces, and every step that rides a preview reports
+> "confirm on this account" rather than a false green.
 
 ## Architecture
 
@@ -37,90 +38,129 @@ Databricks Asset Bundle.
  Unity Catalog: inference tables, system tables, permissions, lineage
 ```
 
-**Where governance data lands:** per-request token usage in `system.serving.endpoint_usage`; DBU cost
-in `system.billing.usage`; full request/response payloads in Unity Catalog **inference tables**
-(`<catalog>.<schema>.gateway_*`) for audit, eval, and guardrail review.
+**Where governance data lands:** per-request token usage and spend in `system.ai_gateway`; the
+audit trail in `system.access`; full request/response payloads in Unity Catalog **inference
+tables** (`<catalog>.<schema>.*`) for audit, eval, and guardrail review.
 
-## Labs
+## The core workshop — Choice · Cost · Control
 
-### 🧠 Unity AI Gateway for Models
-General platform governance — setup, cost control, tagging, resilience.
+Four hours, run top to bottom against the customer's own workspace. Content lives in
+[`workshop_app/config/steps.yaml`](workshop_app/config/steps.yaml); the executable checks behind
+each **Try It** button live in
+[`workshop_app/server/tests_registry.py`](workshop_app/server/tests_registry.py).
 
-| # | Lab | What it shows |
-|---|-----|---------------|
-| 01 | [Rate limiting](labs/models/01-rate-limiting) | Per-endpoint & per-user token/request limits; observe `429` |
-| 02 | [Usage tracking & FinOps](labs/models/02-usage-tracking-finops) | Tokens & cost via system tables + budget alert + AI/BI dashboard |
-| 03 | [Fallbacks](labs/models/03-fallbacks) | Automatic failover across served entities |
-| 04 | [Traffic routing](labs/models/04-traffic-routing) | Load balancing + A/B/canary across backends |
+- **Choice** — place any model, tool, or agent behind one control plane, addressed as a Unity
+  Catalog securable rather than a workspace endpoint name. Connect, discover the model surface,
+  and register agents, tools, and MCP servers as first-class UC assets.
+- **Cost** — project the cost of routing between models (a real custom router plugs in here), set
+  budgets and per-user rate limits, tag for cost attribution, and query usage/cost by project.
+- **Control** — create a governed endpoint, apply guardrails on a model service, attach a
+  contextual policy to an MCP service (allow reads, deny writes), govern coding-agent traffic, and
+  get end-to-end observability — scan the audit log for denied calls and leaked secrets, and open
+  traces.
 
-### 🛡️ Guardrails
-Self-contained guardrail track — apply, then benchmark. See [`labs/guardrails`](labs/guardrails).
+Progress is tracked per team in a JSON file on a Unity Catalog volume, so a room can pause and
+resume with no database to provision, and everything you run is included in the exported outcomes.
 
-| Part | Lab | What it shows |
-|------|-----|---------------|
-| 1 | [Apply guardrails](labs/guardrails/01-apply-guardrails) | PII masking, safety, topic moderation, keyword filtering at the gateway |
-| 2 | [Guardrail benchmark](labs/guardrails/02-guardrail-benchmark) | Precision / recall / **FPR** across PII redaction, PII blocking, unsafe content, jailbreak, hallucination; online vs two managed judges + DSPy/GEPA alignment |
+## Accelerators
 
-### 🔧 Unity AI Gateway for Tools
-| Lab | What it shows |
-|-----|---------------|
-| [Managed MCP servers](labs/tools/01-managed-mcp) | UC functions, Genie, Vector Search as governed MCP tools |
-| [Function calling](labs/tools/03-function-calling) | Unity Catalog functions as governed tools |
+Beyond the core workshop, five optional **~4-hour accelerators** each get their own in-app page —
+same **concept → Try It → Verify** flow, same progress store, same outcomes export. Run the one or
+two that match what the customer needs to unblock rather than all five. They are defined for the
+app in [`workshop_app/config/accelerators.yaml`](workshop_app/config/accelerators.yaml) (build plan
+and design bar in [`workshop_app/docs/ACCELERATOR_PLAN.md`](workshop_app/docs/ACCELERATOR_PLAN.md)).
 
-### 🤖 Unity AI Gateway for Agents
-| Lab | What it shows |
-|-----|---------------|
-| [Agent Framework](labs/agents/01-agent-framework) | Mosaic AI agent on governed endpoints, logged + registered to UC |
-| [Agent evaluation](labs/agents/02-agent-evaluation) | Evaluate & monitor governed agents with MLflow judges |
-| [OpenAI Agents SDK](labs/agents/03-openai-agents-sdk) | Existing agent stack on the OpenAI-compatible endpoint |
+Each accelerator also has a folder under [`accelerators/`](accelerators) with a `README.md`, a
+**`reference_queries.py`** notebook that reproduces the app's SQL/API checks (one section per
+step, so you can reference them **without deploying the app**), and ported deep-dive notebooks.
 
-### 🏁 Capstone
-| Lab | What it shows |
-|-----|---------------|
-| [Zero to production](labs/zero-to-production) | One endpoint, end to end: observability → guardrails → limits → fallback → governed tools → validate → checklist |
+### 🔌 MCP Servers
+Managed vs external MCP, UC permissions, on-behalf-of identity, and service policies — the top
+gap being read-only enforcement for coding-agent users while humans keep write. Eleven steps
+distinguish the two kinds of MCP (managed UC-native endpoints vs `MCP_SERVICE` securables), prove
+OBO identity, write and verify a contextual ALLOW/DENY/ASK policy, scan tool metadata for
+poisoning, and show exactly what MCP telemetry does and does not capture.
+→ [`accelerators/mcp-servers/`](accelerators/mcp-servers) · [reference queries](accelerators/mcp-servers/reference_queries.py)
 
-Every lab above is built, deployable, and verified end-to-end in a workspace.
+### 🤖 Agent Registry
+Make agents first-class UC assets — registered, versioned, owned, traced, and governed like any
+endpoint. Inventory registered agents, register and version a representative one, confirm
+versioning/ownership and traces, and close the identity gap where a custom agent endpoint lacks
+the rate limits, guardrails, or usage tracking a model endpoint has.
+→ [`accelerators/agent-registry/`](accelerators/agent-registry) · [reference queries](accelerators/agent-registry/reference_queries.py)
 
-### Roadmap
-Planned additions: external-model providers, semantic caching (Vector Search), MCP client
-authorization, custom MCP on Databricks Apps, multi-agent orchestration, and developer
-utilities (tracing, streaming, rate-limit tester, mock server).
+### 💻 Coding Agents
+Route dev-agent traffic (Claude Code, Cursor, `ucode`, Codex) through the gateway, prove it is
+actually governed, attribute per developer, and cap the spend. Catches the silent failures:
+traffic landing on a legacy endpoint while limits sit on the new model service, controls that
+don't fire on the provider-native path, and leaked secrets in prompts. Includes a live HTTP 429
+demo and per-developer attribution with no tagging required.
+→ [`accelerators/coding-agents/`](accelerators/coding-agents) · [reference queries](accelerators/coding-agents/reference_queries.py)
+
+### 🌐 External Providers
+Route Bedrock, OpenAI, and Anthropic through the gateway with credentials in secrets (never
+inline) and access bound to approved workspaces. Inventory current provider access, register an
+external route (including the Anthropic OAuth-relay path), verify keys are stored as secrets,
+confirm the catalog is `ISOLATED` with explicit workspace bindings, and migrate one shadow
+workload as proof.
+→ [`accelerators/external-providers/`](accelerators/external-providers) · [reference queries](accelerators/external-providers/reference_queries.py)
+
+### 🛡️ Policies & Guardrails
+Prove guardrails actually work — not just that they're on. Safety + PII filter on input and
+output, MASK vs BLOCK, how a block is delivered (4xx vs HTTP 200 + reason, and the coding-agent
+"sticky block" gotcha), path coverage, and effectiveness measured on a labeled set. The
+effectiveness step draws on the in-repo guardrail benchmark.
+→ [`accelerators/policies-and-guardrails/`](accelerators/policies-and-guardrails) · [reference queries](accelerators/policies-and-guardrails/reference_queries.py) · [guardrail benchmark](accelerators/policies-and-guardrails/guardrail_benchmark.py)
 
 ## Getting started
 
-The whole workshop deploys from **one Databricks Asset Bundle**.
+The workshop app deploys from **one Databricks Asset Bundle** — no shell script, two standard
+commands. Full deploy guide, prerequisites, and the two `system` grants an account admin must run
+are in [`workshop_app/README.md`](workshop_app/README.md).
 
 ```bash
-# 1. Authenticate the Databricks CLI to your workspace (a profile, or host + token).
-# 2. Point the bundle at your workspace: set targets.dev.workspace.host in databricks.yml.
-# 3. Create the endpoint's backing secret (one time):
-databricks secrets create-scope ai_governance
-databricks secrets put-secret  ai_governance api_token      # paste a PAT
+cd workshop_app
 
-# 4. Deploy the gateway endpoint, schema, jobs, and every lab notebook:
-databricks bundle deploy -t dev
+# 1. Deploy: builds the frontend, creates the schema + progress volume, creates the app,
+#    and grants the app's service principal — all in one pass.
+databricks bundle deploy -t dev -p <profile> \
+  --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
 
-# 5. Run a lab group as a job — or just open a notebook and run it:
-databricks bundle run run_core_labs          -t dev    # rate limit · usage/FinOps · fallbacks · routing
-databricks bundle run run_guardrail_labs     -t dev    # apply guardrails
-databricks bundle run run_tools_labs         -t dev    # managed MCP · function calling
-databricks bundle run run_agent_labs         -t dev    # agent framework · evaluation
-databricks bundle run run_zero_to_production  -t dev    # capstone
+# 2. Start (or restart) the app. Databricks requires a separate run to start app compute.
+databricks bundle run ai_governance_workshop_app -t dev -p <profile>
 ```
 
-**Prerequisites:** a workspace with Model Serving + Foundation Model APIs, the Databricks CLI, and
-permission to create a serving endpoint, a Unity Catalog schema, and jobs. The guardrail **benchmark**
-(Part 2) is interactive — it streams datasets and calls models — so open it and set the `n_examples`
-widget rather than running it as a job.
+**Prerequisites:** the Databricks CLI authenticated to the workspace, a running SQL warehouse, an
+existing Unity Catalog catalog, and Node (the bundle builds the frontend on deploy). `warehouse_id`
+and `catalog` are **required**. Two `system` schema grants (`system.ai_gateway`, `system.access`)
+need an account admin and unlock the telemetry steps — the workshop still runs without them, with
+those steps reporting "action needed" rather than failing. See
+[`workshop_app/README.md`](workshop_app/README.md) for the complete instructions.
+
+## Reference notebooks (`accelerators/`)
+
+The Databricks notebooks under [`accelerators/`](accelerators) let you reference and run each
+accelerator's checks **without deploying the app**. Each folder holds a `README.md`, a
+self-contained `reference_queries.py` that reproduces the app's SQL/API checks step by step, and
+one or more ported deep-dive notebooks. They are plain notebooks — clone this repo into Databricks
+(Repos or **Workspace → Import**), open one, set the widgets, and run. No bundle, no deploy.
 
 ## Repository layout
 
 ```
-databricks.yml          Asset Bundle root — one bundle for the whole workshop
-resources/              Bundle resources (endpoint + schema + jobs)
-shared/setup.py         %run helper used by every lab
-labs/                   models · guardrails · tools · agents · zero-to-production
-                        (each lab folder = README.md + notebook.py)
+workshop_app/           The customer-facing workshop app (React + FastAPI Databricks App)
+  config/               workshop.yaml (the one file a customer edits) · steps.yaml · accelerators.yaml
+  server/               FastAPI backend — tests_registry.py holds the executable governance tests
+  frontend/             React + Vite + Tailwind (Databricks design system)
+  databricks.yml        Asset Bundle: app + UC schema + progress volume + grants
+  docs/                 APIS_AND_SETUP.md · ACCELERATOR_PLAN.md · PREREQUISITES.md · …
+
+accelerators/           Reference notebooks, one folder per accelerator:
+  mcp-servers/            reference_queries.py + managed_mcp.py + function_calling.py
+  agent-registry/         reference_queries.py + agent_framework.py + agent_evaluation.py
+  coding-agents/          reference_queries.py + rate_limiting.py + usage_tracking_finops.py + openai_agents_sdk.py
+  external-providers/     reference_queries.py + traffic_routing.py + fallbacks.py
+  policies-and-guardrails/ reference_queries.py + guardrail_benchmark.py + apply_guardrails.py
 ```
 
 ## Maintainers
@@ -150,5 +190,5 @@ All included or referenced third party libraries are subject to their respective
 | requests | HTTP client | Apache 2.0 | https://github.com/psf/requests |
 | polars | DataFrame library | MIT | https://github.com/pola-rs/polars |
 
-A full third-party dependency audit for the workshop app and labs — versions, licenses,
-and purpose — is in [DEPENDENCIES.md](DEPENDENCIES.md).
+A full third-party dependency audit for the workshop app and accelerator notebooks — versions,
+licenses, and purpose — is in [DEPENDENCIES.md](DEPENDENCIES.md).
