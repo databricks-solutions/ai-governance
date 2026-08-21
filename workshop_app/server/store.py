@@ -126,7 +126,7 @@ def save(
             "status": status,
             "last_result": result if result is not None else prev.get("last_result"),
             "notes": notes if notes is not None else prev.get("notes"),
-            "updated_by": updated_by,
+            "updated_by": updated_by if updated_by is not None else prev.get("updated_by"),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         _persist()

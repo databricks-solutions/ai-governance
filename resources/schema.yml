@@ -1,8 +1,0 @@
-# Unity Catalog schema that holds governance artifacts produced by the labs:
-# inference (payload) tables, usage rollup views, and the FinOps dashboard's tables.
-resources:
-  schemas:
-    ai_governance:
-      catalog_name: ${var.catalog}
-      name: ${var.schema}
-      comment: "Artifacts for the Unity AI Gateway POC labs (inference tables, usage views)."
