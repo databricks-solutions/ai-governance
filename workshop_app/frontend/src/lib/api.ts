@@ -57,8 +57,40 @@ export interface TestResult {
 
 export type ProgressMap = Record<
   string,
-  { pillar_id: string; status: string; last_result: TestResult | null; notes: string | null; updated_at: string | null }
+  {
+    pillar_id: string;
+    status: string;
+    last_result: TestResult | null;
+    notes: string | null;
+    /** Hand-marked outcome, independent of the interactive test: "done" | "na" | null. */
+    outcome?: string | null;
+    /** Flagged for the POC follow-up doc. */
+    poc?: boolean;
+    updated_at: string | null;
+  }
 >;
+
+/** Resolve a step's effective outcome from its saved record. A step is `done` if the Try-It
+ *  test passed OR it was hand-marked done; `na` drops it from completion counts. */
+export function stepOutcome(saved: ProgressMap[string] | null | undefined) {
+  const status = saved?.status ?? "not_started";
+  const outcome = saved?.outcome ?? null;
+  const poc = !!saved?.poc;
+  return { status, outcome, poc, done: outcome === "done" || status === "done", na: outcome === "na" };
+}
+
+/** Achieved / applicable / total counts for a group of steps (N/A excluded from applicable). */
+export function groupCounts(steps: { id: string }[], progress: ProgressMap) {
+  let done = 0;
+  let applicable = 0;
+  for (const s of steps) {
+    const o = stepOutcome(progress[s.id]);
+    if (o.na) continue;
+    applicable++;
+    if (o.done) done++;
+  }
+  return { done, applicable, total: steps.length };
+}
 
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
@@ -111,6 +143,21 @@ export const api = {
     }).then((r) => j<TestResult>(r)),
   setProgress: (body: { step_id: string; pillar_id: string; status: string; notes?: string }) =>
     fetch("/api/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => j<{ ok: boolean }>(r)),
+
+  // Set the hand-marked outcome flags (Done / N/A / Add-to-POC). The full desired state is sent
+  // each time (Done and N/A are mutually exclusive; `poc` is independent).
+  setOutcome: (body: {
+    step_id: string;
+    pillar_id: string;
+    outcome: string | null;
+    poc: boolean;
+    updated_by?: string;
+  }) =>
+    fetch("/api/outcome", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

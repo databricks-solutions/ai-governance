@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle, ListChecks } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
+import { api, groupCounts, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
 import Faq from "@/pages/Faq";
@@ -32,9 +32,10 @@ function Shell() {
   }
   useEffect(refreshProgress, []);
 
+  // Nav badges count achieved steps over applicable (N/A excluded), matching the pillar pages.
   function groupProgress(steps: { id: string }[]): { done: number; total: number } {
-    const done = steps.filter((s) => progress[s.id]?.status === "done").length;
-    return { done, total: steps.length };
+    const { done, applicable } = groupCounts(steps, progress);
+    return { done, total: applicable };
   }
 
   return (
@@ -118,7 +119,14 @@ function Shell() {
           </div>
         )}
         {route === "faq" && <Faq />}
-        {route === "prereqs" && <Prerequisites />}
+        {route === "prereqs" && (
+          <Prerequisites
+            pillars={workshop?.pillars}
+            accelerators={accel?.accelerators}
+            progress={progress}
+            onProgressChange={refreshProgress}
+          />
+        )}
         {workshop && route === "intro" && (
           <Intro
             intro={workshop.intro}

@@ -33,8 +33,13 @@ log = logging.getLogger("uvicorn.error")
 # attendees can never interleave a half-serialized file.
 _LOCK = threading.RLock()
 
-# {step_id: {pillar_id, status, last_result, notes, updated_by, updated_at}}
+# {step_id: {pillar_id, status, last_result, notes, updated_by, outcome, poc, updated_at}}
+# `status`/`last_result` track the interactive Try-It test; `outcome` ("done"|"na"|None) and
+# `poc` (bool) are the hand-set outcome flags set from a step card or the outcomes checklist.
 _MEM: dict[str, dict[str, Any]] = {}
+
+# Sentinel so set_outcome can tell "leave this flag unchanged" from "clear it to None/False".
+_UNSET = object()
 
 
 def _vol_cfg() -> dict:
@@ -127,6 +132,39 @@ def save(
             "last_result": result if result is not None else prev.get("last_result"),
             "notes": notes if notes is not None else prev.get("notes"),
             "updated_by": updated_by if updated_by is not None else prev.get("updated_by"),
+            # Manual outcome flags are never touched by a test run / status update — preserve them.
+            "outcome": prev.get("outcome"),
+            "poc": prev.get("poc", False),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _persist()
+
+
+def set_outcome(
+    step_id: str,
+    pillar_id: str,
+    outcome: Any = _UNSET,
+    poc: Any = _UNSET,
+    updated_by: str | None = None,
+) -> None:
+    """Set the hand-marked outcome flags for a step, independent of the interactive test.
+
+    `outcome` is "done" | "na" | None — Done and N/A are mutually exclusive, and None clears
+    both. `poc` flags the step for the POC follow-up. Either arg left unset is preserved
+    (COALESCE), so toggling one control never clears the other, and the interactive
+    `status`/`last_result` are left untouched. A step counts as achieved if EITHER the test ran
+    `done` OR `outcome == "done"`.
+    """
+    with _LOCK:
+        prev = _MEM.get(step_id, {})
+        _MEM[step_id] = {
+            "pillar_id": pillar_id,
+            "status": prev.get("status", "not_started"),
+            "last_result": prev.get("last_result"),
+            "notes": prev.get("notes"),
+            "updated_by": updated_by if updated_by is not None else prev.get("updated_by"),
+            "outcome": prev.get("outcome") if outcome is _UNSET else outcome,
+            "poc": prev.get("poc", False) if poc is _UNSET else bool(poc),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         _persist()

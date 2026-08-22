@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle } from "lucide-react";
-import { api, type Step, type TestResult, type ProgressMap } from "@/lib/api";
+import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle, Ban } from "lucide-react";
+import { api, stepOutcome, type Step, type TestResult, type ProgressMap } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import McpDiagram from "@/components/McpDiagram";
 import Markdown from "@/components/Markdown";
 import ResultDetail from "@/components/ResultDetail";
+import OutcomeControls from "@/components/OutcomeControls";
 
 type Saved = ProgressMap[string] | null;
 
@@ -44,6 +45,8 @@ export default function StepCard({
   const [running, setRunning] = useState<null | "action" | "verify">(null);
   const [result, setResult] = useState<TestResult | null>(saved?.last_result ?? null);
   const status = saved?.status ?? "not_started";
+  // Achieved = Try-It passed OR hand-marked done; `na` = marked not-applicable.
+  const { done: achieved, na } = stepOutcome(saved);
 
   async function run(kind: "action" | "verify", test: string) {
     setRunning(kind);
@@ -58,31 +61,30 @@ export default function StepCard({
     }
   }
 
-  async function toggleDone() {
-    const next = status === "done" ? "in_progress" : "done";
-    await api.setProgress({ step_id: step.id, pillar_id: pillarId, status: next });
-    onProgressChange();
-  }
-
   // A step that ran but proved nothing (a guided UI action, or telemetry with no data yet)
   // must not look complete — that is the difference between an honest workshop record and
   // a green wall of checks.
   const actionRequired = status === "action_required";
 
   return (
-    <div className={cn("rounded-2xl border bg-white p-6", status === "done" ? "border-navy/25" : "border-navy/10")}>
+    <div className={cn("rounded-2xl border bg-white p-6", achieved ? "border-navy/25" : "border-navy/10")}>
       {/* Header */}
       <div className="mb-3 flex items-start gap-3">
-        <button
-          onClick={toggleDone}
+        <span
           className={cn(
-            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors",
-            status === "done" ? "border-navy bg-navy text-white" : "border-navy/20 text-navy-300",
+            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border",
+            achieved ? "border-navy bg-navy text-white" : "border-navy/20 bg-navy/[0.02] text-navy-300",
           )}
-          title="Mark done"
+          title={achieved ? "Achieved" : na ? "Marked N/A" : "Not done yet — set the outcome below"}
         >
-          {status === "done" ? <Check className="h-4 w-4" strokeWidth={3} /> : <Circle className="h-3.5 w-3.5" />}
-        </button>
+          {achieved ? (
+            <Check className="h-4 w-4" strokeWidth={3} />
+          ) : na ? (
+            <Ban className="h-3.5 w-3.5" />
+          ) : (
+            <Circle className="h-3.5 w-3.5" />
+          )}
+        </span>
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-navy-300">Step {index}</div>
@@ -142,6 +144,12 @@ export default function StepCard({
             {step.verify.label}
           </button>
         )}
+      </div>
+
+      {/* Outcome — Done / N/A / Add-to-POC, set by hand and independent of running Try-It. */}
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-navy/[0.07] pt-4">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Outcome</span>
+        <OutcomeControls stepId={step.id} pillarId={pillarId} saved={saved} onChange={onProgressChange} />
       </div>
 
       {/* Result — three states, not two: passed, action needed, failed. */}
