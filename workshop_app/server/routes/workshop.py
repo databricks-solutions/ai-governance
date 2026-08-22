@@ -12,9 +12,11 @@ from ..tests_registry import run_test
 router = APIRouter()
 
 # Version of the outcomes-JSON contract. Bumped to 2 when the account/Salesforce identifiers
-# were removed: the workshop is deployed once per engagement, so the export no longer carries a
-# customer_sfid or customer_name.
-OUTCOMES_SCHEMA_VERSION = 2
+# were removed (the workshop is deployed once per engagement). Bumped to 3 when per-step outcome
+# flags landed: each step now carries `outcome`/`poc`/`na`, "complete" means achieved (test done
+# OR hand-marked done), the summary adds `applicable` (total minus N/A), and a top-level
+# `poc_items` lists steps flagged for the POC follow-up.
+OUTCOMES_SCHEMA_VERSION = 3
 
 
 def _resolve_group(group: dict) -> dict:
@@ -131,11 +133,34 @@ def set_progress(body: Progress):
     return {"ok": True}
 
 
+class Outcome(BaseModel):
+    step_id: str
+    pillar_id: str
+    outcome: str | None = None    # "done" | "na" | null (Done and N/A are mutually exclusive)
+    poc: bool = False             # flag the step for the POC follow-up
+    updated_by: str | None = None
+
+
+@router.post("/outcome")
+def set_outcome(body: Outcome):
+    """Record the hand-marked outcome flags (Done / N/A / Add-to-POC) for one step.
+
+    Separate from /progress: these are set by hand — on a step card or the outcomes checklist —
+    so the workshop can guide activities even when the interactive Try-It tests aren't run. The
+    client sends the full desired state each time. A step is achieved if the test ran `done` OR
+    outcome == "done".
+    """
+    store.set_outcome(body.step_id, body.pillar_id, outcome=body.outcome, poc=body.poc,
+                      updated_by=body.updated_by)
+    return {"ok": True}
+
+
 @router.get("/progress")
 def get_progress():
     return {
         step_id: {"pillar_id": r.get("pillar_id"), "status": r.get("status"),
                   "last_result": r.get("last_result"), "notes": r.get("notes"),
+                  "outcome": r.get("outcome"), "poc": bool(r.get("poc", False)),
                   "updated_at": r.get("updated_at")}
         for step_id, r in store.get().items()
     }
@@ -153,46 +178,74 @@ def _build_outcomes() -> dict:
     step appears, even untouched ones) with saved progress. It carries no account or Salesforce
     identifier — the app is deployed once per workshop.
     """
-    progress = get_progress()  # {step_id: {status, last_result, notes, ...}}
-    totals = {"total": 0, "done": 0}
+    progress = get_progress()  # {step_id: {status, last_result, notes, outcome, poc, ...}}
+    totals = {"total": 0, "applicable": 0, "done": 0, "na": 0}
+    poc_items: list[dict] = []
 
     def _group_out(group: dict) -> dict:
         steps_out = []
         for s in group["steps"]:
             saved = progress.get(s["id"], {})
-            status = saved.get("status", "not_started")
-            complete = status == "done"
+            raw_status = saved.get("status", "not_started")
+            outcome = saved.get("outcome")            # "done" | "na" | None (hand-marked)
+            poc = bool(saved.get("poc", False))
+            na = outcome == "na"
+            # Achieved = the interactive test passed OR the outcome was marked done by hand, so a
+            # workshop run without the app's Try-It buttons still reflects real outcomes.
+            achieved = (raw_status == "done") or (outcome == "done")
+            if na:
+                disp = "n/a"
+            elif achieved and raw_status != "done":
+                disp = "done (marked)"
+            else:
+                disp = raw_status
             totals["total"] += 1
-            totals["done"] += 1 if complete else 0
-            steps_out.append({
+            if na:
+                totals["na"] += 1
+            else:
+                totals["applicable"] += 1
+                totals["done"] += 1 if achieved else 0
+            row = {
                 "step_id": s["id"],
                 "title": s["title"],
-                "status": status,
-                "complete": complete,
+                "status": disp,
+                "raw_status": raw_status,
+                "outcome": outcome,
+                "poc": poc,
+                "na": na,
+                "complete": achieved,
                 "notes": saved.get("notes"),
                 "last_result_summary": (saved.get("last_result") or {}).get("summary")
                 if isinstance(saved.get("last_result"), dict) else None,
                 "updated_at": saved.get("updated_at"),
-            })
+            }
+            if poc:
+                poc_items.append({"pillar_id": group["id"], "step_id": s["id"],
+                                  "title": s["title"], "status": disp, "notes": saved.get("notes")})
+            steps_out.append(row)
         return {"pillar_id": group["id"], "title": group["title"], "steps": steps_out}
 
     pillars_out = [_group_out(p) for p in workshop_content()["pillars"]]
     accelerators_out = [_group_out(a) for a in accelerators_content()["accelerators"]]
 
-    # Next steps = anything not complete, to drive follow-up.
+    # Next steps = anything applicable that isn't achieved, to drive follow-up. N/A drops out.
     next_steps = [
         {"pillar_id": g["pillar_id"], "step_id": st["step_id"], "title": st["title"], "status": st["status"]}
-        for g in pillars_out + accelerators_out for st in g["steps"] if not st["complete"]
+        for g in pillars_out + accelerators_out for st in g["steps"]
+        if not st["complete"] and not st["na"]
     ]
 
-    pct = round(100 * totals["done"] / totals["total"]) if totals["total"] else 0
+    applicable = totals["applicable"]
+    pct = round(100 * totals["done"] / applicable) if applicable else 0
     return {
         "schema_version": OUTCOMES_SCHEMA_VERSION,
         "source": "ai-governance-workshop",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "summary": {"total": totals["total"], "done": totals["done"], "pct": pct},
+        "summary": {"total": totals["total"], "applicable": applicable,
+                    "done": totals["done"], "na": totals["na"], "pct": pct},
         "pillars": pillars_out,
         "accelerators": accelerators_out,
+        "poc_items": poc_items,
         "next_steps": next_steps,
     }
 
@@ -211,8 +264,9 @@ def export_report():
         "# AI Governance Workshop — Outcomes Report",
         "",
         f"**Generated:** {o['generated_at']}  ",
-        f"**Progress:** {o['summary']['done']}/{o['summary']['total']} steps complete "
-        f"({o['summary']['pct']}%)",
+        f"**Progress:** {o['summary']['done']}/{o['summary']['applicable']} applicable steps "
+        f"achieved ({o['summary']['pct']}%)"
+        + (f" · {o['summary']['na']} marked N/A" if o['summary'].get('na') else ""),
         "",
     ]
     def _section(groups, heading=None):
@@ -220,12 +274,15 @@ def export_report():
             lines.append(f"# {heading}")
             lines.append("")
         for p in groups:
-            done = sum(1 for s in p["steps"] if s["complete"])
-            lines.append(f"## {p['title']} — {done}/{len(p['steps'])}")
+            applicable = [s for s in p["steps"] if not s.get("na")]
+            done = sum(1 for s in applicable if s["complete"])
+            lines.append(f"## {p['title']} — {done}/{len(applicable)}")
             lines.append("")
             for s in p["steps"]:
-                mark = "x" if s["complete"] else " "
+                mark = "x" if s["complete"] else ("-" if s.get("na") else " ")
                 line = f"- [{mark}] {s['title']} — **{s['status']}**"
+                if s.get("poc"):
+                    line += "  ·  _POC_"
                 if s.get("notes"):
                     line += f"  \n  _notes:_ {s['notes']}"
                 lines.append(line)
@@ -238,6 +295,15 @@ def export_report():
         lines.append("")
         for n in o["next_steps"]:
             lines.append(f"- {n['title']} ({n['pillar_id']}) — {n['status']}")
+        lines.append("")
+    if o.get("poc_items"):
+        lines.append("## Flagged for POC follow-up")
+        lines.append("")
+        for p in o["poc_items"]:
+            line = f"- {p['title']} ({p['pillar_id']}) — {p['status']}"
+            if p.get("notes"):
+                line += f" — _{p['notes']}_"
+            lines.append(line)
         lines.append("")
     return "\n".join(lines)
 
