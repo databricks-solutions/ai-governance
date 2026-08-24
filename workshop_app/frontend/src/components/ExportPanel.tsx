@@ -27,8 +27,8 @@ export default function ExportPanel() {
         <h3 className="font-semibold text-navy">Export workshop outcomes</h3>
       </div>
       <p className="mb-4 text-sm leading-relaxed text-muted">
-        Generate the leave-behind report and the machine-readable outcomes file for this
-        workshop — every step with its status, plus the incomplete items as next steps.
+        Generate the POC-doc leave-behind and the machine-readable outcomes file — every step with
+        its status, the incomplete items as next steps, and everything flagged for POC.
       </p>
       <div className="flex flex-wrap gap-3">
         <button

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle, ClipboardCheck } from "lucide-react";
-import { api, groupCounts, type Prerequisites as Prereqs, type Pillar, type ProgressMap } from "@/lib/api";
+import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle } from "lucide-react";
+import { api, type Prerequisites as Prereqs } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
-import OutcomeControls from "@/components/OutcomeControls";
 import { cn } from "@/lib/cn";
 
 // The pre-workshop checklist. Content is config-driven (config/prerequisites.yaml) so an SE can
@@ -23,17 +22,7 @@ function loadChecked(): Record<string, boolean> {
   }
 }
 
-export default function Prerequisites({
-  pillars,
-  accelerators,
-  progress = {},
-  onProgressChange = () => {},
-}: {
-  pillars?: Pillar[];
-  accelerators?: Pillar[];
-  progress?: ProgressMap;
-  onProgressChange?: () => void;
-}) {
+export default function Prerequisites() {
   const [data, setData] = useState<Prereqs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>(loadChecked);
@@ -193,61 +182,6 @@ export default function Prerequisites({
           );
         })}
         </div>
-
-        {/* Outcomes checklist — every core and accelerator step in one list, checkable on its
-            own so the workshop can guide activities even without the interactive Try-It flow. It
-            shares the same backing state as the step cards, so ticks sync both ways. */}
-        {pillars && (
-          <div className="mt-14 border-t border-navy/10 pt-10">
-            <div className="mb-1 flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-navy" />
-              <h2 className="text-lg font-semibold text-navy">Workshop outcomes checklist</h2>
-            </div>
-            <p className="mb-6 max-w-3xl text-sm leading-relaxed text-muted">
-              Every core and accelerator step, in one place. Tick <span className="font-semibold text-navy">Done</span> as
-              you run each activity — you don't have to use the app's interactive Try-It buttons.
-              Running a step's Try-It marks it Done here automatically. Mark{" "}
-              <span className="font-semibold text-navy">N/A</span> to drop a step from the count, or{" "}
-              <span className="font-semibold text-navy">Add to POC</span> to carry it into the follow-up.
-              These sync with the step cards on each pillar and accelerator page, and feed the
-              exported outcomes.
-            </p>
-            <div className="flex flex-col gap-6">
-              {[...pillars, ...(accelerators ?? [])].map((g) => {
-                const { done, applicable } = groupCounts(g.steps, progress);
-                return (
-                  <section key={g.id}>
-                    <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
-                      <h3 className="text-base font-semibold text-navy">{g.title}</h3>
-                      <span className="text-xs text-navy-300">
-                        {done}/{applicable}
-                      </span>
-                    </div>
-                    <div className="overflow-hidden rounded-2xl border border-navy/10 bg-white">
-                      {g.steps.map((step, idx) => (
-                        <div
-                          key={step.id}
-                          className={cn(
-                            "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4",
-                            idx > 0 && "border-t border-navy/[0.07]",
-                          )}
-                        >
-                          <span className="min-w-0 flex-1 text-sm font-medium text-navy">{step.title}</span>
-                          <OutcomeControls
-                            stepId={step.id}
-                            pillarId={g.id}
-                            saved={progress[step.id] ?? null}
-                            onChange={onProgressChange}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
