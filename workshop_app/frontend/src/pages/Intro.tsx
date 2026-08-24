@@ -1,7 +1,6 @@
 import { Layers, Lock, DollarSign, ArrowRight, Rocket, FileDown } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
-import ExportPanel from "@/components/ExportPanel";
 import Markdown, { inline } from "@/components/Markdown";
 import { api, groupCounts, type Pillar, type ProgressMap, type DeployGuide } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -129,11 +128,6 @@ export default function Intro({
         <section>
           <Eyebrow>What the app needs from your workspace</Eyebrow>
           <GrantsExplainer go={go} />
-        </section>
-
-        <section>
-          <Eyebrow>Wrap up</Eyebrow>
-          <ExportPanel />
         </section>
       </div>
     </>

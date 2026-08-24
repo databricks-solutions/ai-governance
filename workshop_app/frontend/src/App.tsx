@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle, ListChecks } from "lucide-react";
+import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle, ListChecks, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { api, groupCounts, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
 import Faq from "@/pages/Faq";
 import Prerequisites from "@/pages/Prerequisites";
+import Outcomes from "@/pages/Outcomes";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
 
@@ -52,6 +53,7 @@ function Shell() {
         <nav className="flex flex-col gap-1">
           <NavItem active={route === "intro"} onClick={() => setRoute("intro")} icon={Home} label="Walkthrough" />
           <NavItem active={route === "prereqs"} onClick={() => setRoute("prereqs")} icon={ListChecks} label="Prerequisites" />
+          <NavItem active={route === "outcomes"} onClick={() => setRoute("outcomes")} icon={ClipboardCheck} label="Outcomes" />
           {workshop?.pillars.map((p) => {
             const { done, total } = groupProgress(p.steps);
             const Icon = PILLAR_ICONS[p.id] ?? Layers;
@@ -119,8 +121,9 @@ function Shell() {
           </div>
         )}
         {route === "faq" && <Faq />}
-        {route === "prereqs" && (
-          <Prerequisites
+        {route === "prereqs" && <Prerequisites />}
+        {route === "outcomes" && (
+          <Outcomes
             pillars={workshop?.pillars}
             accelerators={accel?.accelerators}
             progress={progress}
