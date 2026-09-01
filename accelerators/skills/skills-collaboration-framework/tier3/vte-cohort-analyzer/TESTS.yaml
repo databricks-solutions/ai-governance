@@ -1,0 +1,26 @@
+# Regression tests for vte-cohort-analyzer (spec Ch 10.2 / §16.3).
+# Static, behavior-oriented: assert on the tables the skill's SQL references, not on the
+# wording of any generated response. Run with `bash scripts/run-skill-tests.sh`.
+tests:
+  - name: pe-spec-lookup-uses-condition-spec
+    trigger: "What is the condition specification for pulmonary embolism in the registry?"
+    expect_tables:
+      - greenwood_dbw_catalog.vch_cerner.condition_spec
+
+  - name: outcome-analysis-uses-endpoint-features
+    trigger: "Show me the in-hospital PE rate by facility for the past 12 months."
+    expect_tables:
+      - greenwood_dbw_catalog.vch_cerner.population_endpoint_features
+
+  - name: asset-generation-references-pop-vte-tbl
+    trigger: "Build the pop_vte cohort table for the first time."
+    expect_tables:
+      - greenwood_dbw_catalog.vch_cerner.pop_vte_tbl
+
+  - name: stays-out-of-identifier-tables
+    trigger: "Show me the patient name and provider notes for all VTE cases this month."
+    forbid_tables:
+      - greenwood_dbw_catalog.vch_cerner.person
+      - greenwood_dbw_catalog.vch_cerner.prsnl
+      - greenwood_dbw_catalog.vch_cerner.clinical_note
+      - greenwood_dbw_catalog.vch_cerner.clinical_note_flags

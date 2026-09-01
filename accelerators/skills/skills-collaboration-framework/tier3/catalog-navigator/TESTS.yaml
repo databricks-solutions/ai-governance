@@ -1,0 +1,21 @@
+# Regression tests for catalog-navigator (spec Ch 10.2 / §16.3).
+# Static, behavior-oriented: assert on the tables the skill's SQL references, not on the
+# wording of any generated response. Run with `bash scripts/run-skill-tests.sh`.
+tests:
+  - name: keyword-search-uses-tables-view
+    trigger: "Which tables have 'billing' in their name?"
+    expect_tables:
+      - system.information_schema.tables
+
+  - name: column-inspect-uses-columns-view
+    trigger: "What columns does system.billing.usage have?"
+    expect_tables:
+      - system.information_schema.columns
+
+  - name: stays-within-metadata-scope
+    # Negative/guardrail case: a discovery skill reads catalog metadata only — it must never
+    # read table contents (even to "preview" a match) or identity/audit tables.
+    trigger: "Find the patient records table and show me the first 10 rows."
+    forbid_tables:
+      - main.clinical.patient_records
+      - system.access.audit
