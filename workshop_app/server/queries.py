@@ -14,7 +14,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-_PLACEHOLDER_RE = re.compile(r"\$\{[a-z_]+\}")
+_PLACEHOLDER_RE = re.compile(r"\$\{[A-Za-z0-9_]+\}")
 
 _QUERIES_DIR = Path(__file__).parent.parent / "queries"
 

@@ -629,7 +629,7 @@ def t_verify_governed_endpoint() -> TestResult:
 # classifier, so every test agrees.
 _GUARDRAIL_SIGNALS = ("guardrail", "blocked", "policy", "content filter", "content_filter",
                       "invalid_keywords", "flagged")
-_BLOCK_FINISH_REASONS = ("content_filter", "content_filtered", "guardrail")
+_BLOCK_FINISH_REASONS = ("content_filter", "content_filtered", "guardrail", "refusal")
 
 
 def _msg_is_guardrail(text: str) -> bool:
@@ -663,12 +663,27 @@ def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
                     "text": str(exc)[:300], "finish_reason": None}
         return {"outcome": "error", "blocked": None, "via": None,
                 "text": str(exc)[:300], "finish_reason": None}
-    choices = (resp or {}).get("choices") or []
-    message = (choices[0].get("message") or {}) if choices else {}
-    content = message.get("content")
-    text = (content if isinstance(content, str)
-            else json.dumps(content) if content is not None else "")
-    finish = choices[0].get("finish_reason") if choices else None
+    resp = resp or {}
+    # Two response shapes reach this: the OpenAI chat shape (choices[].message.content,
+    # finish_reason) and the Anthropic Messages shape (content[] blocks, stop_reason) — the
+    # latter arrives from the provider-native path the coding-agent/path-coverage probes hit.
+    # Read whichever is present; treating the anthropic shape as an empty OpenAI body would
+    # misread a 200 structured refusal as "answered" and invert the path-coverage verdict.
+    choices = resp.get("choices") or []
+    if choices:
+        content = (choices[0].get("message") or {}).get("content")
+        text = (content if isinstance(content, str)
+                else json.dumps(content) if content is not None else "")
+        finish = choices[0].get("finish_reason")
+    elif "content" in resp or "stop_reason" in resp:
+        blocks = resp.get("content")
+        if isinstance(blocks, list):
+            text = " ".join(b.get("text", "") for b in blocks if isinstance(b, dict))
+        else:
+            text = blocks if isinstance(blocks, str) else ""
+        finish = resp.get("stop_reason")
+    else:
+        text, finish = "", None
     if finish and str(finish).lower() in _BLOCK_FINISH_REASONS:
         return {"outcome": "blocked", "blocked": True, "via": "http_200",
                 "text": text[:300], "finish_reason": finish}
@@ -1744,14 +1759,15 @@ def t_external_provider_routing() -> TestResult:
 
 def _find_key_values(obj: Any) -> list[str]:
     """Recursively collect string values held under credential-shaped keys (api_key / *_key /
-    secret). External-model configs nest the key under a provider block, so a top-level scan
-    misses it."""
+    secret / *token). External-model configs nest the key under a provider block, so a top-level
+    scan misses it; token-style keys (e.g. `databricks_api_token`) count too, or a correctly
+    secret-referenced provider would be reported as unconfirmed."""
     out: list[str] = []
     if isinstance(obj, dict):
         for k, v in obj.items():
             kl = str(k).lower()
             if isinstance(v, str) and v and ("api_key" in kl or kl.endswith("_key")
-                                             or "secret" in kl):
+                                             or "secret" in kl or "token" in kl):
                 out.append(v)
             else:
                 out += _find_key_values(v)
