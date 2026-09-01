@@ -68,8 +68,8 @@ each file's header says what goes where).
 | **Control** ||
 | 10 | Governed endpoint | Create via UI, or `databricks api put /api/2.0/serving-endpoints/<name>/config` with a fallback + inference table. |
 | 11 | Endpoint ACL | `databricks api get /api/2.0/permissions/serving-endpoints/<endpoint-id>`. Watch for a broad group with `CAN_QUERY`, and keep `CAN_MANAGE` to admins. |
-| 12 | Guardrails | Configure PII/safety in the AI Gateway UI; keyword blocklist is a UC SQL function you attach. Test by sending a prompt that should be blocked (a block is the pass). |
-| 13 | MCP policy | `CREATE FUNCTION` a policy that returns ALLOW/DENY (`to_variant_object(...)`, cast VARIANT paths: `event:context.tool.name::STRING`); attach in the UI; test via JSON-RPC. |
+| 12 | Guardrails | Configure PII/safety in the AI Gateway UI; the keyword blocklist is [`queries/keyword_blocklist_policy.sql`](../workshop_app/queries/keyword_blocklist_policy.sql) — create it, attach it in the UI, and prove it fired with [`queries/guardrail_activity.sql`](../workshop_app/queries/guardrail_activity.sql) (`${table}`→your inference table). A blocked prompt is the pass. |
+| 13 | MCP policy | Create [`queries/mcp_service_policy.sql`](../workshop_app/queries/mcp_service_policy.sql) (ALLOW/DENY; `to_variant_object(...)`, cast VARIANT paths: `event:context.tool.name::STRING`), attach it in the UI, test via JSON-RPC. |
 | 14 | Audit & secrets | [`queries/audit_scan.sql`](../workshop_app/queries/audit_scan.sql), then eyeball the args for `sk-`, `AKIA`, `ghp_`. |
 
 For the deeper topics (MCP, agent registry, coding agents, external providers, policies &
