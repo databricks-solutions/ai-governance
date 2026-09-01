@@ -40,14 +40,20 @@ reproduced inline in [`core_walkthrough.py`](core_walkthrough.py).
 - Unity AI Gateway enabled on the account (see [`PREREQUISITES`](../workshop_app/docs/PREREQUISITES.md)).
 - For the telemetry steps: the two `system` grants (`system.ai_gateway`, `system.access`).
 
-Run a query file against your warehouse with the CLI:
+Run a query file against your warehouse via the Statement Execution API (the CLI has no
+`sql query` command):
 
 ```bash
-databricks sql query --warehouse-id <id> --query "$(cat workshop_app/queries/endpoint_inventory_v1_v3.sql | sed 's/\${days}/30/')"
+databricks api post /api/2.0/sql/statements --json "$(jq -n \
+  --arg w "<warehouse-id>" \
+  --arg s "$(sed 's/\${days}/30/' workshop_app/queries/endpoint_inventory_v1_v3.sql)" \
+  '{warehouse_id:$w, statement:$s, wait_timeout:"50s"}')"
 ```
 
 …or just paste the file into the SQL editor (replace each `${...}` placeholder with a literal —
-each file's header says what goes where).
+each file's header says what goes where). For the full set of terminal commands — including the
+REST-only steps (governed endpoint, ACLs, model services, MCP JSON-RPC) — see
+[`cli.md`](cli.md).
 
 ## Core walkthrough — the 14 steps, by hand
 
