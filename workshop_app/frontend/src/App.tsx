@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle, ListChecks } from "lucide-react";
+import { ShieldCheck, Home, Layers, Lock, DollarSign, Loader2, Rocket, HelpCircle, ListChecks, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { api, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
+import { api, groupCounts, type Workshop, type Accelerators, type ProgressMap } from "@/lib/api";
 import Intro from "@/pages/Intro";
 import PillarPage from "@/pages/PillarPage";
 import Faq from "@/pages/Faq";
 import Prerequisites from "@/pages/Prerequisites";
+import Outcomes from "@/pages/Outcomes";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
 
@@ -32,9 +33,16 @@ function Shell() {
   }
   useEffect(refreshProgress, []);
 
+  // Changing pages should start you at the top. Without this the new page keeps the previous
+  // page's scroll position, which reads as a half-loaded page (reported from a workshop).
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [route]);
+
+  // Nav badges count achieved steps over applicable (N/A excluded), matching the pillar pages.
   function groupProgress(steps: { id: string }[]): { done: number; total: number } {
-    const done = steps.filter((s) => progress[s.id]?.status === "done").length;
-    return { done, total: steps.length };
+    const { done, applicable } = groupCounts(steps, progress);
+    return { done, total: applicable };
   }
 
   return (
@@ -51,6 +59,7 @@ function Shell() {
         <nav className="flex flex-col gap-1">
           <NavItem active={route === "intro"} onClick={() => setRoute("intro")} icon={Home} label="Walkthrough" />
           <NavItem active={route === "prereqs"} onClick={() => setRoute("prereqs")} icon={ListChecks} label="Prerequisites" />
+          <NavItem active={route === "outcomes"} onClick={() => setRoute("outcomes")} icon={ClipboardCheck} label="Outcomes" />
           {workshop?.pillars.map((p) => {
             const { done, total } = groupProgress(p.steps);
             const Icon = PILLAR_ICONS[p.id] ?? Layers;
@@ -119,6 +128,14 @@ function Shell() {
         )}
         {route === "faq" && <Faq />}
         {route === "prereqs" && <Prerequisites />}
+        {route === "outcomes" && (
+          <Outcomes
+            pillars={workshop?.pillars}
+            accelerators={accel?.accelerators}
+            progress={progress}
+            onProgressChange={refreshProgress}
+          />
+        )}
         {workshop && route === "intro" && (
           <Intro
             intro={workshop.intro}

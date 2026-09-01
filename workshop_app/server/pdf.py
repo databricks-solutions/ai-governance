@@ -384,6 +384,8 @@ def report_pdf(o: dict) -> bytes:
 
     summary = o.get("summary", {}) or {}
     done, total = summary.get("done", 0), summary.get("total", 0)
+    applicable = summary.get("applicable", total)
+    na = summary.get("na", 0)
     pct = summary.get("pct", 0)
 
     story: list[Any] = [
@@ -395,8 +397,9 @@ def report_pdf(o: dict) -> bytes:
     ]
 
     band = Table([[Paragraph(
-        f"<b>{done} of {total} steps complete ({pct}%)</b> — "
-        f"{total - done} item(s) remain, listed as next steps at the end.", S["item"])]],
+        f"<b>{done} of {applicable} applicable steps achieved ({pct}%)</b> — "
+        f"{applicable - done} item(s) remain, listed as next steps at the end"
+        + (f"; {na} marked N/A" if na else "") + ".", S["item"])]],
         colWidths=[avail_w])
     band.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F5F7F8")),
@@ -461,6 +464,8 @@ def _step_row(step: dict, S: dict, widths: list) -> Any:
         box.add(Line(4.4, 3.0, 8.2, 8.0, strokeColor=HexColor(LAVA), strokeWidth=1.5))
     status = _esc(step.get("status") or "not started").replace("_", " ")
     meta = f'<font size="7.5">status: {status}</font>'
+    if step.get("poc"):
+        meta += ' <font size="7.5">· flagged for POC</font>'
     if step.get("notes"):
         meta += f'<br/><font size="7.5"><i>notes: {_esc(step["notes"])}</i></font>'
     return _checklist_row(box, Paragraph(_md_inline(step.get("title")), S["item"]),

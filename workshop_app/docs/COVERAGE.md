@@ -1,6 +1,8 @@
 # Coverage: workshop vs. the POC DOC, Adoption, and Migration guides
 
-Gap-check of the 20 core workshop steps against three sources of truth:
+**Note:** Workshop timing was retuned from 4 hours / 20 steps to **3 hours hands-on (+ ~1 hour slides/discussion) / ~14 steps**. References below to timing/step counts reflect the current model.
+
+Gap-check of the core workshop steps against three sources of truth:
 
 - **AI Governance POC DOC** — the four pillars the POC is measured on
   (**Cost / Usage / Access / Inventory**) and its three phases.
@@ -16,11 +18,11 @@ All three are marked IN PROGRESS (GA launch edition, 2026-08-04).
 | Phase | Duration | What happens |
 |---|---|---|
 | **Prereqs** | ~1 week | Entitlements, grants, previews, pilot users. See `PREREQUISITES.md`. |
-| **Workshop** | **4 hours** | Test and validate live, in their workspace. The 20 core steps. |
+| **Workshop** | **3 hours hands-on + ~1 hour slides** | Test and validate live, in their workspace. Core accelerators plus optional deep dives. |
 | **Follow-up (POC)** | 1–2 weeks | Close what didn't land; the app's exported outcomes drive it. |
 
-Everything below is judged against that budget. **4 hours is ~20 steps at ~11 minutes each
-including discussion** — there is no room for a feature checklist, so every "not covered" is
+Everything below is judged against that budget. **3 hours hands-on fits ~14 core steps at ~12–13 minutes each
+plus 1 hour of slides and discussion** — there is no room for a feature checklist, so every "not covered" is
 a deliberate call with a stated reason.
 
 **No migration thread.** Migration is a sequence a customer runs over weeks with their own
@@ -203,13 +205,13 @@ From the guides' risk tables — the ones that actually bite:
 
 ## 7. Verdict
 
-**20 core steps + 21 accelerator steps.** Coverage of the POC DOC's four pillars is complete
+**~14 core steps + ~21 accelerator steps.** Coverage of the POC DOC's four pillars is complete
 except two items that need accumulated traffic (monitoring drift, latency benchmark). Coverage
 of the Adoption Guide's target state is good; the one real gap was the *object model and client
 contract*, now `choice_model_services`.
 
-Fits the delivery shape: **~1 week prereqs → 4 hours live → 1–2 weeks follow-up.** 20 steps at
-~11 minutes each with discussion is a full 4 hours with a little air in it — enough to let a
+Fits the delivery shape: **~1 week prereqs → 3 hours hands-on + 1 hour slides → 1–2 weeks follow-up.** ~14 core steps at
+~12–13 minutes each plus slides/discussion fits the hands-on window — enough to let a
 good question run without losing the last pillar.
 
 The omissions are right for that budget. Inventory is pre-work, migration is a multi-week

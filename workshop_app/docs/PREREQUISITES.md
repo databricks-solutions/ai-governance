@@ -153,11 +153,11 @@ Anything red here is a prerequisite that didn't land — resolve it before the r
 
 ## 6. Scope guard
 
-The workshop is 4 hours and deliberately does **not** try to prove every Gateway feature.
+The workshop is 3 hours hands-on plus about 1 hour of slides and discussion, and deliberately does **not** try to prove every Gateway feature.
 Resist adding boxes; the goal is a governed path that demonstrably works, not exhaustive
 coverage.
 
-**In scope — the 20 core steps:** the open-by-default posture on `system.ai`, one governed
+**In scope — the core steps:** the open-by-default posture on `system.ai`, one governed
 endpoint and who may call it, model/tool/agent inventory, a policy that visibly denies
 something, a guardrail that blocks a prompt, a rate limit, spend visible in dollars,
 per-developer coding-agent attribution, a measured routing saving, cost attribution by tag,

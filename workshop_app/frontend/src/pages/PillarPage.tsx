@@ -1,6 +1,6 @@
 import PageHeader from "@/components/PageHeader";
 import StepCard from "@/components/StepCard";
-import type { Pillar, ProgressMap } from "@/lib/api";
+import { groupCounts, type Pillar, type ProgressMap } from "@/lib/api";
 
 export default function PillarPage({
   pillar,
@@ -11,8 +11,8 @@ export default function PillarPage({
   progress: ProgressMap;
   onProgressChange: () => void;
 }) {
-  const done = pillar.steps.filter((s) => progress[s.id]?.status === "done").length;
-  const pct = pillar.steps.length ? Math.round((100 * done) / pillar.steps.length) : 0;
+  const { done, applicable } = groupCounts(pillar.steps, progress);
+  const pct = applicable ? Math.round((100 * done) / applicable) : 0;
 
   return (
     <>
@@ -22,7 +22,7 @@ export default function PillarPage({
             <div className="h-full bg-navy transition-all" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-sm font-semibold tabular-nums text-navy">
-            {done}/{pillar.steps.length}
+            {done}/{applicable}
           </span>
         </div>
       </PageHeader>
