@@ -730,14 +730,7 @@ def t_guardrail_activity() -> TestResult:
         cfg.get("governed_endpoint", {}).get("inference_table_prefix", "workshop_governed"),
         "governed_endpoint.inference_table_prefix")
     table = f"{cat}.{sch}.{prefix}_payload"
-    sql = f"""
-      SELECT event_time, requester, status_code, destination_model,
-             substr(request, 1, 400)  AS request_excerpt,
-             substr(response, 1, 400) AS response_excerpt
-      FROM {table}
-      WHERE status_code IS NULL OR status_code >= 400
-      ORDER BY event_time DESC LIMIT 10
-    """
+    sql = load_query("guardrail_activity", table=table)
     try:
         rows = fetchall(sql)
         if not rows:
@@ -774,15 +767,7 @@ def t_create_mcp_policy() -> TestResult:
     reason = _sql_str(pol.get("deny_reason")
                       or "This tool is blocked by workshop policy.")
     fqn = f"{cat}.{sch}.{fn}"
-    ddl = f"""
-    CREATE OR REPLACE FUNCTION {fqn}(event VARIANT)
-    RETURNS VARIANT
-    RETURN CASE
-      WHEN event:context.tool.name::STRING IN ({deny_sql})
-      THEN to_variant_object(named_struct('result','DENY','reason',{reason}))
-      ELSE to_variant_object(named_struct('result','ALLOW','reason',''))
-    END;
-    """
+    ddl = load_query("mcp_service_policy", function_fqn=fqn, deny_tools=deny_sql, reason=reason)
     try:
         fetchall(ddl)
         return _ok(f"Created policy function `{fqn}`.", function=fqn, denies=deny, ddl=ddl,

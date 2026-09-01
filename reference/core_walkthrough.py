@@ -222,21 +222,24 @@ except Exception as e:
 
 # COMMAND ----------
 
-# Example: a keyword-blocklist policy function (adjust catalog/schema). This is the same DDL the
-# app runs — creating a function is the one write here, and it changes no endpoint behavior until
-# you ATTACH it in the UI.
+# These are the same DDLs the app runs, loaded from queries/ so there's one source of truth.
+# Creating a function is the one write here; it changes no endpoint behavior until you ATTACH it
+# in the AI Gateway UI.
 if CATALOG and SCHEMA:
-    ddl = f"""
-    CREATE OR REPLACE FUNCTION {CATALOG}.{SCHEMA}.keyword_blocklist_policy(event VARIANT)
-    RETURNS STRING
-    RETURN CASE
-      WHEN lower(CAST(event:input.messages[0].content AS STRING)) LIKE '%social security number%'
-        OR lower(CAST(event:input.messages[0].content AS STRING)) LIKE '%credit card number%'
-      THEN 'DENY: blocked keyword'
-      ELSE 'ALLOW' END
-    """
-    print(ddl)
-    # run_sql(ddl)  # uncomment to create it
+    keyword_ddl = load_query(
+        "keyword_blocklist_policy",
+        function_fqn=f"{CATALOG}.{SCHEMA}.keyword_blocklist_policy",
+        keywords="'social security number', 'credit card number'",
+    )
+    mcp_ddl = load_query(
+        "mcp_service_policy",
+        function_fqn=f"{CATALOG}.{SCHEMA}.mcp_read_only_policy",
+        deny_tools="'create_issue', 'push_files'",
+        reason="'Blocked by workshop policy.'",
+    )
+    print("--- keyword blocklist guardrail ---\n", keyword_ddl)
+    print("--- MCP service policy ---\n", mcp_ddl)
+    # run_sql(keyword_ddl); run_sql(mcp_ddl)   # uncomment to create them
 else:
     print("Set the catalog widget to generate the policy DDL.")
 
