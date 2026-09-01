@@ -1,0 +1,3 @@
+[submodule "skills-collaboration-framework"]
+	path = skills-collaboration-framework
+	url = https://github.com/greenwood-skills-admin/skills-collaboration-framework
