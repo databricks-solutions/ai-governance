@@ -1,0 +1,14 @@
+extends: default
+rules:
+  # Long lines warn (don't fail) — GitHub Actions/JSON lines legitimately exceed 120.
+  line-length:
+    max: 120
+    level: warning
+  # Allow only real booleans as values, but don't flag keys like GitHub Actions `on:`.
+  truthy:
+    allowed-values: ['true', 'false']
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  # Config/workflow files don't begin with `---`.
+  document-start: disable

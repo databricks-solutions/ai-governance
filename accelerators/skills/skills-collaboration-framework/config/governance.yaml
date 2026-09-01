@@ -1,0 +1,62 @@
+# governance.yaml — single people-and-roles directory. The platform team owns this file.
+# Owner-eligible = the union of every email listed anywhere below.
+platform_team:
+  - cedric.boisvert@databricks.com
+tier2:
+  stewards:
+    # VCH-aligned domains (organized by team so the demo reads as familiar). For this demo every
+    # domain is stewarded by the same real people so any T2 skill can be signed off; in production
+    # each domain names its own steward. Abbreviations:
+    #   acute             — Acute Care
+    #   community         — Community (Health) Services
+    #   dgp               — Data Governance & Privacy
+    #   faa               — Financial Applications & Analytics
+    #   aa                — Advanced Analytics
+    #   ed                — Emergency Department
+    #   lmps              — Lower Mainland Pharmacy Services
+    #   maa               — Medical Academics & Affairs
+    #   quality-analytics — Quality Analytics
+    #   infrastructure    — Infrastructure
+    #   eabi              — Enterprise Analytics & BI
+    acute:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    community:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    dgp:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    faa:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    aa:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    ed:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    lmps:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    maa:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    quality-analytics:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    infrastructure:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+    eabi:
+      - cedric.boisvert@databricks.com
+      - siddesh.ujjni@databricks.com
+tier3:
+  # For this demo both council and security are the same real people so a T3 promotion can be
+  # signed off; in production these are distinct roles (council ≠ security) held by different teams.
+  council:
+    - cedric.boisvert@databricks.com
+    - siddesh.ujjni@databricks.com
+  security:
+    - cedric.boisvert@databricks.com
+    - siddesh.ujjni@databricks.com

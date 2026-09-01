@@ -1,0 +1,25 @@
+{
+  "_comment": "Skills sync FLAT to skills_path. NEVER nest skills under tier/domain subfolders — Genie Code auto-loads from the top level of skills_path only. This greenwood demo maps tiers to a dev→staging→prod SDLC (NOT one-workspace-per-domain): Tier 1 is self-uploaded to DEV and never CI-synced; Tier 2 (every VCH domain) syncs to STAGING; Tier 3 (enterprise) syncs to ALL THREE workspaces. Domains are organized to mirror VCH's team structure so the demo reads as familiar — the tier→reach model is what generalizes; the domain list is illustrative.",
+  "skills_path": "/.assistant/skills",
+  "tier2": {
+    "acute": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "community": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "dgp": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "faa": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "aa": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "ed": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "lmps": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "maa": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "quality-analytics": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "infrastructure": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"],
+    "eabi": ["https://dbc-e1d9ab39-ffcf.cloud.databricks.com"]
+  },
+  "tier3": {
+    "workspaces": [
+      "https://dbc-fb813e75-e5db.cloud.databricks.com",
+      "https://dbc-e1d9ab39-ffcf.cloud.databricks.com",
+      "https://dbc-fbcbb704-ba3c.cloud.databricks.com"
+    ]
+  },
+  "notes": "Workspace roles: DEV=dbc-fb813e75-e5db (greenwood-demo-dev), STAGING=dbc-e1d9ab39-ffcf (greenwood-demo-staging), PROD=dbc-fbcbb704-ba3c (greenwood-demo-prod). Tier 1 never syncs (self-uploaded to DEV only, for dogfooding). Tier 2 syncs each domain's skill folders to skills_path on STAGING — a shared team-integration workspace, since 3 demo workspaces can't give each of 11 domains its own. Tier 3 syncs to skills_path on every workspace in tier3.workspaces (dev+staging+prod) — enterprise skills are available everywhere. In a real VCH topology each domain would map to its own workspace(s); only this mapping changes, the scripts and CI do not. Each target workspace needs a CI service principal valid there (account-level OAuth M2M) with CAN_MANAGE on skills_path."
+}
