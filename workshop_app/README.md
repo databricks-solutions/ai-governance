@@ -45,7 +45,7 @@ an MCP policy function, etc.).
 
 ## Accelerators (optional add-ons)
 
-Beyond the core workshop, five optional **~4-hour accelerators** each get their own page (same
+Beyond the core workshop, six optional **~3-hour accelerators** each get their own page (same
 concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
 - **MCP Servers** — on-behalf-of auth to a managed/external MCP.
@@ -56,6 +56,7 @@ concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
   migrate one shadow workload.
 - **Policies & Guardrails** — safety filter on input/output, custom PII-leakage
   judge, red-team dataset.
+- **Skills** — build, govern, and deploy Agent Skills in Genie Code with registry control.
 
 Run the one that matches the customer's priority (the accelerator overview and links live on
 the in-app **Walkthrough** page). Accelerator progress is tracked in the same volume-backed

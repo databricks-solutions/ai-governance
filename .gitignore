@@ -9,6 +9,10 @@ __pycache__
 *.egg-info/
 .ruff_cache/
 .pytest_cache/
+uv.lock
+
+# Editor
+.vscode/
 
 # Databricks Asset Bundles
 .databricks/

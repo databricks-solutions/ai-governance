@@ -1,7 +1,7 @@
 # Accelerator — External Providers
 
 Route Bedrock, OpenAI, and Anthropic through the gateway with credentials in secrets (never
-inline) and access bound to approved workspaces. A ~4-hour deep dive on bringing shadow
+inline) and access bound to approved workspaces. A ~3-hour deep dive on bringing shadow
 provider access onto one governed path.
 
 Register providers as external models behind a governed endpoint so they inherit the same limits,

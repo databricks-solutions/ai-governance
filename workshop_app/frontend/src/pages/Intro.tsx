@@ -1,9 +1,8 @@
 import { Layers, Lock, DollarSign, ArrowRight, Rocket, FileDown } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
-import ExportPanel from "@/components/ExportPanel";
 import Markdown, { inline } from "@/components/Markdown";
-import { api, type Pillar, type ProgressMap, type DeployGuide } from "@/lib/api";
+import { api, groupCounts, type Pillar, type ProgressMap, type DeployGuide } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
 const ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
@@ -53,7 +52,7 @@ export default function Intro({
           <div className="grid gap-4 md:grid-cols-3">
             {pillars.map((p) => {
               const Icon = ICONS[p.id] ?? Layers;
-              const done = p.steps.filter((s) => progress[s.id]?.status === "done").length;
+              const { done, applicable } = groupCounts(p.steps, progress);
               return (
                 <button
                   key={p.id}
@@ -65,8 +64,8 @@ export default function Intro({
                 >
                   <div className="mb-4 flex w-full items-center justify-between">
                     <Icon className="h-6 w-6 text-navy" strokeWidth={2} />
-                    <Pill tone={done === p.steps.length ? "lava" : "muted"}>
-                      {done}/{p.steps.length}
+                    <Pill tone={applicable > 0 && done === applicable ? "lava" : "muted"}>
+                      {done}/{applicable}
                     </Pill>
                   </div>
                   <h3 className="text-xl font-semibold text-navy">{p.title}</h3>
@@ -91,7 +90,7 @@ export default function Intro({
             )}
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {accelerators.map((a) => {
-                const done = a.steps.filter((s) => progress[s.id]?.status === "done").length;
+                const { done, applicable } = groupCounts(a.steps, progress);
                 return (
                   <button
                     key={a.id}
@@ -103,8 +102,8 @@ export default function Intro({
                   >
                     <div className="mb-4 flex w-full items-center justify-between">
                       <Rocket className="h-6 w-6 text-navy" strokeWidth={2} />
-                      <Pill tone={done === a.steps.length && a.steps.length > 0 ? "lava" : "muted"}>
-                        {done}/{a.steps.length}
+                      <Pill tone={applicable > 0 && done === applicable ? "lava" : "muted"}>
+                        {done}/{applicable}
                       </Pill>
                     </div>
                     <h3 className="text-lg font-semibold text-navy">{a.title}</h3>
@@ -129,11 +128,6 @@ export default function Intro({
         <section>
           <Eyebrow>What the app needs from your workspace</Eyebrow>
           <GrantsExplainer go={go} />
-        </section>
-
-        <section>
-          <Eyebrow>Wrap up</Eyebrow>
-          <ExportPanel />
         </section>
       </div>
     </>

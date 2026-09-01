@@ -18,6 +18,7 @@ from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
 from . import deep_links, mcp, routing
 from .config import get_config, get_workspace_client
+from .queries import load_query
 from .workspace_sql import fetchall, test_connection
 
 TestResult = dict[str, Any]
@@ -109,6 +110,7 @@ API_DOCS: dict[str, dict[str, str]] = {
     "agent_sp_attribution": {
         "api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway config on agent-like endpoints)"},
     "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
+    "endpoint_inventory_v1_v3": {"api": "SQL: system.ai_gateway.usage (service_name NULL = v1)"},
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
         "api": "GET /api/2.1/unity-catalog/models + /api/2.1/unity-catalog/functions"},
@@ -191,6 +193,44 @@ def t_list_endpoints() -> TestResult:
     eps = list(w.serving_endpoints.list())
     names = [e.name for e in eps]
     return _ok(f"Found {len(names)} serving endpoints.", endpoints=names[:50])
+
+
+def t_endpoint_inventory_v1_v3() -> TestResult:
+    """Inventory Gateway traffic split by v1 (legacy endpoint) vs v3 (model service).
+
+    The migration backlog, read straight from usage. A call naming a legacy endpoint lands with
+    service_name NULL (the v1 /serving-endpoints path); a call naming a model-service FQN lands
+    with service_name set (the v3 /ai-gateway path). Any v1 row is traffic that breaks when the
+    v1 killswitch flips and needs to move to a model service first. SQL in
+    queries/endpoint_inventory_v1_v3.sql — copy-runnable so a customer can re-check on their own.
+    """
+    sql = load_query("endpoint_inventory_v1_v3", days="30")
+    try:
+        rows = fetchall(sql)
+    except Exception as e:
+        return _fail("Endpoint-inventory query failed — system.ai_gateway.usage may not be "
+                     "enabled on this account (Beta).", error=str(e)[:600], sql=sql)
+    if not rows:
+        return _todo("No Gateway traffic recorded in the last 30 days, so there is nothing to "
+                     "classify yet. Send a request through the Gateway, then re-run.", sql=sql)
+    v1 = [r for r in rows if str(r.get("gateway_path", "")).startswith("v1")]
+    v3 = [r for r in rows if str(r.get("gateway_path", "")).startswith("v3")]
+    v1_requests = sum(int(r.get("requests") or 0) for r in v1)
+    v3_requests = sum(int(r.get("requests") or 0) for r in v3)
+    if v1:
+        return _fail(
+            f"{len(v1)} target(s) still on the v1 (legacy endpoint) path — {v1_requests} "
+            f"request(s) in 30 days that break when the v1 killswitch flips. "
+            f"{len(v3)} target(s) already on v3 ({v3_requests} request(s)).",
+            v1_targets=[r.get("target") for r in v1][:25],
+            v3_targets=[r.get("target") for r in v3][:25],
+            rows=rows, sql=sql,
+            next="Stand up a model service in front of each v1 target, move clients to its FQN "
+                 "on the /ai-gateway/mlflow/v1 path, then revoke the legacy path.")
+    return _ok(
+        f"All {len(v3)} target(s) with recent traffic are on the v3 (model service) path — "
+        f"no v1 legacy-endpoint traffic in the last 30 days.",
+        v3_targets=[r.get("target") for r in v3][:25], rows=rows, sql=sql)
 
 
 def t_model_services() -> TestResult:
@@ -525,14 +565,7 @@ def t_gateway_spend_by_model() -> TestResult:
     why the app needs no grant on system.billing. It covers external-provider models routed
     through the Gateway: the spend a router actually shifts.
     """
-    sql = """
-      SELECT usage_metadata.model      AS model,
-             usage_metadata.provider   AS provider,
-             ROUND(SUM(usage_quantity), 2) AS usd
-      FROM system.ai_gateway.external_model_spend
-      WHERE usage_date > current_date() - 30
-      GROUP BY 1, 2 ORDER BY usd DESC LIMIT 20
-    """
+    sql = load_query("spend_by_model")  # queries/spend_by_model.sql
     try:
         rows = fetchall(sql)
         if not rows:
@@ -596,7 +629,7 @@ def t_verify_governed_endpoint() -> TestResult:
 # classifier, so every test agrees.
 _GUARDRAIL_SIGNALS = ("guardrail", "blocked", "policy", "content filter", "content_filter",
                       "invalid_keywords", "flagged")
-_BLOCK_FINISH_REASONS = ("content_filter", "content_filtered", "guardrail")
+_BLOCK_FINISH_REASONS = ("content_filter", "content_filtered", "guardrail", "refusal")
 
 
 def _msg_is_guardrail(text: str) -> bool:
@@ -630,12 +663,27 @@ def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
                     "text": str(exc)[:300], "finish_reason": None}
         return {"outcome": "error", "blocked": None, "via": None,
                 "text": str(exc)[:300], "finish_reason": None}
-    choices = (resp or {}).get("choices") or []
-    message = (choices[0].get("message") or {}) if choices else {}
-    content = message.get("content")
-    text = (content if isinstance(content, str)
-            else json.dumps(content) if content is not None else "")
-    finish = choices[0].get("finish_reason") if choices else None
+    resp = resp or {}
+    # Two response shapes reach this: the OpenAI chat shape (choices[].message.content,
+    # finish_reason) and the Anthropic Messages shape (content[] blocks, stop_reason) — the
+    # latter arrives from the provider-native path the coding-agent/path-coverage probes hit.
+    # Read whichever is present; treating the anthropic shape as an empty OpenAI body would
+    # misread a 200 structured refusal as "answered" and invert the path-coverage verdict.
+    choices = resp.get("choices") or []
+    if choices:
+        content = (choices[0].get("message") or {}).get("content")
+        text = (content if isinstance(content, str)
+                else json.dumps(content) if content is not None else "")
+        finish = choices[0].get("finish_reason")
+    elif "content" in resp or "stop_reason" in resp:
+        blocks = resp.get("content")
+        if isinstance(blocks, list):
+            text = " ".join(b.get("text", "") for b in blocks if isinstance(b, dict))
+        else:
+            text = blocks if isinstance(blocks, str) else ""
+        finish = resp.get("stop_reason")
+    else:
+        text, finish = "", None
     if finish and str(finish).lower() in _BLOCK_FINISH_REASONS:
         return {"outcome": "blocked", "blocked": True, "via": "http_200",
                 "text": text[:300], "finish_reason": finish}
@@ -697,14 +745,7 @@ def t_guardrail_activity() -> TestResult:
         cfg.get("governed_endpoint", {}).get("inference_table_prefix", "workshop_governed"),
         "governed_endpoint.inference_table_prefix")
     table = f"{cat}.{sch}.{prefix}_payload"
-    sql = f"""
-      SELECT event_time, requester, status_code, destination_model,
-             substr(request, 1, 400)  AS request_excerpt,
-             substr(response, 1, 400) AS response_excerpt
-      FROM {table}
-      WHERE status_code IS NULL OR status_code >= 400
-      ORDER BY event_time DESC LIMIT 10
-    """
+    sql = load_query("guardrail_activity", table=table)
     try:
         rows = fetchall(sql)
         if not rows:
@@ -741,15 +782,7 @@ def t_create_mcp_policy() -> TestResult:
     reason = _sql_str(pol.get("deny_reason")
                       or "This tool is blocked by workshop policy.")
     fqn = f"{cat}.{sch}.{fn}"
-    ddl = f"""
-    CREATE OR REPLACE FUNCTION {fqn}(event VARIANT)
-    RETURNS VARIANT
-    RETURN CASE
-      WHEN event:context.tool.name::STRING IN ({deny_sql})
-      THEN to_variant_object(named_struct('result','DENY','reason',{reason}))
-      ELSE to_variant_object(named_struct('result','ALLOW','reason',''))
-    END;
-    """
+    ddl = load_query("mcp_service_policy", function_fqn=fqn, deny_tools=deny_sql, reason=reason)
     try:
         fetchall(ddl)
         return _ok(f"Created policy function `{fqn}`.", function=fqn, denies=deny, ddl=ddl,
@@ -848,26 +881,14 @@ def t_usage_by_project() -> TestResult:
     """
     proj = get_config().get("project", {}).get("name", "")
     p = _sql_str(proj)
-    # Break out WHICH tag matched rather than OR-ing them together. The distinction is the
-    # teaching point: request_tags rows are the ones this app produced by sending a header,
-    # endpoint_tags rows come from the server-side tags the platform owner set. A single
-    # combined count hides which mechanism is actually working.
-    # COALESCE(service_name, endpoint_name) is required, not defensive: a Gateway call that
-    # names a plain ENDPOINT (which is what the routing steps do) lands with service_name NULL
-    # and endpoint_name set. Grouping on service_name alone shows the workshop's own traffic as
-    # an unnamed bucket. Verified live.
-    sql = f"""
-      SELECT requester,
-             COALESCE(service_name, endpoint_name) AS target,
-             SUM(CASE WHEN request_tags['project'] = {p} THEN 1 ELSE 0 END) AS request_tagged,
-             SUM(CASE WHEN endpoint_tags['project'] = {p} THEN 1 ELSE 0 END) AS endpoint_tagged,
-             COUNT(*) AS requests,
-             SUM(total_tokens) AS tokens
-      FROM system.ai_gateway.usage
-      WHERE event_time > current_timestamp() - INTERVAL 7 DAYS
-        AND (request_tags['project'] = {p} OR endpoint_tags['project'] = {p})
-      GROUP BY 1, 2 ORDER BY tokens DESC LIMIT 20
-    """
+    # SQL in queries/usage_by_project.sql. It breaks out WHICH tag matched rather than OR-ing
+    # them together — the teaching point: request_tags rows are the ones this app produced by
+    # sending a header, endpoint_tags rows come from the server-side tags the platform owner set;
+    # a single combined count hides which mechanism is actually working. COALESCE(service_name,
+    # endpoint_name) is required, not defensive: a Gateway call that names a plain ENDPOINT (what
+    # the routing steps do) lands with service_name NULL and endpoint_name set, so grouping on
+    # service_name alone shows the workshop's own traffic as an unnamed bucket. Verified live.
+    sql = load_query("usage_by_project", project=p)
     # How far behind real time the table is. Reported on the empty result because otherwise an
     # ingestion lag is indistinguishable from broken tagging — observed 13-21 minutes on a
     # reference workspace, which is long enough for a room to start debugging a working control.
@@ -923,16 +944,7 @@ def t_audit_scan() -> TestResult:
     `response` is a STRUCT in system.access.audit, so the field is read with dot notation.
     The `response:status_code` VARIANT-path form fails with a DATATYPE_MISMATCH.
     """
-    sql = """
-      SELECT event_time, action_name, service_name,
-             user_identity.email AS actor,
-             response.status_code AS status_code,
-             request_params
-      FROM system.access.audit
-      WHERE event_date >= current_date() - INTERVAL 1 DAY
-        AND (response.status_code >= 400 OR lower(action_name) LIKE '%deny%')
-      ORDER BY event_time DESC LIMIT 20
-    """
+    sql = load_query("audit_scan")  # queries/audit_scan.sql
     try:
         rows = fetchall(sql)
         leaks = [r for r in rows if _looks_like_secret(json.dumps(r, default=str))]
@@ -988,14 +1000,7 @@ def t_budget_status() -> TestResult:
     list_prices is needed. Budgets themselves are created in the account console; hard
     "block usage" caps are rolling out, so alert-only budgets are the safe assumption.
     """
-    sql = """
-      SELECT usage_metadata.model    AS model,
-             identity_metadata.run_by AS run_by,
-             ROUND(SUM(usage_quantity), 2) AS usd
-      FROM system.ai_gateway.external_model_spend
-      WHERE usage_date > current_date() - 30
-      GROUP BY 1, 2 ORDER BY usd DESC LIMIT 20
-    """
+    sql = load_query("budget_status")  # queries/budget_status.sql
     try:
         rows = fetchall(sql)
         total = sum(float(r.get("usd") or 0) for r in rows)
@@ -1754,14 +1759,15 @@ def t_external_provider_routing() -> TestResult:
 
 def _find_key_values(obj: Any) -> list[str]:
     """Recursively collect string values held under credential-shaped keys (api_key / *_key /
-    secret). External-model configs nest the key under a provider block, so a top-level scan
-    misses it."""
+    secret / *token). External-model configs nest the key under a provider block, so a top-level
+    scan misses it; token-style keys (e.g. `databricks_api_token`) count too, or a correctly
+    secret-referenced provider would be reported as unconfirmed."""
     out: list[str] = []
     if isinstance(obj, dict):
         for k, v in obj.items():
             kl = str(k).lower()
             if isinstance(v, str) and v and ("api_key" in kl or kl.endswith("_key")
-                                             or "secret" in kl):
+                                             or "secret" in kl or "token" in kl):
                 out.append(v)
             else:
                 out += _find_key_values(v)
@@ -2115,6 +2121,7 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
     "list_endpoints": t_list_endpoints,
+    "endpoint_inventory_v1_v3": t_endpoint_inventory_v1_v3,
     "model_services": t_model_services,
     "default_access": t_default_access,
     "endpoint_acl": t_endpoint_acl,

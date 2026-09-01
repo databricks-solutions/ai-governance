@@ -1,7 +1,7 @@
 # Accelerator — Coding Agents
 
 Route dev-agent traffic (Claude Code, Cursor, `ucode`, Codex) through the gateway, prove it is
-actually governed, attribute per developer, and cap the spend. A ~4-hour deep dive on the surface
+actually governed, attribute per developer, and cap the spend. A ~3-hour deep dive on the surface
 where the field sees the most questions and the most silent failures.
 
 Coding agents call model providers directly by default. Pointing them at the governed model
