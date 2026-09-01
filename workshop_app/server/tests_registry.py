@@ -18,6 +18,7 @@ from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
 
 from . import deep_links, mcp, routing
 from .config import get_config, get_workspace_client
+from .queries import load_query
 from .workspace_sql import fetchall, test_connection
 
 TestResult = dict[str, Any]
@@ -109,6 +110,7 @@ API_DOCS: dict[str, dict[str, str]] = {
     "agent_sp_attribution": {
         "api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway config on agent-like endpoints)"},
     "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
+    "endpoint_inventory_v1_v3": {"api": "SQL: system.ai_gateway.usage (service_name NULL = v1)"},
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
         "api": "GET /api/2.1/unity-catalog/models + /api/2.1/unity-catalog/functions"},
@@ -191,6 +193,44 @@ def t_list_endpoints() -> TestResult:
     eps = list(w.serving_endpoints.list())
     names = [e.name for e in eps]
     return _ok(f"Found {len(names)} serving endpoints.", endpoints=names[:50])
+
+
+def t_endpoint_inventory_v1_v3() -> TestResult:
+    """Inventory Gateway traffic split by v1 (legacy endpoint) vs v3 (model service).
+
+    The migration backlog, read straight from usage. A call naming a legacy endpoint lands with
+    service_name NULL (the v1 /serving-endpoints path); a call naming a model-service FQN lands
+    with service_name set (the v3 /ai-gateway path). Any v1 row is traffic that breaks when the
+    v1 killswitch flips and needs to move to a model service first. SQL in
+    queries/endpoint_inventory_v1_v3.sql — copy-runnable so a customer can re-check on their own.
+    """
+    sql = load_query("endpoint_inventory_v1_v3", days="30")
+    try:
+        rows = fetchall(sql)
+    except Exception as e:
+        return _fail("Endpoint-inventory query failed — system.ai_gateway.usage may not be "
+                     "enabled on this account (Beta).", error=str(e)[:600], sql=sql)
+    if not rows:
+        return _todo("No Gateway traffic recorded in the last 30 days, so there is nothing to "
+                     "classify yet. Send a request through the Gateway, then re-run.", sql=sql)
+    v1 = [r for r in rows if str(r.get("gateway_path", "")).startswith("v1")]
+    v3 = [r for r in rows if str(r.get("gateway_path", "")).startswith("v3")]
+    v1_requests = sum(int(r.get("requests") or 0) for r in v1)
+    v3_requests = sum(int(r.get("requests") or 0) for r in v3)
+    if v1:
+        return _fail(
+            f"{len(v1)} target(s) still on the v1 (legacy endpoint) path — {v1_requests} "
+            f"request(s) in 30 days that break when the v1 killswitch flips. "
+            f"{len(v3)} target(s) already on v3 ({v3_requests} request(s)).",
+            v1_targets=[r.get("target") for r in v1][:25],
+            v3_targets=[r.get("target") for r in v3][:25],
+            rows=rows, sql=sql,
+            next="Stand up a model service in front of each v1 target, move clients to its FQN "
+                 "on the /ai-gateway/mlflow/v1 path, then revoke the legacy path.")
+    return _ok(
+        f"All {len(v3)} target(s) with recent traffic are on the v3 (model service) path — "
+        f"no v1 legacy-endpoint traffic in the last 30 days.",
+        v3_targets=[r.get("target") for r in v3][:25], rows=rows, sql=sql)
 
 
 def t_model_services() -> TestResult:
@@ -525,14 +565,7 @@ def t_gateway_spend_by_model() -> TestResult:
     why the app needs no grant on system.billing. It covers external-provider models routed
     through the Gateway: the spend a router actually shifts.
     """
-    sql = """
-      SELECT usage_metadata.model      AS model,
-             usage_metadata.provider   AS provider,
-             ROUND(SUM(usage_quantity), 2) AS usd
-      FROM system.ai_gateway.external_model_spend
-      WHERE usage_date > current_date() - 30
-      GROUP BY 1, 2 ORDER BY usd DESC LIMIT 20
-    """
+    sql = load_query("spend_by_model")  # queries/spend_by_model.sql
     try:
         rows = fetchall(sql)
         if not rows:
@@ -848,26 +881,14 @@ def t_usage_by_project() -> TestResult:
     """
     proj = get_config().get("project", {}).get("name", "")
     p = _sql_str(proj)
-    # Break out WHICH tag matched rather than OR-ing them together. The distinction is the
-    # teaching point: request_tags rows are the ones this app produced by sending a header,
-    # endpoint_tags rows come from the server-side tags the platform owner set. A single
-    # combined count hides which mechanism is actually working.
-    # COALESCE(service_name, endpoint_name) is required, not defensive: a Gateway call that
-    # names a plain ENDPOINT (which is what the routing steps do) lands with service_name NULL
-    # and endpoint_name set. Grouping on service_name alone shows the workshop's own traffic as
-    # an unnamed bucket. Verified live.
-    sql = f"""
-      SELECT requester,
-             COALESCE(service_name, endpoint_name) AS target,
-             SUM(CASE WHEN request_tags['project'] = {p} THEN 1 ELSE 0 END) AS request_tagged,
-             SUM(CASE WHEN endpoint_tags['project'] = {p} THEN 1 ELSE 0 END) AS endpoint_tagged,
-             COUNT(*) AS requests,
-             SUM(total_tokens) AS tokens
-      FROM system.ai_gateway.usage
-      WHERE event_time > current_timestamp() - INTERVAL 7 DAYS
-        AND (request_tags['project'] = {p} OR endpoint_tags['project'] = {p})
-      GROUP BY 1, 2 ORDER BY tokens DESC LIMIT 20
-    """
+    # SQL in queries/usage_by_project.sql. It breaks out WHICH tag matched rather than OR-ing
+    # them together — the teaching point: request_tags rows are the ones this app produced by
+    # sending a header, endpoint_tags rows come from the server-side tags the platform owner set;
+    # a single combined count hides which mechanism is actually working. COALESCE(service_name,
+    # endpoint_name) is required, not defensive: a Gateway call that names a plain ENDPOINT (what
+    # the routing steps do) lands with service_name NULL and endpoint_name set, so grouping on
+    # service_name alone shows the workshop's own traffic as an unnamed bucket. Verified live.
+    sql = load_query("usage_by_project", project=p)
     # How far behind real time the table is. Reported on the empty result because otherwise an
     # ingestion lag is indistinguishable from broken tagging — observed 13-21 minutes on a
     # reference workspace, which is long enough for a room to start debugging a working control.
@@ -923,16 +944,7 @@ def t_audit_scan() -> TestResult:
     `response` is a STRUCT in system.access.audit, so the field is read with dot notation.
     The `response:status_code` VARIANT-path form fails with a DATATYPE_MISMATCH.
     """
-    sql = """
-      SELECT event_time, action_name, service_name,
-             user_identity.email AS actor,
-             response.status_code AS status_code,
-             request_params
-      FROM system.access.audit
-      WHERE event_date >= current_date() - INTERVAL 1 DAY
-        AND (response.status_code >= 400 OR lower(action_name) LIKE '%deny%')
-      ORDER BY event_time DESC LIMIT 20
-    """
+    sql = load_query("audit_scan")  # queries/audit_scan.sql
     try:
         rows = fetchall(sql)
         leaks = [r for r in rows if _looks_like_secret(json.dumps(r, default=str))]
@@ -988,14 +1000,7 @@ def t_budget_status() -> TestResult:
     list_prices is needed. Budgets themselves are created in the account console; hard
     "block usage" caps are rolling out, so alert-only budgets are the safe assumption.
     """
-    sql = """
-      SELECT usage_metadata.model    AS model,
-             identity_metadata.run_by AS run_by,
-             ROUND(SUM(usage_quantity), 2) AS usd
-      FROM system.ai_gateway.external_model_spend
-      WHERE usage_date > current_date() - 30
-      GROUP BY 1, 2 ORDER BY usd DESC LIMIT 20
-    """
+    sql = load_query("budget_status")  # queries/budget_status.sql
     try:
         rows = fetchall(sql)
         total = sum(float(r.get("usd") or 0) for r in rows)
@@ -2115,6 +2120,7 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
     "list_endpoints": t_list_endpoints,
+    "endpoint_inventory_v1_v3": t_endpoint_inventory_v1_v3,
     "model_services": t_model_services,
     "default_access": t_default_access,
     "endpoint_acl": t_endpoint_acl,

@@ -1,0 +1,45 @@
+name: Feature Request
+description: Suggest an enhancement or new capability for the workshop or accelerators
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the feature request! Please describe the capability you'd like to see.
+
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: Feature Description
+      description: What would you like to add or improve?
+      placeholder: "e.g., Add support for Terraform deployment, add Genie-specific cost attribution, create a FinOps dashboard template..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case / Problem
+      description: What customer problem does this solve?
+      placeholder: "e.g., Customers want Infrastructure-as-Code instead of click-through UI, need real-time budget alerts, need self-service model discovery..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution (Optional)
+      description: How might this be implemented?
+      placeholder: "e.g., New Terraform modules in the bundle, deep-dive notebook on cost control, new workshop accelerator..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other details, links, or background
+      placeholder: "Customer feedback, related issues, priority level..."
+    validations:
+      required: false

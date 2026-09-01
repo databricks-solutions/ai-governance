@@ -33,6 +33,12 @@ function Shell() {
   }
   useEffect(refreshProgress, []);
 
+  // Changing pages should start you at the top. Without this the new page keeps the previous
+  // page's scroll position, which reads as a half-loaded page (reported from a workshop).
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [route]);
+
   // Nav badges count achieved steps over applicable (N/A excluded), matching the pillar pages.
   function groupProgress(steps: { id: string }[]): { done: number; total: number } {
     const { done, applicable } = groupCounts(steps, progress);

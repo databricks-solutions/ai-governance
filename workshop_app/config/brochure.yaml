@@ -10,12 +10,12 @@
 
 title: AI Governance Workshop
 subtitle: Work with Databricks to stand up Unity AI Gateway in your workshop and see it live.
-duration: 4-hour hands-on workshop
+duration: 3-hour hands-on workshop (plus ~1 hour slides/discussion)
 format: Live in your own Databricks workspace
 
 # The one-line frame that sits under the title band.
 lead: >-
-  In one focused half-day your platform team builds a governed AI control plane and proves it
+  In one focused 4-hour session your platform team builds a governed AI control plane and proves it
   works: every model, tool, and agent behind one Unity Catalog control plane, with the cost,
   choice, and control to run AI at scale without slowing teams down.
 
@@ -59,10 +59,11 @@ personas:
 # The blurb that closes the page: an intro line, then one bullet per accelerator.
 accelerators:
   title: Go deeper with accelerators
-  intro: "There are also five optional ~4-hour accelerators to explore concepts deeper:"
+  intro: "There are also six optional ~3-hour accelerators to explore concepts deeper:"
   items:
     - "**MCP Servers** — on-behalf-of identity, UC permissions, and service policies"
     - "**Agent Registry** — register, version, and own a representative agent"
     - "**Coding Agents** — govern dev-agent traffic with per-developer attribution and secret detection"
     - "**External Providers** — route Bedrock, OpenAI, and Anthropic through the Gateway"
     - "**Policies & Guardrails** — safety filters and a custom PII-leakage judge"
+    - "**Skills** — build, govern, and deploy Agent Skills in Genie Code with a tiered registry and allowlist enforcement"

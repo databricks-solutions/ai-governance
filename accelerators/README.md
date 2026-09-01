@@ -1,6 +1,6 @@
 # Accelerators — reference notebooks
 
-Optional **~4-hour deep dives** that run after the core AI Governance Workshop (Choice · Cost ·
+Optional **~3-hour deep dives** that run after the core AI Governance Workshop (Choice · Cost ·
 Control). Each accelerator is delivered in-app by the workshop app (defined in
 [`../workshop_app/config/accelerators.yaml`](../workshop_app/config/accelerators.yaml)); the
 folders here let you **reference and run the same checks without deploying the app**.

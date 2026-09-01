@@ -5,7 +5,7 @@ A customer-facing, guided workshop for standing up a governed AI control plane o
 Databricks workspace — and proving it works live. Organized around three pillars —
 Choice · Cost · Control — where every step has a concept, a "Try It" action that
 exercises a real control against the connected workspace, and a "Verify" step that
-proves it fired. Runs in four hours, with optional ~4-hour accelerators for deeper dives.
+proves it fired. Runs in three hours hands-on, plus about an hour of slides and discussion, with optional ~3-hour accelerators for deeper dives.
 ```
 
 The workshop puts the **Unity AI Gateway** — a single, governed control plane in front of the
@@ -44,7 +44,7 @@ tables** (`<catalog>.<schema>.*`) for audit, eval, and guardrail review.
 
 ## The core workshop — Choice · Cost · Control
 
-Four hours, run top to bottom against the customer's own workspace. Content lives in
+Three hours hands-on, plus about an hour of slides and discussion, run top to bottom against the customer's own workspace. Content lives in
 [`workshop_app/config/steps.yaml`](workshop_app/config/steps.yaml); the executable checks behind
 each **Try It** button live in
 [`workshop_app/server/tests_registry.py`](workshop_app/server/tests_registry.py).
@@ -64,9 +64,9 @@ resume with no database to provision, and everything you run is included in the 
 
 ## Accelerators
 
-Beyond the core workshop, five optional **~4-hour accelerators** each get their own in-app page —
+Beyond the core workshop, six optional **~3-hour accelerators** each get their own in-app page —
 same **concept → Try It → Verify** flow, same progress store, same outcomes export. Run the one or
-two that match what the customer needs to unblock rather than all five. They are defined for the
+two that match what the customer needs to unblock rather than all six. They are defined for the
 app in [`workshop_app/config/accelerators.yaml`](workshop_app/config/accelerators.yaml) (build plan
 and design bar in [`workshop_app/docs/ACCELERATOR_PLAN.md`](workshop_app/docs/ACCELERATOR_PLAN.md)).
 
@@ -111,6 +111,12 @@ output, MASK vs BLOCK, how a block is delivered (4xx vs HTTP 200 + reason, and t
 "sticky block" gotcha), path coverage, and effectiveness measured on a labeled set. The
 effectiveness step draws on the in-repo guardrail benchmark.
 → [`accelerators/policies-and-guardrails/`](accelerators/policies-and-guardrails) · [reference queries](accelerators/policies-and-guardrails/reference_queries.py) · [guardrail benchmark](accelerators/policies-and-guardrails/guardrail_benchmark.py)
+
+### 🎛️ Skills
+Build, govern, and deploy Agent Skills in Genie Code with a tiered registry and allowlist enforcement.
+Register skills as first-class assets, control who can discover and invoke them, and audit skill usage
+across your organization.
+→ [`accelerators/skills/`](accelerators/skills) · [reference queries](accelerators/skills/reference_queries.py)
 
 ## Getting started
 
