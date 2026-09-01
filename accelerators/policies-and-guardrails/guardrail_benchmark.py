@@ -436,8 +436,11 @@ def online_pred(payload: str) -> int:
     try:
         r = invoke(payload, max_tokens=64)
         body = json.dumps(r.get("body", {}))
+        # A benign 200 chat body always contains the schema key "content", so matching the bare
+        # word flags every response. Match block/moderation markers instead.
         blocked = r.get("status_code", 200) != 200 or any(
-            k in body.lower() for k in ["guardrail", "flagged", "content", "moderat", "pii"])
+            k in body.lower() for k in ["guardrail", "flagged", "content_filter", "content filter",
+                                        "content_filtered", "moderat", "invalid_keywords", "blocked"])
         return 1 if blocked else 0
     except Exception:
         return 1

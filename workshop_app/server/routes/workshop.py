@@ -191,8 +191,10 @@ def _build_outcomes() -> dict:
             poc = bool(saved.get("poc", False))
             na = outcome == "na"
             # Achieved = the interactive test passed OR the outcome was marked done by hand, so a
-            # workshop run without the app's Try-It buttons still reflects real outcomes.
-            achieved = (raw_status == "done") or (outcome == "done")
+            # workshop run without the app's Try-It buttons still reflects real outcomes. N/A wins:
+            # a step marked N/A is never "achieved", even if its Try-It had passed earlier —
+            # otherwise it would show complete while being excluded from the applicable count.
+            achieved = (not na) and ((raw_status == "done") or (outcome == "done"))
             if na:
                 disp = "n/a"
             elif achieved and raw_status != "done":
