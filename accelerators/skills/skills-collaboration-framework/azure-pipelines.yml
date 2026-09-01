@@ -1,0 +1,314 @@
+# Azure Pipelines — Skills Collaboration Framework
+# Calls the SAME scripts/ as GitHub Actions. No logic is duplicated between vendors.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - tier2/**
+      - tier3/**
+
+schedules:
+  - cron: '0 7 * * 1'
+    displayName: Weekly ownership health
+    branches:
+      include:
+        - main
+    always: true
+
+pr:
+  branches:
+    include:
+      - main
+
+# CI auth lives in per-environment Library variable groups (Pipelines → Library):
+#   databricks-cicd-dev / -staging / -prod — each provides DATABRICKS_HOST, DATABRICKS_CLIENT_ID,
+#   and DATABRICKS_CLIENT_SECRET (the environment SP's OAuth client secret). There is NO global
+#   group: each job links only the group(s) it needs, so no single credential spans all workspaces
+#   (least privilege) and the identically-named variables from different groups never collide.
+#   AI_ENDPOINT_NAME (a non-secret) is set inline where AI review runs.
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Validate
+    displayName: PR Validation
+    condition: eq(variables['Build.Reason'], 'PullRequest')
+    jobs:
+      - job: LintAndScan
+        displayName: Lint + Secret Scan
+        steps:
+          - checkout: self
+          - script: |
+              npm install -g markdownlint-cli
+              pip install yamllint
+              GITLEAKS_VERSION=8.21.2
+              curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+                | sudo tar -xz -C /usr/local/bin gitleaks
+            displayName: Install markdownlint, yamllint, gitleaks
+          - script: bash scripts/lint-and-scan.sh
+            displayName: Lint markdown + scan for secrets
+
+      - job: ValidateMeta
+        displayName: Metadata Validation
+        steps:
+          - checkout: self
+            fetchDepth: 0   # full history so validate-meta can diff vs the target branch (version-bump check)
+          - script: pip install pyyaml sqlglot
+            displayName: Install PyYAML + sqlglot
+          - script: bash scripts/validate-meta.sh
+            displayName: Validate frontmatter, versions, duplicates, tier eligibility, approvals
+            env:
+              # PR target branch — enables the "skill changed ⇒ registry version bumped" check.
+              BASE_REF: $(System.PullRequest.TargetBranch)
+
+      - job: SkillTests
+        displayName: Per-Skill Regression Tests
+        steps:
+          - checkout: self
+          - script: pip install pyyaml sqlglot
+            displayName: Install PyYAML + sqlglot
+          - script: bash scripts/run-skill-tests.sh
+            displayName: Run per-skill regression tests (behavior assertions over declared SQL)
+
+      - job: AIReview
+        displayName: AI Skill Review (Smart Gate)
+        dependsOn: [LintAndScan, ValidateMeta]
+        # AI review calls the Databricks AI Gateway (read-only). Any environment SP works; use dev.
+        variables:
+          - group: databricks-cicd-dev
+          - name: AI_ENDPOINT_NAME
+            value: databricks-claude-haiku-4-5
+        steps:
+          - checkout: self
+            fetchDepth: 0   # full history so we can diff changed skills vs the target branch
+          # ai-review.sh talks to the AI Gateway over HTTPS (curl + OAuth M2M) — no Databricks CLI needed here.
+          - script: pip install pyyaml
+            displayName: Install PyYAML
+          - script: |
+              # System.* values come via env (not inline macro expansion) to avoid injection.
+              TARGET_BRANCH="${TARGET_BRANCH_REF#refs/heads/}"
+              # Tier 2/3 only (spec §2: Tier 1 = lint + secret scan only).
+              CHANGED=$(git diff --name-only "origin/${TARGET_BRANCH}...HEAD" | grep -E '^tier[23]/.*SKILL\.md$' || true)
+              if [[ -z "$CHANGED" ]]; then
+                echo "No Tier 2/3 SKILL.md changed — AI review not required."
+                exit 0
+              fi
+              while IFS= read -r skill_file; do
+                bash scripts/ai-review.sh "$skill_file" "$PR_ID"
+              done <<< "$CHANGED"
+            displayName: Run AI review on changed skills
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+              AI_ENDPOINT_NAME: $(AI_ENDPOINT_NAME)
+              # Per-tier gate (spec §16.3): advisory at Tier 2, blocking (human-review) at Tier 3.
+              # EVAL_GATE_MODE is the fallback if a tier-specific override is unset.
+              EVAL_GATE_MODE: advisory
+              EVAL_GATE_MODE_T2: advisory
+              EVAL_GATE_MODE_T3: human-review
+              ADO_TOKEN: $(System.AccessToken)   # Azure DevOps OAuth token for PR comments — NOT a Databricks credential
+              CI_SYSTEM: ado
+              ADO_ORG: greenwood
+              ADO_PROJECT: cicd-demo
+              ADO_REPO: skills-collaboration-framework
+              TARGET_BRANCH_REF: $(System.PullRequest.TargetBranch)
+              PR_ID: $(System.PullRequest.PullRequestId)
+
+      - job: GateSelfCheck
+        displayName: Branch-protection self-check
+        steps:
+          - checkout: self   # need the repo on disk to run scripts/check-branch-protection.sh
+          - script: bash scripts/check-branch-protection.sh
+            displayName: Assert main is gated
+            env:
+              CI_SYSTEM: ado
+              ADO_ORG: greenwood
+              ADO_PROJECT: cicd-demo
+              ADO_REPO: skills-collaboration-framework
+              ADO_TOKEN: $(System.AccessToken)
+
+  - stage: Sync
+    displayName: Sync to Workspace
+    # No dependsOn: on a main build the Validate stage is skipped, and an implicit
+    # dependency on a skipped stage makes succeeded() false — which would wrongly skip Sync.
+    dependsOn: []
+    condition: >
+      and(eq(variables['Build.SourceBranchName'], 'main'),
+          ne(variables['Build.Reason'], 'PullRequest'))
+    # Per-environment sync jobs. Each links ONLY its own databricks-cicd-<env> variable group and
+    # authenticates with that environment's service principal — no shared credential (true least
+    # privilege: the dev SP cannot write to prod). Linking all three groups in one job would collide
+    # (they define the same DATABRICKS_CLIENT_ID/SECRET names), hence one job per environment.
+    #   Tier 2 → STAGING only.   Tier 3 → dev + staging + prod (each job restricts to its own host
+    #   via --this-host-only, which filters the tier's target list to $DATABRICKS_HOST).
+    jobs:
+      - job: SyncT2Staging
+        displayName: Sync Tier 2 → Staging
+        variables:
+          - group: databricks-cicd-staging
+        steps:
+          - checkout: self
+            fetchDepth: 2   # need HEAD~1..HEAD to detect which skills changed on the merge
+          - script: |
+              pip install pyyaml
+              curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: Install PyYAML + Databricks CLI
+          - script: |
+              # mapfile (not `for x in $var`) so a domain name is never word-split on whitespace.
+              mapfile -t CHANGED_DOMAINS < <(git diff --name-only HEAD~1..HEAD | grep '^tier2/' | cut -d'/' -f2 | sort -u)
+              if [[ ${#CHANGED_DOMAINS[@]} -eq 0 ]]; then echo "No tier2 change on this merge."; exit 0; fi
+              for domain in "${CHANGED_DOMAINS[@]}"; do
+                echo "==> Syncing tier2/$domain → staging"
+                bash scripts/sync-skills.sh 2 "$domain" --this-host-only
+              done
+            displayName: Sync changed Tier-2 domains to staging
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+
+      - job: SyncT3Dev
+        displayName: Sync Tier 3 → Dev
+        variables:
+          - group: databricks-cicd-dev
+        steps:
+          - checkout: self
+            fetchDepth: 2
+          - script: |
+              pip install pyyaml
+              curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: Install PyYAML + Databricks CLI
+          - script: |
+              [[ -n "$(git diff --name-only HEAD~1..HEAD | grep '^tier3/' || true)" ]] || { echo "No tier3 change."; exit 0; }
+              bash scripts/sync-skills.sh 3 --this-host-only
+            displayName: Sync Tier-3 skills to dev
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+
+      - job: SyncT3Staging
+        displayName: Sync Tier 3 → Staging
+        variables:
+          - group: databricks-cicd-staging
+        steps:
+          - checkout: self
+            fetchDepth: 2
+          - script: |
+              pip install pyyaml
+              curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: Install PyYAML + Databricks CLI
+          - script: |
+              [[ -n "$(git diff --name-only HEAD~1..HEAD | grep '^tier3/' || true)" ]] || { echo "No tier3 change."; exit 0; }
+              bash scripts/sync-skills.sh 3 --this-host-only
+            displayName: Sync Tier-3 skills to staging
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+
+      - job: SyncT3Prod
+        displayName: Sync Tier 3 → Prod
+        variables:
+          - group: databricks-cicd-prod
+        steps:
+          - checkout: self
+            fetchDepth: 2
+          - script: |
+              pip install pyyaml
+              curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: Install PyYAML + Databricks CLI
+          - script: |
+              [[ -n "$(git diff --name-only HEAD~1..HEAD | grep '^tier3/' || true)" ]] || { echo "No tier3 change."; exit 0; }
+              bash scripts/sync-skills.sh 3 --this-host-only
+            displayName: Sync Tier-3 skills to prod
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+
+      - job: EvalReport
+        displayName: Report eval_score from AI review
+        # AI review calls the Databricks AI Gateway (read-only) — it needs a valid credential + the
+        # serving endpoint, independent of the sync targets. Uses the dev environment's SP; the
+        # endpoint name is a non-secret inline variable.
+        variables:
+          - group: databricks-cicd-dev
+          - name: AI_ENDPOINT_NAME
+            value: databricks-claude-haiku-4-5
+        steps:
+          - checkout: self
+            fetchDepth: 2
+          - script: |
+              pip install pyyaml
+              curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: Install PyYAML + Databricks CLI
+          - script: |
+              CHANGED=$(git diff --name-only HEAD~1..HEAD | grep 'SKILL\.md$' || true)
+              [[ -z "$CHANGED" ]] && { echo "No SKILL.md changed."; exit 0; }
+              REPORT="$(Build.ArtifactStagingDirectory)/eval-score-report.md"
+              echo "# AI Skill Review — eval_score report (build $(Build.BuildNumber))" > "$REPORT"
+              echo "" >> "$REPORT"
+              # Attribute to whoever triggered the pipeline. Values come via env (NOT inline macro
+              # expansion) so a crafted display name can't inject shell; sanitize to a safe charset.
+              SAFE_BY=$(printf '%s' "${REQUESTED_BY:-unknown}" | tr -cd '[:alnum:] @._-')
+              SAFE_EMAIL=$(printf '%s' "${REQUESTED_EMAIL:-}" | tr -cd '[:alnum:]@._-')
+              echo "_Triggered by **${SAFE_BY}** (${SAFE_EMAIL}) — merge \`${SOURCE_VERSION:-}\`_" >> "$REPORT"
+              echo "" >> "$REPORT"
+              # main is branch-protected (no CI commit-back). Surface eval_score in ADO instead:
+              # ai-review.sh appends the rationale to $REPORT_FILE; we also tag the build per skill.
+              while IFS= read -r skill_file; do
+                [[ -f "$skill_file" ]] || continue
+                OUT=$(bash scripts/ai-review.sh "$skill_file") || true
+                echo "$OUT"
+                SCORE=$(echo "$OUT" | sed -n 's/.*Score: \([0-9.][0-9.]*\).*/\1/p' | tail -1)
+                NAME=$(basename "$(dirname "$skill_file")")
+                # Build tags become URL path segments — no ':' or '=' allowed. Use hyphens.
+                [[ -n "$SCORE" ]] && echo "##vso[build.addbuildtag]eval-${NAME}-${SCORE}"
+              done <<< "$CHANGED"
+              # Attach the accumulated report as a build-summary tab.
+              echo "##vso[task.uploadsummary]$REPORT"
+            displayName: Report eval_score from AI review
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+              AI_ENDPOINT_NAME: $(AI_ENDPOINT_NAME)
+              REPORT_FILE: $(Build.ArtifactStagingDirectory)/eval-score-report.md
+              REQUESTED_BY: $(Build.RequestedFor)          # via env to avoid command injection
+              REQUESTED_EMAIL: $(Build.RequestedForEmail)
+              SOURCE_VERSION: $(Build.SourceVersion)
+
+  - stage: OwnershipHealth
+    displayName: Ownership Health
+    dependsOn: []
+    condition: eq(variables['Build.Reason'], 'Schedule')
+    jobs:
+      - job: Health
+        displayName: Ownership health check + auto-deprecation PRs
+        steps:
+          - checkout: self
+            fetchDepth: 0   # full history for last-commit dates
+            persistCredentials: true   # lets the build service push the auto/* branch
+          - script: pip install pyyaml
+            displayName: Install PyYAML
+          - script: bash scripts/ownership-health.sh
+            displayName: Report stale + ownerless skills
+            env:
+              REPORT_FILE: $(Build.ArtifactStagingDirectory)/ownership-health-report.md
+          - script: |
+              echo "##vso[task.uploadsummary]$(Build.ArtifactStagingDirectory)/ownership-health-report.md"
+              bash scripts/open-deprecation-pr.sh
+            displayName: Open auto-deprecation PRs for ownerless skills
+            env:
+              CI_SYSTEM: ado
+              RUN_ID: $(Build.BuildId)
+              ADO_TOKEN: $(System.AccessToken)
+              ADO_ORG: greenwood
+              ADO_PROJECT: cicd-demo
+              ADO_REPO: skills-collaboration-framework

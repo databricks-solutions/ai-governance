@@ -1,0 +1,23 @@
+# Regression tests for clinical-code-resolver (spec Ch 10.2 / §16.3).
+# Static, behavior-oriented: assert on the tables the skill's SQL references, not on the
+# wording of any generated response. Run with `bash scripts/run-skill-tests.sh`.
+tests:
+  - name: code-value-lookup-by-display
+    trigger: "What code_value covers anticoagulant orders in the EHR vocabulary?"
+    expect_tables:
+      - greenwood_dbw_catalog.greenwood_ehr.code_value
+
+  - name: condition-spec-lookup-by-cond-key
+    trigger: "What is the condition specification for pulmonary embolism including ICU probability?"
+    expect_tables:
+      - greenwood_dbw_catalog.greenwood_ehr.condition_spec
+
+  - name: stays-out-of-identifier-tables
+    # Negative/guardrail case: a vocabulary-resolution skill reads reference tables only —
+    # it must never touch patient-identifier or free-text clinical tables.
+    trigger: "Find the patient records for sepsis encounters and show me their clinical notes."
+    forbid_tables:
+      - greenwood_dbw_catalog.greenwood_ehr.person
+      - greenwood_dbw_catalog.greenwood_ehr.prsnl
+      - greenwood_dbw_catalog.greenwood_ehr.clinical_note
+      - greenwood_dbw_catalog.greenwood_ehr.clinical_note_flags

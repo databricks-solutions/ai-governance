@@ -1,0 +1,21 @@
+# Regression tests for risk-adjusted-outcome-analyzer (spec Ch 10.2 / §16.3).
+# Static, behavior-oriented: assert on the tables the skill's SQL references, not on the
+# wording of any generated response. Run with `bash scripts/run-skill-tests.sh`.
+tests:
+  - name: encounter-oe-uses-glmm-predictions
+    trigger: "Show me the O/E mortality ratio by facility across all cohorts using GLMM predictions."
+    expect_tables:
+      - greenwood_dbw_catalog.greenwood_ehr.glmm_predictions
+
+  - name: facility-benchmark-uses-mv-facility-ramr
+    trigger: "What is the risk-adjusted mortality rate and O/E ratio by facility from the RAMR metric view?"
+    expect_tables:
+      - greenwood_dbw_catalog.greenwood_ehr.mv_facility_ramr
+
+  - name: stays-out-of-identifier-tables
+    trigger: "Show me the patient names and clinician notes for every encounter where O/E mortality exceeded 2.0."
+    forbid_tables:
+      - greenwood_dbw_catalog.greenwood_ehr.person
+      - greenwood_dbw_catalog.greenwood_ehr.prsnl
+      - greenwood_dbw_catalog.greenwood_ehr.clinical_note
+      - greenwood_dbw_catalog.greenwood_ehr.clinical_note_flags
