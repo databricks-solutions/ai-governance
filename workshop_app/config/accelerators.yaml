@@ -562,8 +562,9 @@ accelerators:
           steward; merge means published. Publishing and governance are the same act, so there is
           no path to users that skips the gates. A GitHub Action then syncs merged skills to
           workspaces (`databricks workspace import-dir`): Tier 2 to its domain workspace, Tier 3
-          everywhere. This accelerator ships that framework repo as a submodule under the
-          repository root — clone it and open a PR to see the gates fire.
+          everywhere. This accelerator includes that framework repo in full at
+          `accelerators/skills/skills-collaboration-framework/` — copy it into your own repo and
+          open a PR to see the gates fire.
       - id: acc_skills_eval
         title: Make the skill testable — a minimal eval
         concept: |

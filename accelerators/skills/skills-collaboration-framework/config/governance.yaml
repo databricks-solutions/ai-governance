@@ -1,0 +1,62 @@
+# governance.yaml — single people-and-roles directory. The platform team owns this file.
+# Owner-eligible = the union of every email listed anywhere below.
+platform_team:
+  - platform-lead@greenwood.example.com
+tier2:
+  stewards:
+    # Greenwood-aligned domains (organized by team so the demo reads as familiar). For this demo every
+    # domain is stewarded by the same real people so any T2 skill can be signed off; in production
+    # each domain names its own steward. Abbreviations:
+    #   acute             — Acute Care
+    #   community         — Community (Health) Services
+    #   dgp               — Data Governance & Privacy
+    #   faa               — Financial Applications & Analytics
+    #   aa                — Advanced Analytics
+    #   ed                — Emergency Department
+    #   lmps              — Lower Mainland Pharmacy Services
+    #   maa               — Medical Academics & Affairs
+    #   quality-analytics — Quality Analytics
+    #   infrastructure    — Infrastructure
+    #   eabi              — Enterprise Analytics & BI
+    acute:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    community:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    dgp:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    faa:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    aa:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    ed:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    lmps:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    maa:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    quality-analytics:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    infrastructure:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+    eabi:
+      - platform-lead@greenwood.example.com
+      - security-lead@greenwood.example.com
+tier3:
+  # For this demo both council and security are the same real people so a T3 promotion can be
+  # signed off; in production these are distinct roles (council ≠ security) held by different teams.
+  council:
+    - platform-lead@greenwood.example.com
+    - security-lead@greenwood.example.com
+  security:
+    - platform-lead@greenwood.example.com
+    - security-lead@greenwood.example.com

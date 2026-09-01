@@ -1,0 +1,353 @@
+# Skills registry — governance metadata for T2/T3 skills.
+# T1 (personal sandbox) entries are optional.
+# IMPORTANT: registry.name must match SKILL.md name; tier must match folder placement.
+skills:
+  - name: pipeline-cost-analyzer
+    tier: 2
+    version: 1.3.1
+    owner: platform-lead@greenwood.example.com
+    domain: infrastructure
+    description: Analyze DBU cost trends and job costs; recommend optimizations.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - system.billing.usage
+      - system.lakeflow.jobs
+    approvals:
+      steward: platform-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: bed-capacity-monitor
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: acute
+    description: Monitor Acute Care bed occupancy, unit capacity, and census trends from aggregate ward-level tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.acute.bed_census
+      - main.acute.unit_capacity
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: community-service-volumes
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: community
+    description: Report Community Health service volumes, program utilization, and referral trends from aggregate program-level tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.community.service_visits
+      - main.community.programs
+      - main.community.referrals
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: governance-coverage-reporter
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: dgp
+    description: Report Unity Catalog governance coverage — table comments, ownership, and classification tags — from system.information_schema.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - system.information_schema.tables
+      - system.information_schema.table_tags
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: budget-variance-analyzer
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: faa
+    description: Analyze Financial Applications budget-vs-actual variance by cost center and account from aggregate ledger tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.finance.actuals
+      - main.finance.budgets
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: model-performance-tracker
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: aa
+    description: Track Advanced Analytics model performance (accuracy/drift) and inference volumes from aggregate ML-monitoring tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.analytics.model_metrics
+      - main.analytics.inference_logs
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: ed-throughput-monitor
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: ed
+    description: Monitor Emergency Department throughput — arrivals, wait times, length-of-stay, and LWBS rates — from aggregate time-bucketed tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.ed.throughput_hourly
+      - main.ed.daily_summary
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: pharmacy-dispensing-analytics
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: lmps
+    description: Analyze Lower Mainland Pharmacy dispensing volumes, formulary utilization, and drug spend from aggregate dispensing tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.pharmacy.dispensing
+      - main.pharmacy.formulary
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: academic-activity-tracker
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: maa
+    description: Track Medical Academics & Affairs activity — learner placements, teaching hours, and research output — from aggregate program tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.maa.placements
+      - main.maa.research_output
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: quality-indicator-reporter
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: quality-analytics
+    description: Report Quality Analytics indicators — readmission, adverse-event, and hand-hygiene rates — against target from aggregate quality-measure tables.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - main.quality.indicator_measures
+      - main.quality.targets
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: bi-adoption-analyzer
+    tier: 2
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    domain: eabi
+    description: Analyze Enterprise BI adoption — active users, query volumes, warehouse utilization, and slow-query hotspots — from system.query.history.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - system.query.history
+    approvals:
+      steward: security-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: catalog-navigator
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Enterprise-wide Unity Catalog discovery — find tables by name or topic, inspect columns, and locate data across the metastore from system.information_schema.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - system.information_schema.tables
+      - system.information_schema.columns
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null
+  - name: cost-optimizer
+    tier: 2
+    version: 1.0.1
+    owner: platform-lead@greenwood.example.com
+    domain: infrastructure
+    description: Recommend Databricks cost-optimization actions — commitment/discount coverage, budget variance, and forecast-vs-actual DBU spend from system.billing.usage and system.billing.list_prices.
+    data_classification: internal
+    pii: false
+    unity_catalog_scopes:
+      - system.billing.usage
+      - system.billing.list_prices
+    approvals:
+      steward: platform-lead@greenwood.example.com
+      council: ""
+      security: ""
+    deprecated: false
+    removed_after: null
+  - name: clinical-code-resolver
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Resolve clinical free-text concepts to coded values and condition definitions from greenwood_ehr code_value and condition_spec.
+    data_classification: regulated
+    pii: false
+    unity_catalog_scopes:
+      - greenwood_dbw_catalog.greenwood_ehr.code_value
+      - greenwood_dbw_catalog.greenwood_ehr.condition_spec
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null
+  - name: elixhauser-comorbidity-profiler
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Profile the 31 AHRQ Elixhauser comorbidity flags and van Walraven weighted index for Greenwood EHR encounter cohorts — the standard risk-adjustment covariate layer.
+    data_classification: regulated
+    pii: false
+    unity_catalog_scopes:
+      - greenwood_dbw_catalog.greenwood_ehr.elixhauser_encounter
+      - greenwood_dbw_catalog.greenwood_ehr.elixhauser_icd10_map
+      - greenwood_dbw_catalog.greenwood_ehr.population_elixhauser_summary
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null
+  - name: vte-cohort-analyzer
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Analyze hospital-acquired VTE (DVT/PE) outcomes and prophylaxis adherence from
+      the Greenwood EHR semantic layer; build the governed pop_vte cohort asset (function, table,
+      metric view) when it does not yet exist.
+    data_classification: regulated
+    pii: false
+    unity_catalog_scopes:
+      - greenwood_dbw_catalog.greenwood_ehr.condition_spec
+      - greenwood_dbw_catalog.greenwood_ehr.population_endpoint_features
+      - greenwood_dbw_catalog.greenwood_ehr.orders
+      - greenwood_dbw_catalog.greenwood_ehr.pop_vte_tbl
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null
+  - name: sepsis-cohort-analyzer
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Analyze sepsis cohort outcomes (in-hospital mortality, ICU transfer, LOS) and
+      SEP-1 bundle compliance from the Greenwood EHR semantic layer, reusing the governed
+      pop_sepsis cohort asset and Sepsis-3 / CMS SEP-1 clinical framing.
+    data_classification: regulated
+    pii: false
+    unity_catalog_scopes:
+      - greenwood_dbw_catalog.greenwood_ehr.pop_sepsis_tbl
+      - greenwood_dbw_catalog.greenwood_ehr.condition_spec
+      - greenwood_dbw_catalog.greenwood_ehr.population_endpoint_features
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null
+  - name: stroke-mi-cohort-analyzer
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Analyze ischemic stroke and acute MI cohort outcomes (30-day mortality, 30-day
+      readmission, reperfusion therapy rates) from the Greenwood EHR semantic layer, reusing the
+      governed pop_stroke_mi cohort asset and standard vascular-care clinical endpoints.
+    data_classification: regulated
+    pii: false
+    unity_catalog_scopes:
+      - greenwood_dbw_catalog.greenwood_ehr.pop_stroke_mi_tbl
+      - greenwood_dbw_catalog.greenwood_ehr.condition_spec
+      - greenwood_dbw_catalog.greenwood_ehr.population_endpoint_features
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null
+  - name: readmission-cohort-analyzer
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Analyze CMS HWR 30-day all-cause unplanned readmission outcomes, comorbidity
+      risk burden, and discharge disposition patterns from the Greenwood EHR semantic layer,
+      reusing the governed pop_readmit_30d cohort asset and mv_readmit_endpoint metric view.
+    data_classification: regulated
+    pii: false
+    unity_catalog_scopes:
+      - greenwood_dbw_catalog.greenwood_ehr.pop_readmit_30d_tbl
+      - greenwood_dbw_catalog.greenwood_ehr.mv_readmit_endpoint
+      - greenwood_dbw_catalog.greenwood_ehr.population_endpoint_features
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null
+  - name: risk-adjusted-outcome-analyzer
+    tier: 3
+    version: 1.0.0
+    owner: platform-lead@greenwood.example.com
+    description: Analyze cross-cohort risk-adjusted mortality (RAMR) and observed-vs-expected
+      (O/E) ratios using the Greenwood EHR GLMM machinery — facility random effects, van Walraven
+      adjustment, and the governed glmm_predictions table and mv_facility_ramr metric view.
+    data_classification: regulated
+    pii: false
+    unity_catalog_scopes:
+      - greenwood_dbw_catalog.greenwood_ehr.glmm_predictions
+      - greenwood_dbw_catalog.greenwood_ehr.mv_facility_ramr
+      - greenwood_dbw_catalog.greenwood_ehr.population_endpoint_features
+    approvals:
+      steward: ""
+      council: platform-lead@greenwood.example.com
+      security: security-lead@greenwood.example.com
+    deprecated: false
+    removed_after: null

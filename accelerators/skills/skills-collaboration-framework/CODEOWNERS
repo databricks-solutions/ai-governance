@@ -1,0 +1,29 @@
+# Backstop — the platform team reviews anything not claimed by a more specific rule below.
+# Nothing is ever unowned at review time.
+*   @greenwood-skills-admin
+
+# Tier 1 — personal sandboxes, no approval required
+/tier1/ @greenwood-skills-admin
+
+# Tier 2 — domain steward approval required (Greenwood-aligned domains)
+/tier2/acute/ @greenwood-skills-admin
+/tier2/community/ @greenwood-skills-admin
+/tier2/dgp/ @greenwood-skills-admin
+/tier2/faa/ @greenwood-skills-admin
+/tier2/aa/ @greenwood-skills-admin
+/tier2/ed/ @greenwood-skills-admin
+/tier2/lmps/ @greenwood-skills-admin
+/tier2/maa/ @greenwood-skills-admin
+/tier2/quality-analytics/ @greenwood-skills-admin
+/tier2/infrastructure/ @greenwood-skills-admin
+/tier2/eabi/ @greenwood-skills-admin
+
+# Tier 3 — council + security approval required (recorded in registry.yaml)
+/tier3/ @greenwood-skills-admin
+
+# Governance config — changes require council review
+/config/ @greenwood-skills-admin
+/CODEOWNERS @greenwood-skills-admin
+
+# Workspace instructions — always-on, org-wide Assistant context (council review)
+/workspace-instructions/ @greenwood-skills-admin

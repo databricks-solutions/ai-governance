@@ -1,0 +1,12 @@
+.env
+*.token
+*.secret
+__pycache__/
+*.pyc
+.DS_Store
+docs/env-inspection.md
+.planning/
+docs/superpowers/
+
+# Generated locally by ownership-health.sh (in CI it goes to the artifact staging dir)
+ownership-health-report.md
