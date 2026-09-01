@@ -336,7 +336,7 @@ def _require_pdf() -> None:
 @router.get("/export/brochure.pdf")
 def export_brochure_pdf(customer_name: str | None = None):
     """The one-page workshop brochure as a PDF — the leave-ahead an account team sends to book
-    the session (cost/choice/control, 4-hour format, target personas, accelerators).
+    the session (cost/choice/control, 3h hands-on + 1h slides, target personas, accelerators).
 
     Exists before any workshop does, so it needs no progress.
     """

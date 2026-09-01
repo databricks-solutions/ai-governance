@@ -14,6 +14,18 @@ Understand the three-layer instruction model (user instructions, workspace instr
 |---|---|
 | [`build_a_skill.py`](build_a_skill.py) | Hands-on lab: scaffold a skill.md, write a registry.yaml entry, run a minimal eval (3–5 golden Q&A scored by an LLM-as-judge), and a simple secret-scan over the skill text. |
 
+## The production framework (submodule)
+
+This repo vendors the real, batteries-included implementation as a submodule at the repo root:
+[`skills-collaboration-framework/`](../../skills-collaboration-framework). It ships the tiered
+registry (`tier1/`, `tier2/`, `tier3/`, `config/registry.yaml`), the CI gates
+(`scripts/lint-and-scan.sh`, `validate-meta.sh`, `run-skill-tests.sh`, `ai-review.sh`), the
+allowlist sync (`scripts/sync-skills.sh`), ownership-health tooling, and a
+[`docs/demo-runbook.md`](../../skills-collaboration-framework/docs/demo-runbook.md). Clone it
+(`git submodule update --init`) and open a PR to watch the gates fire — that is the non-app,
+production route. The notebook below is the lightweight hands-on primer that teaches the same
+concepts before you adopt the framework.
+
 ## Prerequisites
 
 - A SQL warehouse and an existing Unity Catalog catalog + schema.
