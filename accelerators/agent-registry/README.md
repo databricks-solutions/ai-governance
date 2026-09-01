@@ -1,7 +1,7 @@
 # Accelerator — Agent Registry
 
 Make agents first-class Unity Catalog assets — registered, versioned, owned, traced, and governed
-like any endpoint. A ~4-hour deep dive that turns one-off agent deploys into reproducible,
+like any endpoint. A ~3-hour deep dive that turns one-off agent deploys into reproducible,
 rollback-able UC models with owners and telemetry.
 
 A one-off deploy is not a registered agent. Each agent should be a UC model with an owner and a

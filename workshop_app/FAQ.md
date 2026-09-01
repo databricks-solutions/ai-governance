@@ -17,11 +17,11 @@ Three phases, and the middle one is the only day in a room:
 | Phase | Duration | What happens |
 |---|---|---|
 | **Prerequisites** | ~1 week | Entitlements, grants, previews, pilot users — mostly waiting on admins |
-| **Workshop** | **4 hours** | Test and validate live in your own workspace |
+| **Workshop** | **3 hours hands-on + ~1 hour slides/discussion** | Test and validate live in your own workspace |
 | **Follow-up** | 1–2 weeks | Close what didn't land on the day |
 
-Each optional **accelerator** is a ~4-hour add-on on one customer need — run the one that
-matches your priority, not all five.
+Each optional **accelerator** is a ~3-hour add-on on one customer need — run the one that
+matches your priority, not all six.
 
 ## Why isn't <capability> in the workshop?
 
@@ -80,7 +80,7 @@ A few controls aren't yet available through the API (e.g. attaching a guardrail 
 policy in the AI Gateway UI, or creating an account-console budget). Those are marked MANUAL
 with a deep link to the exact place in the workspace to complete them.
 
-## What are the five accelerators?
+## What are the six accelerators?
 
 - **MCP Server Setup & Testing** — on-behalf-of auth to a managed/external MCP.
 - **Agent Registry Setup & Testing** — register, version, and own a representative agent.
@@ -88,6 +88,7 @@ with a deep link to the exact place in the workspace to complete them.
   and code-secret detection.
 - **External Provider Setup & Testing** — route Bedrock/OpenAI/Anthropic through the Gateway.
 - **Policies & Guardrails (PII & Safety)** — safety filter, custom PII-leakage judge, red-team dataset.
+- **Skills** — build, govern, and deploy Agent Skills in Genie Code with a tiered registry.
 
 ## What do I get at the end?
 

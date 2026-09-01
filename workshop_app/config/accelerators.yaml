@@ -1,4 +1,4 @@
-# Optional add-on accelerators — each a ~4-hour deep dive on one customer need, run after
+# Optional add-on accelerators — each a ~3-hour deep dive on one customer need, run after
 # the core choice/cost/control workshop. Same step shape as pillars (config/steps.yaml),
 # so they reuse the StepCard UI, the backend tests, and the outcomes export. `test` values
 # map to server/tests_registry.py; several reuse core tests.
@@ -7,8 +7,8 @@ overview:
   title: How to use the accelerators
   body: |
     The core workshop covers the control plane across choice, cost, and control. Accelerators
-    are optional ~4-hour add-ons, each on a single topic. Run the one or two that match what
-    the customer needs to unblock rather than all five.
+    are optional ~3-hour add-ons, each on a single topic. Run the one or two that match what
+    the customer needs to unblock rather than all six.
 
     Each uses the same **concept → Try It → Verify** flow as the core steps, is tracked in the
     same progress store, and is included in the exported outcomes.
@@ -495,3 +495,101 @@ accelerators:
         action:
           label: Show guardrail activity
           test: guardrail_activity
+
+  - id: acc_skills
+    title: Skills
+    tagline: Build, govern, and deploy Agent Skills in Genie Code — a runtime allowlist and a tiered registry.
+    steps:
+      - id: acc_skills_what
+        title: What an Agent Skill is — and the three instruction layers
+        concept: |
+          An **Agent Skill** is a markdown file (instructions + a couple of examples) that
+          teaches the Databricks Assistant / Genie Code a new capability. It lives in the
+          workspace skills folder `~/.assistant/skills/` and shows up under
+          **Assistant → Settings → Agent Skills**.
+
+          Genie Code takes instructions from three layers, from personal to org-wide:
+
+          - **User instructions** — `~/.assistant_instructions.md`, editable by the user (type
+            `#` in chat to add one fast). Personal, per-user.
+          - **Workspace instructions** — set by a workspace admin, applied across the workspace.
+          - **Agent Skills** — the markdown files in `~/.assistant/skills/`. This is the layer
+            you govern.
+
+          The hands-on notebook for this accelerator is
+          `accelerators/skills/build_a_skill.py`, with a sample skill in
+          `accelerators/skills/example_skill.md`.
+      - id: acc_skills_create
+        title: Build and place a minimal skill
+        concept: |
+          Write a small skill file — a title, a few lines of instruction, and two worked
+          examples — and drop it in `~/.assistant/skills/`. Keep it narrow: one capability done
+          well beats a catch-all. `example_skill.md` is a governance-relevant starting point (a
+          Unity Catalog query helper) you can adapt.
+        manual:
+          label: Create a skill .md and save it under ~/.assistant/skills/
+      - id: acc_skills_verify
+        title: See it load — and prove the allowlist
+        concept: |
+          Open **Assistant → Settings → Agent Skills** and confirm your skill appears. Then the
+          governance point: a skill **in** the folder is invokable; a skill **not** in the folder
+          cannot be called, no matter how a user prompts. The folder *is* the allowlist, and it
+          is enforced at runtime — not advisory. Move a skill out, refresh, and watch it become
+          uninvokable.
+        manual:
+          label: Confirm the skill in Agent Skills settings; test in-allowlist vs removed
+      - id: acc_skills_tier
+        title: Classify the skill into a tier and register it
+        concept: |
+          Friction should scale with risk, not block everything:
+
+          - **Tier 1 — personal**: sandbox, no production data, no review. Keep this
+            zero-friction, or people route around governance.
+          - **Tier 2 — team**: peer- and steward-reviewed, limited data scope.
+          - **Tier 3 — enterprise**: security review, evals, full audit trail, regulated data.
+
+          Pick a tier and write the skill's `registry.yaml` entry — owner, tier, tags, declared
+          data scope, and (for Tier 2/3) an eval score. Before building anything, **dupe-check**
+          the registry: discovery beats rebuilding the same skill a fifth time.
+        manual:
+          label: Add a registry.yaml entry (owner, tier, data scope, tags)
+      - id: acc_skills_github_workflow
+        title: The GitHub registry and its PR gates
+        concept: |
+          Skills live in one Git repo — `/tier1`, `/tier2`, `/tier3`, and a `registry.yaml`
+          manifest — governed by the tools engineers already trust. Promotion is a pull request:
+          CI runs **lint**, **secret scan**, and the **eval suite**; CODEOWNERS routes the right
+          steward; merge means published. Publishing and governance are the same act, so there is
+          no path to users that skips the gates. A GitHub Action then syncs merged skills to
+          workspaces (`databricks workspace import-dir`): Tier 2 to its domain workspace, Tier 3
+          everywhere. This accelerator ships that framework repo as a submodule under the
+          repository root — clone it and open a PR to see the gates fire.
+      - id: acc_skills_eval
+        title: Make the skill testable — a minimal eval
+        concept: |
+          A skill without an eval is a hope, not a control. Write 3–5 golden prompt/answer pairs
+          and score the skill's output with an LLM-as-judge against a Databricks foundation-model
+          endpoint — the notebook does exactly this. Evals gate Tier 2/3 promotion and, run on a
+          schedule, catch drift over time rather than only at publish.
+        manual:
+          label: Run the eval cells in build_a_skill.py (golden Q&A + judge)
+      - id: acc_skills_security
+        title: Security & data-classification gates
+        concept: |
+          Two gates every skill passes before it can touch anything sensitive: a **secret scan**
+          over the skill text (no `sk-…`, `AKIA…`, `ghp_…` baked into instructions or examples)
+          and a **declared data classification** the skill's data scope must not exceed. Auth
+          rides Unity Catalog, so a skill can only reach what its identity is granted — the same
+          governance surface as the rest of this workshop, not a parallel one. The notebook runs
+          the secret scan for you.
+        manual:
+          label: Run the secret-scan cell; confirm the declared data scope
+      - id: acc_skills_deploy
+        title: Deploy and retire
+        concept: |
+          Deployment is the GitHub Action sync above landing the skill in the workspace
+          allowlist, where Genie Code auto-loads it on relevant prompts. Retirement is what keeps
+          the registry honest: a deprecation notice, a migration path, and removal from the
+          allowlist so a stale skill stops being invokable. Propose → design → build → review →
+          publish → operate → **retire** — the last step is the one that makes this a living
+          registry instead of a wiki page.

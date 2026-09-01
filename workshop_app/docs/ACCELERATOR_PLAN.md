@@ -1,8 +1,8 @@
 # Accelerator build plan — from box-checking to compelling
 
 The core workshop proves the control plane across choice / cost / control. The **accelerators**
-are optional ~4-hour deep dives. One of them (**MCP Servers**, 10 steps) is strong; the other
-four are thin — mostly `list` / `manual` / `readiness` steps that don't *prove* anything a
+are optional ~3-hour deep dives. One of them (**MCP Servers**, 10 steps) is strong; the other
+five are thin — mostly `list` / `manual` / `readiness` steps that don't *prove* anything a
 customer couldn't already assume. This plan deepens them.
 
 ## What makes an accelerator compelling

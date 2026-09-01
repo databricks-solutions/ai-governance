@@ -21,8 +21,9 @@
 
 lead_time_note: >-
   These are the prerequisites for your AI Governance Workshop — getting them in place ahead of
-  time is what lets us spend the four hours proving governance on your own workspace instead of
-  waiting on access. Each item is tagged by persona. The session needs as few as three people:
+  time is what lets us spend the three hours of hands-on time (plus about an hour of slides and
+  discussion) proving governance on your own workspace instead of waiting on access. Each item
+  is tagged by persona. The session needs as few as three people:
   an account admin, a business champion, and a technical champion — everyone else is optional.
   The long-lead items need an account admin and can take a few days, so please start those about
   a week out; the short-lead items we can run together the day before.
@@ -40,7 +41,18 @@ groups:
         item: Turn on Unity AI Gateway for the account and this workspace
         why: >-
           This is the control plane the whole workshop is built on. Nothing else works until it
-          is enabled, so it is the first thing to confirm.
+          is enabled, so it is the first thing to confirm. It is enabled at the **account** level
+          (Account Console → Settings), not per workspace.
+        who: Account admin
+      - id: beta_readiness
+        item: Confirm your org can use Beta features — and flag CSP
+        why: >-
+          Unity AI Gateway and several of the system tables the telemetry steps read are still
+          **Beta**. If your organization cannot run Beta features in production, tell us before
+          the session — we will scope the workshop to what is GA on your account and skip the
+          rest, rather than discover it live. If this workspace is on **CSP** (Compliance
+          Security Profile), flag that too: some Governance Hub / cost surfaces render differently
+          there, and we would rather plan around it than hit it in the room.
         who: Account admin
       - id: system_grants
         item: Grant the app read access to two `system` schemas (`system.ai_gateway` and `system.access`)
@@ -69,7 +81,10 @@ groups:
         item: Enable the MCP previews (Service policies and Managed MCP)
         why: >-
           Only needed if we plan to run the MCP governance steps or the MCP accelerator. Both are
-          Beta features an account admin toggles on.
+          Beta features an account admin toggles on. You do **not** need to bring your own MCP
+          server: the provided `system.ai.github` service is a ready-to-use, read-only example
+          the workshop governs out of the box (it worked cleanly at a recent workshop). Bring a
+          real MCP server only if you already run one and want to govern it specifically.
         who: Account admin
         optional: true
 
@@ -106,8 +121,8 @@ groups:
       - id: accelerator_choice
         item: Decide whether to run an accelerator, and which one
         why: >-
-          There are five optional ~4-hour deep dives (MCP, agent registry, coding agents, external
-          providers, policies & guardrails). Pick the one matching your top priority — we won't run
-          all of them, there isn't time.
+          There are six optional ~3-hour deep dives (MCP, agent registry, coding agents, external
+          providers, policies & guardrails, and skills). Pick the one matching your top priority —
+          we won't run all of them, there isn't time.
         who: Business champion
         optional: true

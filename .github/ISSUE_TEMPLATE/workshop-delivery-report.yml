@@ -1,0 +1,207 @@
+name: Workshop Delivery Report
+description: Submit structured feedback from a delivered AI Governance Workshop session
+title: "[WORKSHOP] [date] - [customer/org]"
+labels: ["workshop-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for delivering the AI Governance Workshop! Please fill out this form to capture the session details and any issues encountered.
+
+  - type: input
+    id: customer
+    attributes:
+      label: Customer / Organization
+      description: Name of the customer or internal org that attended
+      placeholder: "e.g., Acme Corp, Internal Sales"
+    validations:
+      required: true
+
+  - type: input
+    id: industry
+    attributes:
+      label: Industry / Use Case
+      description: Customer's industry or primary AI use case
+      placeholder: "e.g., Financial Services, Retail, Healthcare"
+    validations:
+      required: false
+
+  - type: input
+    id: date
+    attributes:
+      label: Workshop Date
+      description: Date the workshop was delivered (YYYY-MM-DD)
+      placeholder: "2026-09-15"
+    validations:
+      required: true
+
+  - type: input
+    id: attendees
+    attributes:
+      label: Attendees / Personas
+      description: Number and roles of attendees (e.g., 8 people - 2 platform admins, 3 engineers, 2 security, 1 business)
+      placeholder: "8 people - 2 platform admins, 3 engineers, 2 security, 1 business"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: pillars
+    attributes:
+      label: Which pillars were covered?
+      description: Select all that applied
+      options:
+        - label: Choice
+        - label: Cost
+        - label: Control
+
+  - type: checkboxes
+    id: accelerators
+    attributes:
+      label: Which accelerators were run?
+      description: Select all that applied
+      options:
+        - label: MCP Servers
+        - label: Agent Registry
+        - label: Coding Agents
+        - label: External Providers
+        - label: Policies & Guardrails
+        - label: Skills
+        - label: None
+
+  - type: dropdown
+    id: prerequisite_readiness
+    attributes:
+      label: Prerequisite / Beta Readiness Issues
+      description: Were there blockers related to prerequisites or Beta feature limitations?
+      options:
+        - "Select..."
+        - "No issues - all prereqs met"
+        - "Beta features blocked steps (specify below)"
+        - "Missing entitlements (CSP, Model Serving, Unity AI Gateway, etc.)"
+        - "Account admin grants (system schema access) delayed"
+        - "Console features missing or unavailable"
+        - "Managed MCP not enabled"
+        - "Service policies not available"
+        - "Other (describe below)"
+
+  - type: dropdown
+    id: budget_visibility
+    attributes:
+      label: Budget / Cost Visibility Issues
+      description: Were there issues with cost tracking, budgets, or permissions?
+      options:
+        - "Select..."
+        - "No issues"
+        - "Non-admin spend visibility gaps (self-service queries failed)"
+        - "Budget alerts not working / not configured"
+        - "Per-user budget attribution unclear"
+        - "FinOps setup complexity (too many steps)"
+        - "Request tags vs service tags confusion"
+        - "Other (describe below)"
+
+  - type: dropdown
+    id: migration_concerns
+    attributes:
+      label: V1 / V3 Migration Concerns
+      description: Were there questions or blockers around legacy-to-v3 migration?
+      options:
+        - "Select..."
+        - "No migration questions"
+        - "In-place rename expectations (customers surprised by staged cutover)"
+        - "Client contract changes unclear"
+        - "Passthrough mode misunderstood as a viable path"
+        - "Legacy endpoint still open (shadow endpoint risk)"
+        - "Other (describe below)"
+
+  - type: dropdown
+    id: mcp_issues
+    attributes:
+      label: MCP-Related Blockers or Questions
+      description: Any issues with MCP configuration or understanding?
+      options:
+        - "Select..."
+        - "No MCP issues"
+        - "Canned MCP example needed"
+        - "Private networking / external MCP connectivity"
+        - "Broken external MCP (credentials, availability)"
+        - "Managed vs external MCP confusion"
+        - "Service policy attachment unclear"
+        - "Read-only enforcement (write tools) confusion"
+        - "OBO (on-behalf-of) identity unclear"
+        - "Other (describe below)"
+
+  - type: dropdown
+    id: dashboard_perms
+    attributes:
+      label: Dashboard / UI Permissioning Issues
+      description: Were there permission or visibility issues in the workspace UI?
+      options:
+        - "Select..."
+        - "No issues"
+        - "Inference tables not visible (storage format mismatch)"
+        - "System table access denied despite grants"
+        - "Lakeview dashboard permission inheritance unclear"
+        - "Model serving endpoint ACLs confusing"
+        - "Other (describe below)"
+
+  - type: dropdown
+    id: hierarchy_issues
+    attributes:
+      label: Model-Service Hierarchy / Terminology Confusion
+      description: Were there misunderstandings about the object model or naming?
+      options:
+        - "Select..."
+        - "No confusion"
+        - "Model service vs model provider service unclear"
+        - "Endpoint vs model service vs gateway terminology"
+        - "UC catalog vs schema layout unclear"
+        - "Governed endpoint naming/discovery issues"
+        - "Other (describe below)"
+
+  - type: textarea
+    id: what_worked
+    attributes:
+      label: What Worked Well
+      description: Highlight the strongest parts of the workshop and delivery
+      placeholder: "e.g., The Try-It/Verify flow was intuitive, cost tracking demo resonated, hands-on nature kept energy high..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: brickroad_issues
+    attributes:
+      label: What Didn't Work / Brickroad Issues
+      description: What got stuck or fell flat? Any dead ends the team hit?
+      placeholder: "e.g., Rate limit propagation took 20 min (lag explained), guardrail demo blocked too aggressively, MCP service not available on account..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: product_gaps
+    attributes:
+      label: Product Gaps / Feature Requests
+      description: Missing features, limitations, or capabilities the customer asked for?
+      placeholder: "e.g., Per-org budgets, Terraform support, fine-grained model service ACLs, UI for policy attachment..."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: poc_outcome
+    attributes:
+      label: Did a POC Document Come Out of This?
+      description: Is a POC being scoped or underway as a result?
+      options:
+        - "Select..."
+        - "POC signed / underway"
+        - "POC scoped, likely to proceed"
+        - "POC not scoped yet"
+        - "Not applicable for this engagement"
+
+  - type: textarea
+    id: additional_notes
+    attributes:
+      label: Additional Notes / Context
+      description: Any other details, customer feedback, or follow-up items
+      placeholder: "e.g., Team wants to pilot Genie integration next, need custom MCP example, 2 week follow-up scheduled..."
+    validations:
+      required: false

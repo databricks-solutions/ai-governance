@@ -1,6 +1,6 @@
 # Accelerator — MCP Servers
 
-Managed vs external MCP, UC permissions, on-behalf-of identity, and service policies. A ~4-hour
+Managed vs external MCP, UC permissions, on-behalf-of identity, and service policies. A ~3-hour
 deep dive on the single most-requested MCP control: read-only enforcement for coding-agent users
 while humans keep write.
 

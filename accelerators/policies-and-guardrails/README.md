@@ -1,6 +1,6 @@
 # Accelerator — Policies & Guardrails
 
-Prove guardrails actually *work* — not just that they're on. A ~4-hour deep dive on block vs mask,
+Prove guardrails actually *work* — not just that they're on. A ~3-hour deep dive on block vs mask,
 how a block is delivered, path coverage, and measured effectiveness.
 
 "Is the guardrail on?" is not "does it work?". This accelerator moves from configuring the safety
