@@ -123,7 +123,7 @@ TIER="${PICK_RESULT%% *}"   # leading digit
 USERNAME=""
 DOMAIN=""
 if [[ "$TIER" == "1" ]]; then
-  read -rp "Your username (e.g. cedric.boisvert): " USERNAME
+  read -rp "Your username (e.g. dana.lee): " USERNAME
   SKILL_DIR="tier1/${USERNAME}/${SKILL_NAME}"
 elif [[ "$TIER" == "2" ]]; then
   # Domains come from governance.yaml (tier2.stewards) so the list is always current.
@@ -142,8 +142,8 @@ fi
 # Owner — for T2/T3 the value must be listed in governance.yaml, so offer that
 # exact set instead of a free-text prompt that would fail validation.
 if [[ "$TIER" == "1" ]]; then
-  read -rp "Owner email [${USERNAME:+${USERNAME}@databricks.com}]: " OWNER
-  OWNER="${OWNER:-${USERNAME}@databricks.com}"
+  read -rp "Owner email [${USERNAME:+${USERNAME}@greenwood.example}]: " OWNER
+  OWNER="${OWNER:-${USERNAME}@greenwood.example}"
 else
   OWNERS_RAW="$(python3 -c "
 import yaml
