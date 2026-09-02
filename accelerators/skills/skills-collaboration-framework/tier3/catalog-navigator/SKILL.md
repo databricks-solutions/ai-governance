@@ -3,6 +3,9 @@ name: catalog-navigator
 description: Discover data across Unity Catalog — find tables by name or topic, inspect columns and comments, and trace where data lives — from system.information_schema. An enterprise-wide skill for locating the right table before you query it, in any workspace.
 ---
 
+> **Illustrative example** — demonstrates a well-formed `SKILL.md` for this reference
+> implementation. Adapt the content to your own org; do not deploy verbatim.
+
 # catalog-navigator
 
 ## Overview
