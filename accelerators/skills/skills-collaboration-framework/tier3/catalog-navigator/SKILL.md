@@ -24,7 +24,7 @@ Reach for this skill whenever a user needs to locate or understand data anywhere
 
 - "Which tables have 'billing' in their name?"
 - "What columns does `system.billing.usage` have?"
-- "Find tables that contain a `patient_id` column."
+- "Find tables that contain a `customer_id` column."
 - "What's in the `system.lakeflow` schema?"
 - "Where would I find data about job runs?"
 

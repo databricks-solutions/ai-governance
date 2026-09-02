@@ -1,6 +1,6 @@
 ---
 name: cost-optimizer
-description: Recommend Databricks cost-optimization actions for the finance team — commitment/discount coverage, budget variance, and forecast-vs-actual DBU spend from system.billing.usage and system.billing.list_prices.
+description: Recommend Databricks cost-optimization actions for the FinOps/platform team — commitment/discount coverage, budget variance, and forecast-vs-actual DBU spend from system.billing.usage and system.billing.list_prices.
 ---
 
 > **Illustrative example** — demonstrates a well-formed `SKILL.md` for this reference
@@ -12,7 +12,7 @@ description: Recommend Databricks cost-optimization actions for the finance team
 
 Turns Databricks billing data into finance-facing optimization actions: it measures
 commitment/discount coverage, compares actual spend against budget, and forecasts
-month-end DBU cost so the finance team can act before overruns land. Distinct from
+month-end DBU cost so the FinOps/platform team can act before overruns land. Distinct from
 `pipeline-cost-analyzer` (which is engineering-facing job/SKU analysis) — this skill is
 scoped to budget governance and dollarized recommendations.
 

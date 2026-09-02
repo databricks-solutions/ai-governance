@@ -24,7 +24,7 @@ DRY_RUN="${DRY_RUN:-false}"
 
 if [[ -z "$TIER" ]]; then
   echo "Usage: sync-skills.sh <tier> [domain] [--this-host-only]" >&2
-  echo "  Tier 2 requires domain (e.g. 'infrastructure'). Tier 3 does not." >&2
+  echo "  Tier 2 requires domain (e.g. 'platform'). Tier 3 does not." >&2
   echo "  --this-host-only: publish only to the workspace in DATABRICKS_HOST (per-env CI job)." >&2
   exit 1
 fi
