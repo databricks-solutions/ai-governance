@@ -113,7 +113,7 @@ stages:
               EVAL_GATE_MODE_T3: human-review
               ADO_TOKEN: $(System.AccessToken)   # Azure DevOps OAuth token for PR comments — NOT a Databricks credential
               CI_SYSTEM: ado
-              ADO_ORG: greenwood
+              ADO_ORG: greenwood-demo
               ADO_PROJECT: cicd-demo
               ADO_REPO: skills-collaboration-framework
               TARGET_BRANCH_REF: $(System.PullRequest.TargetBranch)
@@ -127,7 +127,7 @@ stages:
             displayName: Assert main is gated
             env:
               CI_SYSTEM: ado
-              ADO_ORG: greenwood
+              ADO_ORG: greenwood-demo
               ADO_PROJECT: cicd-demo
               ADO_REPO: skills-collaboration-framework
               ADO_TOKEN: $(System.AccessToken)
@@ -309,6 +309,6 @@ stages:
               CI_SYSTEM: ado
               RUN_ID: $(Build.BuildId)
               ADO_TOKEN: $(System.AccessToken)
-              ADO_ORG: greenwood
+              ADO_ORG: greenwood-demo
               ADO_PROJECT: cicd-demo
               ADO_REPO: skills-collaboration-framework

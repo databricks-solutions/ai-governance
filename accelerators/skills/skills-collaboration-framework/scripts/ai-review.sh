@@ -317,7 +317,7 @@ if [[ -n "$PR_NUMBER" ]]; then
     gh pr comment "$PR_NUMBER" --body "$COMMENT" 2>/dev/null || \
       echo "WARNING: Could not post GitHub PR comment (check GH_TOKEN)" >&2
   elif [[ "$CI_SYSTEM" == "ado" ]]; then
-    ADO_ORG="${ADO_ORG:-greenwood}"
+    ADO_ORG="${ADO_ORG:-greenwood-demo}"
     ADO_PROJECT="${ADO_PROJECT:-cicd-demo}"
     ADO_REPO="${ADO_REPO:-skills-collaboration-framework}"
     ADO_TOKEN="${ADO_TOKEN:-}"   # Azure DevOps token — set to $(System.AccessToken) in the pipeline.
