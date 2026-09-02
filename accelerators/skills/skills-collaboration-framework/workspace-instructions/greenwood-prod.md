@@ -1,6 +1,6 @@
 <!--
 Canonical workspace-level Assistant instructions for the greenwood PROD workspace
-(https://dbc-c3d4e5f6-a7b8.cloud.databricks.com) — a Tier 3 (enterprise) fan-out target.
+(https://greenwood-prod.cloud.databricks.example) — a Tier 3 (enterprise) fan-out target.
 
 Governed in Git, reviewed by PR. Applied MANUALLY by an admin to
 /Workspace/.assistant_workspace_instructions.md (auto-push is out of scope — see
@@ -31,7 +31,7 @@ published here; this is the org-wide serving workspace.
 - Dates are ISO `YYYY-MM-DD`; the fiscal year starts **April 1**.
 - Always qualify tables as `catalog.schema.table`.
 - Prefer **serverless** SQL warehouses; avoid all-purpose compute for ad-hoc queries.
-- When counting clinical encounters, exclude non-real records:
+- When counting patient encounters, exclude non-real records:
   `status NOT IN ('test', 'cancelled')`.
 
 ## Behavior
