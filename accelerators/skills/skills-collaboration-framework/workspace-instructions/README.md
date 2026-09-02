@@ -9,9 +9,9 @@ workspace, mapped to the URLs in [`../workspaces.json`](../workspaces.json):
 
 | File | Workspace | Tiers served |
 |------|-----------|--------------|
-| `greenwood-dev.md` | `https://dbc-fb813e75-e5db.cloud.databricks.com` | Tier 1 sandbox + Tier 3 fan-out |
-| `greenwood-staging.md` | `https://dbc-e1d9ab39-ffcf.cloud.databricks.com` | Tier 2 (all domains) + Tier 3 fan-out |
-| `greenwood-prod.md` | `https://dbc-fbcbb704-ba3c.cloud.databricks.com` | Tier 3 (enterprise) fan-out |
+| `greenwood-dev.md` | `https://greenwood-dev.cloud.databricks.example` | Tier 1 sandbox + Tier 3 fan-out |
+| `greenwood-staging.md` | `https://greenwood-staging.cloud.databricks.example` | Tier 2 (all domains) + Tier 3 fan-out |
+| `greenwood-prod.md` | `https://greenwood-prod.cloud.databricks.example` | Tier 3 (enterprise) fan-out |
 
 ## Why these are governed like a protected file
 

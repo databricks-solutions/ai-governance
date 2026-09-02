@@ -1,6 +1,6 @@
 <!--
 Canonical workspace-level Assistant instructions for the greenwood DEV workspace
-(https://dbc-fb813e75-e5db.cloud.databricks.com) — the Tier 1 sandbox (self-upload) and a Tier 3
+(https://greenwood-dev.cloud.databricks.example) — the Tier 1 sandbox (self-upload) and a Tier 3
 fan-out target.
 
 Governed in Git, reviewed by PR. Applied MANUALLY by an admin to
@@ -13,10 +13,10 @@ keep this concise.
 
 Org-wide context applied to **every** Databricks Assistant / Genie Code interaction in this
 workspace. This is where developers dogfood **Tier-1** sandbox skills before promoting them; it
-also receives the **Tier-3** enterprise fan-out. Audiences span VCH's domains — Acute, Community,
-Data Governance & Privacy, Financial Applications & Analytics, Advanced Analytics, Emergency
-Department, Lower Mainland Pharmacy Services, Medical Academics & Affairs, Quality Analytics,
-Infrastructure, and Enterprise Analytics & BI.
+also receives the **Tier-3** enterprise fan-out. Audiences span Greenwood Health's domains — Acute
+Care, Community Health, Data Governance & Privacy, Financial Analytics, Advanced Analytics,
+Emergency Medicine, Pharmacy Services, Quality Analytics, Infrastructure, and Enterprise Analytics
+& BI.
 
 ## Data governance (non-negotiable)
 
@@ -32,7 +32,7 @@ Infrastructure, and Enterprise Analytics & BI.
 - Dates are ISO `YYYY-MM-DD`; the fiscal year starts **April 1**.
 - Always qualify tables as `catalog.schema.table`.
 - Prefer **serverless** SQL warehouses; avoid all-purpose compute for ad-hoc queries.
-- When counting clinical encounters, exclude non-real records:
+- When counting patient encounters, exclude non-real records:
   `status NOT IN ('test', 'cancelled')`.
 
 ## Behavior
