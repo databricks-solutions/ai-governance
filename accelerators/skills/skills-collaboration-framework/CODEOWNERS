@@ -1,29 +1,22 @@
 # Backstop — the platform team reviews anything not claimed by a more specific rule below.
-# Nothing is ever unowned at review time.
-*   @cedric-boisvert_data
+# Nothing is ever unowned at review time. (Illustrative placeholder handles for a fictional org.)
+*   @greenwood-org/platform-team
 
 # Tier 1 — personal sandboxes, no approval required
-/tier1/ @cedric-boisvert_data
+/tier1/ @greenwood-org/platform-team
 
-# Tier 2 — domain steward approval required (VCH-aligned domains)
-/tier2/acute/ @cedric-boisvert_data
-/tier2/community/ @cedric-boisvert_data
-/tier2/dgp/ @cedric-boisvert_data
-/tier2/faa/ @cedric-boisvert_data
-/tier2/aa/ @cedric-boisvert_data
-/tier2/ed/ @cedric-boisvert_data
-/tier2/lmps/ @cedric-boisvert_data
-/tier2/maa/ @cedric-boisvert_data
-/tier2/quality-analytics/ @cedric-boisvert_data
-/tier2/infrastructure/ @cedric-boisvert_data
-/tier2/eabi/ @cedric-boisvert_data
+# Tier 2 — domain steward approval required
+/tier2/platform/   @greenwood-org/platform-stewards
+/tier2/analytics/  @greenwood-org/analytics-stewards
+/tier2/finance/    @greenwood-org/finance-stewards
+/tier2/governance/ @greenwood-org/governance-stewards
 
 # Tier 3 — council + security approval required (recorded in registry.yaml)
-/tier3/ @cedric-boisvert_data
+/tier3/ @greenwood-org/skills-council
 
 # Governance config — changes require council review
-/config/ @cedric-boisvert_data
-/CODEOWNERS @cedric-boisvert_data
+/config/ @greenwood-org/platform-team
+/CODEOWNERS @greenwood-org/platform-team
 
 # Workspace instructions — always-on, org-wide Assistant context (council review)
-/workspace-instructions/ @cedric-boisvert_data
+/workspace-instructions/ @greenwood-org/platform-team
