@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-12
-- **Deciders:** Platform team (`cedric.boisvert@databricks.com`)
+- **Deciders:** Platform team (`dana.lee@greenwood.example`)
 - **Related:** [specification §2](../specification.md#2-tiers),
   [operating-model — Tier-1 sandbox isolation](../operating-model.md#tier-1-sandbox-isolation-deliberate-choice--recorded),
   [adoption-model](../adoption-model.md)
@@ -69,7 +69,7 @@ single workspace** — not on the org's total skill count. Tiering is what keeps
 - In the **real** topology, a given workspace holds **its own domain's Tier-2 skills** (a curated
   handful per team) **plus the enterprise Tier-3 set** (which must stay small — dozens, not
   hundreds; council + security approval is exactly what enforces that scarcity).
-- So a user in the ED workspace matches against ~15–25 skills, **regardless of how many skills the
+- So a user in the analytics workspace matches against ~15–25 skills, **regardless of how many skills the
   1000-person org has authored in total.** The org scales *horizontally across workspaces*; no
   single namespace saturates.
 
@@ -86,7 +86,7 @@ prod)** to *teach the tier methodology* with the fewest moving parts:
   local-only Tier 1 has nothing to *show* in a repo walkthrough — so the demo trades the scale
   design for a visible one. This is a **teaching shortcut, recorded as such.**
 - **All Tier-2 domains → one staging workspace.** With only three workspaces we cannot give each
-  of eleven domains its own, so every domain syncs to STAGING and Tier 3 fans out to all three.
+  domain its own, so every domain syncs to STAGING and Tier 3 fans out to all three.
   This models reach as a **dev→staging→prod lifecycle** instead of one-workspace-per-domain — the
   exact DABs framing above — which is *why the SDLC analogy is the demo's backbone*.
 - **Single `registry.yaml`.** Fine for ~13 demo skills; it makes the governance metadata legible
