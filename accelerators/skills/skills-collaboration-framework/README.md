@@ -188,16 +188,20 @@ platform_team:
   - dana.lee@greenwood.example
 tier2:
   stewards:                             # one steward list per domain
-    platform:   [dana.lee@greenwood.example, sam.rivera@greenwood.example]
-    analytics:  [dana.lee@greenwood.example, sam.rivera@greenwood.example]
     # platform, analytics, finance, governance
+    platform:    [sam.rivera@greenwood.example]
+    analytics:   [sam.rivera@greenwood.example]
+    finance:     [sam.rivera@greenwood.example]
+    governance:  [sam.rivera@greenwood.example]
 tier3:
-  council:  [dana.lee@greenwood.example, sam.rivera@greenwood.example]
-  security: [dana.lee@greenwood.example, sam.rivera@greenwood.example]
+  council:  [priya.nair@greenwood.example]
+  security: [marcus.chen@greenwood.example]
 ```
 
-> In this demo every domain (and both T3 roles) is stewarded by the same real people so any skill
-> can be signed off. In production each domain names its own steward and council ≠ security.
+> This reference already uses distinct personas — `priya.nair` for council and `marcus.chen` for
+> security — so council and security are separate roles, as they would be in a real org. All four
+> domain stewards map to the same `sam.rivera` here to keep the reference concise; in a real org
+> each domain names its own steward(s).
 
 The **owner-eligible set** is the union of every email anywhere in this file.
 
@@ -206,7 +210,7 @@ The **owner-eligible set** is the union of every email anywhere in this file.
 ```json
 {
   "skills_path": "/.assistant/skills",
-  "tier2": { "infrastructure": ["https://<staging>.cloud.databricks.com"], "...": [] },
+  "tier2": { "platform": ["https://greenwood-staging.cloud.databricks.example"], "...": [] },
   "tier3": { "workspaces": ["https://<dev>...", "https://<staging>...", "https://<prod>..."] }
 }
 ```

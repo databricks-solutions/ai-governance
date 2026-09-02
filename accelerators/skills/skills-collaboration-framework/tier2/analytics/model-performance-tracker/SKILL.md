@@ -22,7 +22,7 @@ Reach for this skill when a data-science or MLOps user asks about model health:
 - "Which models are degrading in accuracy over the last 30 days?"
 - "Show me drift metrics by model version."
 - "Which serving endpoints handled the most requests this week?"
-- "Is the readmission model's performance trending down?"
+- "Is the churn model's performance trending down?"
 
 ## Instructions
 
