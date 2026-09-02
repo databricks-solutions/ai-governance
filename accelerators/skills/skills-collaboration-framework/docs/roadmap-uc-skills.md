@@ -31,9 +31,9 @@ via AI Gateway MCP. When it ships, the only change in this framework is in `sync
 
 | Today (folder sync) | Tomorrow (UC Skills) |
 |---------------------|----------------------|
-| `databricks workspace import-dir tier2/infrastructure /.assistant/skills` (skills land flat) | `databricks uc skills publish tier2/infrastructure/pipeline-cost-analyzer --catalog main --schema skills` |
+| `databricks workspace import-dir tier2/platform /.assistant/skills` (skills land flat) | `databricks uc skills publish tier2/platform/pipeline-cost-analyzer --catalog main --schema skills` |
 | Tier isolation via separate workspaces (per-tier/domain sync targets) | Tier isolation via UC grant scopes |
-| `users` group = CAN_READ on folder | `GRANT READ ON SKILL main.skills.pipeline-cost-analyzer TO infrastructure_users` |
+| `users` group = CAN_READ on folder | `GRANT READ ON SKILL main.skills.pipeline-cost-analyzer TO platform_users` |
 | Genie Code reads from workspace folder | Genie Code + Claude Code + Cursor read from AI Gateway MCP |
 | Deprecation = `workspace delete` | Deprecation = `DROP SKILL` or revoke grant |
 
