@@ -42,11 +42,10 @@ structure exists only in this Git repo. Team-to-team isolation is by **separate 
 (mapped in `workspaces.json`), never by subfolders, because Genie Code only auto-loads from the
 top level of the skills path.
 
-The tier-2 domains in this reference mirror **Greenwood's team structure**: `acute`, `community`, `dgp`
-(Data Governance & Privacy), `faa` (Financial Applications & Analytics), `aa` (Advanced Analytics),
-`ed` (Emergency Department), `lmps` (Lower Mainland Pharmacy Services), `maa` (Medical Academics &
-Affairs), `quality-analytics`, `infrastructure`, `eabi` (Enterprise Analytics & BI). Swap them for
-your own org's domains in `governance.yaml`, `CODEOWNERS`, and `workspaces.json`.
+The tier-2 domains in this reference are four neutral, cross-industry examples: `platform`
+(infrastructure/cost engineering), `analytics` (BI & data science), `finance` (financial planning
+& analysis), and `governance` (data governance & catalog stewardship). Swap them for your own org's
+domains in `governance.yaml`, `CODEOWNERS`, and `workspaces.json`.
 
 ---
 
@@ -166,8 +165,8 @@ skills:
   - name: pipeline-cost-analyzer        # must match SKILL.md frontmatter name
     tier: 2                             # must match folder placement
     version: 1.2.1                      # semver; MUST bump when SKILL.md changes
-    owner: platform-lead@greenwood.example.com   # must be listed in governance.yaml
-    domain: infrastructure              # one of the governance.yaml tier-2 domains (must be mapped in workspaces.json)
+    owner: dana.lee@greenwood.example      # must be listed in governance.yaml
+    domain: platform                    # one of the governance.yaml tier-2 domains (must be mapped in workspaces.json)
     description: Analyze DBU cost trends and job costs; recommend optimizations.
     data_classification: internal
     pii: false
@@ -175,7 +174,7 @@ skills:
       - system.billing.usage
       - system.lakeflow.jobs
     approvals:
-      steward: platform-lead@greenwood.example.com   # T2: a steward for this domain
+      steward: dana.lee@greenwood.example         # T2: a steward for this domain
       council: ""                       # T3: a council member (date or email)
       security: ""                      # T3: a security reviewer
     deprecated: false
@@ -186,19 +185,23 @@ skills:
 
 ```yaml
 platform_team:
-  - platform-lead@greenwood.example.com
+  - dana.lee@greenwood.example
 tier2:
   stewards:                             # one steward list per domain
-    infrastructure: [platform-lead@greenwood.example.com, security-lead@greenwood.example.com]
-    eabi:           [platform-lead@greenwood.example.com, security-lead@greenwood.example.com]
-    # acute, community, dgp, faa, aa, ed, lmps, maa, quality-analytics ...
+    # platform, analytics, finance, governance
+    platform:    [sam.rivera@greenwood.example]
+    analytics:   [sam.rivera@greenwood.example]
+    finance:     [sam.rivera@greenwood.example]
+    governance:  [sam.rivera@greenwood.example]
 tier3:
-  council:  [platform-lead@greenwood.example.com, security-lead@greenwood.example.com]
-  security: [platform-lead@greenwood.example.com, security-lead@greenwood.example.com]
+  council:  [priya.nair@greenwood.example]
+  security: [marcus.chen@greenwood.example]
 ```
 
-> In this demo every domain (and both T3 roles) is stewarded by the same real people so any skill
-> can be signed off. In production each domain names its own steward and council ≠ security.
+> This reference already uses distinct personas — `priya.nair` for council and `marcus.chen` for
+> security — so council and security are separate roles, as they would be in a real org. All four
+> domain stewards map to the same `sam.rivera` here to keep the reference concise; in a real org
+> each domain names its own steward(s).
 
 The **owner-eligible set** is the union of every email anywhere in this file.
 
@@ -207,7 +210,7 @@ The **owner-eligible set** is the union of every email anywhere in this file.
 ```json
 {
   "skills_path": "/.assistant/skills",
-  "tier2": { "infrastructure": ["https://<staging>.cloud.databricks.com"], "...": [] },
+  "tier2": { "platform": ["https://greenwood-staging.cloud.databricks.example"], "...": [] },
   "tier3": { "workspaces": ["https://<dev>...", "https://<staging>...", "https://<prod>..."] }
 }
 ```

@@ -65,7 +65,7 @@ cat > "$TMPDIR/config/registry.yaml" << 'REGEOF'
 skills:
   - name: needs-approval
     tier: 3
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     description: A T3 skill with empty approvals.
     data_classification: internal
     pii: false
@@ -101,7 +101,7 @@ cat > "$TMPDIR/config/registry.yaml" << 'REGEOF'
 skills:
   - name: needs-version
     tier: 2
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: A T2 skill with no version field.
     data_classification: internal
@@ -119,13 +119,13 @@ write_governance() {
   mkdir -p "$1/config"
   cat > "$1/config/governance.yaml" << 'GOVEOF'
 platform_team:
-  - platform-lead@greenwood.example.com
+  - dana.lee@greenwood.example
 tier2:
   stewards:
     platform:
-      - platform-lead@greenwood.example.com
+      - dana.lee@greenwood.example
 tier3:
-  council: [platform-lead@greenwood.example.com]
+  council: [dana.lee@greenwood.example]
   security: [security@example.invalid]
 GOVEOF
 }
@@ -164,12 +164,12 @@ skills:
   - name: needs-scope
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: A T2 skill with no declared UC scopes.
     data_classification: internal
     pii: false
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -197,13 +197,13 @@ skills:
   - name: leaky
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: A T2 skill whose SQL escapes its declared scope.
     data_classification: internal
     pii: false
     unity_catalog_scopes: [system.billing.usage]
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -249,7 +249,7 @@ skills:
   - name: unauth
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: A T2 skill signed off by an unauthorized steward.
     data_classification: internal
@@ -285,13 +285,13 @@ skills:
   - name: good
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: A well-formed, in-bounds T2 skill.
     data_classification: internal
     pii: false
     unity_catalog_scopes: [system.billing.usage, system.lakeflow.jobs]
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -324,7 +324,7 @@ skills:
     data_classification: internal
     pii: false
     unity_catalog_scopes: [system.billing.usage]
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -413,13 +413,13 @@ skills:
   - name: pii-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: analytics
     description: A T2 skill that improperly declares PII access.
     data_classification: internal
     pii: true
     unity_catalog_scopes: [system.billing.usage]
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -446,13 +446,13 @@ skills:
   - name: reg-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: analytics
     description: A T2 skill that improperly declares regulated data.
     data_classification: regulated
     pii: false
     unity_catalog_scopes: [system.billing.usage]
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -479,13 +479,13 @@ skills:
   - name: write-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: analytics
     description: A T2 skill that mutates a table.
     data_classification: internal
     pii: false
     unity_catalog_scopes: [system.billing.usage]
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -517,12 +517,12 @@ skills:
   - name: todo-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: analytics
     description: Analyze something useful and recommend concrete next steps.
     data_classification: internal
     pii: false
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -571,12 +571,12 @@ skills:
   - name: thin-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: Summarize daily active users from the events table for a given date range.
     data_classification: internal
     pii: false
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -614,12 +614,12 @@ skills:
   - name: good-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: Rank the most expensive Databricks jobs over a date range and recommend cost cuts.
     data_classification: internal
     pii: false
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -657,12 +657,12 @@ skills:
   - name: mapped-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: platform
     description: Analyze DBU cost trends and recommend concrete optimizations for the team.
     data_classification: internal
     pii: false
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -694,12 +694,12 @@ skills:
   - name: unmapped-skill
     tier: 2
     version: 1.0.0
-    owner: platform-lead@greenwood.example.com
+    owner: dana.lee@greenwood.example
     domain: ghost-domain
     description: Analyze DBU cost trends and recommend concrete optimizations for the team.
     data_classification: internal
     pii: false
-    approvals: {steward: platform-lead@greenwood.example.com, council: "", security: ""}
+    approvals: {steward: dana.lee@greenwood.example, council: "", security: ""}
     deprecated: false
     removed_after: null
 REGEOF
@@ -707,13 +707,13 @@ REGEOF
 # unmapped-domain gate (ghost-domain is intentionally absent from write_workspaces' tier2).
 cat > "$TMPDIR/config/governance.yaml" << 'GOVEOF'
 platform_team:
-  - platform-lead@greenwood.example.com
+  - dana.lee@greenwood.example
 tier2:
   stewards:
     ghost-domain:
-      - platform-lead@greenwood.example.com
+      - dana.lee@greenwood.example
 tier3:
-  council: [platform-lead@greenwood.example.com]
+  council: [dana.lee@greenwood.example]
   security: [security@example.invalid]
 GOVEOF
 assert_exit "T2 skill in an unmapped domain exits 1" 1 bash -c "cd '$TMPDIR' && python3 '$SCRIPT'"

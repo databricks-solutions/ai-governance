@@ -123,7 +123,7 @@ TIER="${PICK_RESULT%% *}"   # leading digit
 USERNAME=""
 DOMAIN=""
 if [[ "$TIER" == "1" ]]; then
-  read -rp "Your username (e.g. platform.lead): " USERNAME
+  read -rp "Your username (e.g. dana.lee): " USERNAME
   SKILL_DIR="tier1/${USERNAME}/${SKILL_NAME}"
 elif [[ "$TIER" == "2" ]]; then
   # Domains come from governance.yaml (tier2.stewards) so the list is always current.
@@ -142,8 +142,8 @@ fi
 # Owner — for T2/T3 the value must be listed in governance.yaml, so offer that
 # exact set instead of a free-text prompt that would fail validation.
 if [[ "$TIER" == "1" ]]; then
-  read -rp "Owner email [${USERNAME:+${USERNAME}@databricks.com}]: " OWNER
-  OWNER="${OWNER:-${USERNAME}@databricks.com}"
+  read -rp "Owner email [${USERNAME:+${USERNAME}@greenwood.example}]: " OWNER
+  OWNER="${OWNER:-${USERNAME}@greenwood.example}"
 else
   OWNERS_RAW="$(python3 -c "
 import yaml
@@ -183,10 +183,11 @@ PII="$PICK_RESULT"
 # runtime on the executing principal regardless, so there's no authoring-time scope prompt.
 
 mkdir -p "$SKILL_DIR"
-# Baseline template — aligned with Databricks Genie Code skill best practices:
-# focused single task, progressive disclosure (keep SKILL.md concise; link out for depth),
-# explicit step-by-step instructions, concrete examples, edge cases, and a prose data-footprint.
-# See https://docs.databricks.com/aws/en/genie-code/skills#best-practices
+# Baseline template — aligned with agentskills.io best practices and Databricks Genie Code skill
+# guidance: focused single task, progressive disclosure (keep SKILL.md concise; link out for depth),
+# explicit step-by-step instructions, concrete examples, edge cases, gotchas, and a prose data-footprint.
+# See https://agentskills.io/skill-creation/best-practices and
+#     https://docs.databricks.com/aws/en/genie-code/skills#best-practices
 cat > "$SKILL_DIR/SKILL.md" << EOF
 ---
 name: ${SKILL_NAME}
@@ -221,6 +222,11 @@ TODO: Explicit, ordered steps the agent should follow.
 
 TODO: Common variations or exceptions and how to handle them.
 - TODO: an edge case
+
+## Gotchas
+
+TODO: Environment-specific facts the agent would get WRONG without being told — concrete
+corrections, not general advice (e.g. "table X uses soft deletes; filter WHERE deleted_at IS NULL").
 
 ## Data scope
 

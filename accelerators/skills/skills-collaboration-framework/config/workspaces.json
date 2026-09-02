@@ -1,25 +1,18 @@
 {
-  "_comment": "Skills sync FLAT to skills_path. NEVER nest skills under tier/domain subfolders — Genie Code auto-loads from the top level of skills_path only. This greenwood demo maps tiers to a dev→staging→prod SDLC (NOT one-workspace-per-domain): Tier 1 is self-uploaded to DEV and never CI-synced; Tier 2 (every Greenwood domain) syncs to STAGING; Tier 3 (enterprise) syncs to ALL THREE workspaces. Domains are organized to mirror Greenwood's team structure so the demo reads as familiar — the tier→reach model is what generalizes; the domain list is illustrative.",
+  "_comment": "Skills sync FLAT to skills_path. NEVER nest skills under tier/domain subfolders — Genie Code auto-loads from the top level of skills_path only. This Greenwood reference maps tiers to a dev->staging->prod SDLC (NOT one-workspace-per-domain): Tier 1 is self-uploaded to DEV and never CI-synced; Tier 2 (every domain) syncs to STAGING; Tier 3 (enterprise) syncs to ALL THREE workspaces. The tier->reach model is what generalizes; the domain list and URLs are illustrative placeholders.",
   "skills_path": "/.assistant/skills",
   "tier2": {
-    "acute": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "community": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "dgp": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "faa": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "aa": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "ed": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "lmps": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "maa": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "quality-analytics": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "infrastructure": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"],
-    "eabi": ["https://dbc-b2c3d4e5-f6a7.cloud.databricks.com"]
+    "platform": ["https://greenwood-staging.cloud.databricks.example"],
+    "analytics": ["https://greenwood-staging.cloud.databricks.example"],
+    "finance": ["https://greenwood-staging.cloud.databricks.example"],
+    "governance": ["https://greenwood-staging.cloud.databricks.example"]
   },
   "tier3": {
     "workspaces": [
-      "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com",
-      "https://dbc-b2c3d4e5-f6a7.cloud.databricks.com",
-      "https://dbc-c3d4e5f6-a7b8.cloud.databricks.com"
+      "https://greenwood-dev.cloud.databricks.example",
+      "https://greenwood-staging.cloud.databricks.example",
+      "https://greenwood-prod.cloud.databricks.example"
     ]
   },
-  "notes": "Workspace roles: DEV=dbc-a1b2c3d4-e5f6 (greenwood-demo-dev), STAGING=dbc-b2c3d4e5-f6a7 (greenwood-demo-staging), PROD=dbc-c3d4e5f6-a7b8 (greenwood-demo-prod). Tier 1 never syncs (self-uploaded to DEV only, for dogfooding). Tier 2 syncs each domain's skill folders to skills_path on STAGING — a shared team-integration workspace, since 3 demo workspaces can't give each of 11 domains its own. Tier 3 syncs to skills_path on every workspace in tier3.workspaces (dev+staging+prod) — enterprise skills are available everywhere. In a real Greenwood topology each domain would map to its own workspace(s); only this mapping changes, the scripts and CI do not. Each target workspace needs a CI service principal valid there (account-level OAuth M2M) with CAN_MANAGE on skills_path."
+  "notes": "Workspace roles: DEV=greenwood-dev (self-upload/dogfood, Tier 1 only), STAGING=greenwood-staging (Tier 2 team-integration target), PROD=greenwood-prod. Tier 1 never syncs. Tier 2 syncs each domain's skill folders to skills_path on STAGING — a shared team-integration workspace. Tier 3 syncs to skills_path on every workspace in tier3.workspaces (dev+staging+prod). In a real topology each domain would map to its own workspace(s); only this mapping changes, the scripts and CI do not. Each target workspace needs a CI service principal valid there (account-level OAuth M2M) with CAN_MANAGE on skills_path."
 }

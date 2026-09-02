@@ -61,10 +61,10 @@ own identity can reach anything that identity can — so "Tier 1 = no production
 by a deliberate isolation control, not assumed.
 
 **This deployment's choice: a dev→staging→prod SDLC across dedicated workspaces (the strongest
-option).** Tier 1 is self-uploaded to the **greenwood DEV workspace** (`dbc-a1b2c3d4-e5f6`) and
-dogfooded there; Tier 2 is CI-synced to the **greenwood STAGING workspace** (`dbc-b2c3d4e5-f6a7`)
+option).** Tier 1 is self-uploaded to the **greenwood DEV workspace** (`greenwood-dev`) and
+dogfooded there; Tier 2 is CI-synced to the **greenwood STAGING workspace** (`greenwood-staging`)
 for team integration; Tier 3 (enterprise) fans out to **all three** workspaces (dev + staging +
-`dbc-c3d4e5f6-a7b8` prod) so enterprise skills are available everywhere. Because DEV is a distinct
+`greenwood-prod` prod) so enterprise skills are available everywhere. Because DEV is a distinct
 workspace with its own catalogs and grants, Tier-1 experimentation cannot reach production data
 through a developer's identity — the isolation is topological, not merely policy.
 
@@ -73,7 +73,7 @@ This mapping is the single knob (`workspaces.json`): every T2 domain → STAGING
 (account-level OAuth M2M) with `CAN_MANAGE` on `skills_path`.
 
 > With only three demo workspaces we model reach as an SDLC lifecycle rather than one-workspace-per-domain.
-> In a real Greenwood topology each domain would map to its own workspace(s); only `workspaces.json` changes —
+> In a real Greenwood deployment each domain would map to its own workspace(s); only `workspaces.json` changes —
 > the scripts and CI do not.
 
 > [!NOTE]
