@@ -1,62 +1,27 @@
 # governance.yaml — single people-and-roles directory. The platform team owns this file.
 # Owner-eligible = the union of every email listed anywhere below.
+# This is an illustrative reference implementation for a fictional "Greenwood" org.
 platform_team:
-  - platform-lead@greenwood.example.com
+  - dana.lee@greenwood.example
 tier2:
   stewards:
-    # Greenwood-aligned domains (organized by team so the demo reads as familiar). For this demo every
-    # domain is stewarded by the same real people so any T2 skill can be signed off; in production
-    # each domain names its own steward. Abbreviations:
-    #   acute             — Acute Care
-    #   community         — Community (Health) Services
-    #   dgp               — Data Governance & Privacy
-    #   faa               — Financial Applications & Analytics
-    #   aa                — Advanced Analytics
-    #   ed                — Emergency Department
-    #   lmps              — Lower Mainland Pharmacy Services
-    #   maa               — Medical Academics & Affairs
-    #   quality-analytics — Quality Analytics
-    #   infrastructure    — Infrastructure
-    #   eabi              — Enterprise Analytics & BI
-    acute:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    community:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    dgp:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    faa:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    aa:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    ed:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    lmps:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    maa:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    quality-analytics:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    infrastructure:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
-    eabi:
-      - platform-lead@greenwood.example.com
-      - security-lead@greenwood.example.com
+    # Four neutral, cross-industry example domains. In a real org each domain names its own
+    # steward(s); here a small set keeps the reference readable.
+    #   platform    — platform / infrastructure / cost engineering
+    #   analytics   — BI and data-science analytics
+    #   finance     — financial planning & analysis
+    #   governance  — data governance & catalog stewardship
+    platform:
+      - sam.rivera@greenwood.example
+    analytics:
+      - sam.rivera@greenwood.example
+    finance:
+      - sam.rivera@greenwood.example
+    governance:
+      - sam.rivera@greenwood.example
 tier3:
-  # For this demo both council and security are the same real people so a T3 promotion can be
-  # signed off; in production these are distinct roles (council ≠ security) held by different teams.
+  # Distinct council and security roles (council != security), as a real org would separate them.
   council:
-    - platform-lead@greenwood.example.com
-    - security-lead@greenwood.example.com
+    - priya.nair@greenwood.example
   security:
-    - platform-lead@greenwood.example.com
-    - security-lead@greenwood.example.com
+    - marcus.chen@greenwood.example
