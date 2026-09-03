@@ -3,7 +3,7 @@
 fastapi==0.141.1            # MIT — web framework (serves ./dist + /api)
 uvicorn[standard]==0.52.2   # BSD-3-Clause — ASGI server
 databricks-sdk==0.133.0     # Apache-2.0 — workspace auth + Model Serving access
-pydantic==2.13.4            # MIT — request/response models
+pydantic==2.13.5            # MIT — request/response models
 pyyaml==6.0.3               # MIT — reads config/*.yaml
 requests==2.34.2            # Apache-2.0 — HTTP calls to the FMAPI /invocations endpoint
 mlflow-skinny==3.15.2       # Apache-2.0 — best-effort LLM-as-judge run logging
