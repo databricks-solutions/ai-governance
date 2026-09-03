@@ -1,7 +1,7 @@
 # Backend dependencies — pinned to audited versions (see DEPENDENCIES.md).
 # All permissive OSS licenses (MIT / BSD-3-Clause / Apache-2.0); no copyleft.
 fastapi==0.141.1            # MIT — web framework (serves ./dist + /api)
-uvicorn[standard]==0.52.2   # BSD-3-Clause — ASGI server
+uvicorn[standard]==0.52.4   # BSD-3-Clause — ASGI server
 databricks-sdk==0.133.0     # Apache-2.0 — workspace auth + Model Serving access
 pydantic==2.13.4            # MIT — request/response models
 pyyaml==6.0.3               # MIT — reads config/*.yaml
