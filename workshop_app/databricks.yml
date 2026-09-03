@@ -159,6 +159,16 @@ targets:
     # (dev_<user>_<name>) while leaving the app literal, which would point the app at a
     # schema/volume the bundle did not create. Names stay literal here so the bundle,
     # config/workshop.yaml, and the running app all agree.
+    #
+    # `dev` serves BOTH customer self-deploys (their own workspace + --var warehouse_id/catalog,
+    # see README / PREREQUISITES.md) AND our single internal hosted instance on the shared Unity
+    # AI Gateway stable FEVM. Deploy/refresh the hosted instance with:
+    #   databricks bundle deploy -t dev -p fevm-uaigw-stable \
+    #     --var="warehouse_id=9ac8efcd98a76929" --var="catalog=uaigw_fe"
+    #   databricks bundle run ai_governance_workshop_app -t dev -p fevm-uaigw-stable \
+    #     --var="warehouse_id=9ac8efcd98a76929" --var="catalog=uaigw_fe"
+    # (Host comes from --profile. The old shm-skunkworks instance was removed so uaigw is the
+    # single authoritative deployment.)
     default: true
   prod:
     mode: production
