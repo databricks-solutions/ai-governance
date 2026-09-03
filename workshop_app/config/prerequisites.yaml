@@ -53,6 +53,7 @@ groups:
           is enabled, so it is the first thing to confirm. It is enabled at the **account** level
           (Account Console → Settings), not per workspace.
         who: Account admin
+        blocker: true
       - id: beta_readiness
         item: Confirm your org can use Beta features — and flag CSP
         why: >-
@@ -77,8 +78,10 @@ groups:
         why: >-
           The app deploys into a catalog you choose and runs every live check through the warehouse.
           A serverless warehouse starts fastest. The catalog must already exist — the app creates
-          only its own schema inside it.
+          only its own schema inside it. Without Unity Catalog there is nothing to govern and the
+          workshop cannot run.
         who: Technical champion
+        blocker: true
       - id: pilot_users
         item: Line up a few pilot users from your identity provider
         why: >-

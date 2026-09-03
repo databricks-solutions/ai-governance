@@ -175,6 +175,44 @@ def reset_progress():
     return {"ok": True, "cleared": cleared}
 
 
+class ScopeImport(BaseModel):
+    # The scope.json the internal sales-play app exports (schema_version 1). Extra keys ignored.
+    schema_version: int | None = None
+    focus_pillars: list[str] = []
+    in_scope_accelerators: list[str] = []
+    na_accelerators: list[str] = []
+    na_steps: list[str] = []
+    notes: str | None = None
+
+
+@router.post("/scope/import")
+def import_scope(body: ScopeImport):
+    """Apply a scope.json from the internal app: mark every out-of-scope accelerator's steps N/A
+    (and any explicit na_steps) so the room opens focused on the core + the recommended add-on.
+    The mirror of the outcomes.json this app exports back. Re-runnable; clears nothing else."""
+    accels = {a["id"]: a for a in accelerators_content()["accelerators"]}
+    # step_id -> its group id, across core pillars and accelerators, to resolve na_steps.
+    group_of = {s["id"]: g["id"]
+                for g in workshop_content()["pillars"] + accelerators_content()["accelerators"]
+                for s in g["steps"]}
+    na = 0
+    for acc_id in body.na_accelerators:
+        grp = accels.get(acc_id)
+        if not grp:
+            continue
+        for s in grp["steps"]:
+            store.set_outcome(s["id"], acc_id, outcome="na")
+            na += 1
+    for step_id in body.na_steps:
+        pid = group_of.get(step_id)
+        if pid:
+            store.set_outcome(step_id, pid, outcome="na")
+            na += 1
+    return {"ok": True, "na_marked": na,
+            "in_scope_accelerators": body.in_scope_accelerators,
+            "focus_pillars": body.focus_pillars}
+
+
 def _save_progress(step_id, pillar_id, status, result, updated_by, notes=None):
     store.save(step_id, pillar_id, status, result, updated_by, notes)
 

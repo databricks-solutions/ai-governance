@@ -64,6 +64,8 @@ export default function Prerequisites() {
   const all = data.groups.flatMap((g) => g.items);
   const required = all.filter((i) => !i.optional);
   const doneRequired = required.filter((i) => checked[i.id]).length;
+  const blockers = all.filter((i) => i.blocker);
+  const blockersUnmet = blockers.filter((i) => !checked[i.id]);
 
   return (
     <div>
@@ -124,6 +126,19 @@ export default function Prerequisites() {
         </div>
       </div>
 
+      {blockers.length > 0 && (
+        <div className="mb-8 flex items-start gap-3 rounded-2xl border border-lava/40 bg-lava/[0.05] p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-lava" />
+          <div className="text-sm leading-relaxed text-navy">
+            <span className="font-semibold">
+              Hard blockers — {blockersUnmet.length} of {blockers.length} still open.
+            </span>{" "}
+            The workshop cannot run until these are met: without Unity Catalog and the Unity AI
+            Gateway there is nothing to govern. Confirm them (checked below) before scheduling.
+          </div>
+        </div>
+      )}
+
       {data.lead_time_note && (
         <p className="mb-8 whitespace-pre-line text-sm leading-relaxed text-muted">{data.lead_time_note}</p>
       )}
@@ -173,6 +188,11 @@ export default function Prerequisites() {
                           >
                             {item.item}
                           </span>
+                          {item.blocker && (
+                            <span className="rounded bg-lava/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lava">
+                              hard blocker
+                            </span>
+                          )}
                           {item.optional && (
                             <span className="rounded bg-navy/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
                               scope-dependent

@@ -109,6 +109,8 @@ export interface PrereqItem {
   who?: string;
   /** Only needed for a specific scope (a named accelerator, external providers, …). */
   optional?: boolean;
+  /** Hard blocker — the workshop cannot run until this is met. */
+  blocker?: boolean;
 }
 export interface PrereqGroup {
   id: string;
@@ -156,6 +158,14 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     }).then((r) => j<{ ok: boolean; cleared: number }>(r)),
+
+  // Apply a scope.json from the internal app: pre-mark out-of-scope accelerators N/A.
+  importScope: (scope: unknown) =>
+    fetch("/api/scope/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(scope),
+    }).then((r) => j<{ ok: boolean; na_marked: number; in_scope_accelerators: string[]; focus_pillars: string[] }>(r)),
 
   // Set the hand-marked outcome flags (Done / N/A / Add-to-POC). The full desired state is sent
   // each time (Done and N/A are mutually exclusive; `poc` is independent).
