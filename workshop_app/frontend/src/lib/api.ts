@@ -120,6 +120,8 @@ export interface PrereqGroup {
 export interface Prerequisites {
   lead_time_note?: string;
   groups: PrereqGroup[];
+  /** Shareable Google Doc generated from the same prerequisites.yaml (kept in sync). */
+  google_doc_url?: string | null;
   /** False when reportlab is missing from the deployment — hide the PDF button rather than 503. */
   pdf_available: boolean;
   pdf_unavailable_reason?: string | null;
@@ -147,6 +149,13 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => j<{ ok: boolean }>(r)),
+
+  // Clear ALL workshop progress so the room can start fresh. Cannot be undone — export first.
+  resetProgress: () =>
+    fetch("/api/progress/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).then((r) => j<{ ok: boolean; cleared: number }>(r)),
 
   // Set the hand-marked outcome flags (Done / N/A / Add-to-POC). The full desired state is sent
   // each time (Done and N/A are mutually exclusive; `poc` is independent).

@@ -5,6 +5,11 @@
 # steps.yaml) so it can be tailored per customer without a code change. Rendered on the
 # Prerequisites page and exported as a PDF with real checkboxes (GET /api/export/prerequisites.pdf).
 #
+# THIS FILE IS THE SINGLE SOURCE OF TRUTH for the prerequisites. The matching Google Doc is
+# generated from it (so the two never drift) via the internal repo's generator:
+#   python scripts/generate_google.py workshop_app/config/prerequisites.yaml --prereqs
+# Link the resulting Doc back here in `google_doc_url` so the app points at the shareable copy.
+#
 # Two groups only — long lead time and short lead time — and only the essentials. Every item is
 # tagged by persona in `who`. The workshop needs as few as THREE people:
 #   - Account admin      — enables platform capabilities and runs the account-level grants.
@@ -18,6 +23,10 @@
 #   why       what it buys you / what it unblocks. Plain language, customer-facing.
 #   who       the persona who owns it (Account admin / Business champion / Technical champion)
 #   optional  true if only some customers need it; say who/when in `why`
+
+# Shareable Google Doc generated from this file (see the generator note in the header). Kept in
+# sync by regenerating whenever this YAML changes.
+google_doc_url: https://docs.google.com/document/d/12CnGW0qXCAfrL_lH8r1vPezdQvAzm5OL4GKGVdKePPE/edit
 
 lead_time_note: >-
   These are the prerequisites for your AI Governance Workshop — getting them in place ahead of

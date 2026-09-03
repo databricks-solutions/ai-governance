@@ -166,6 +166,15 @@ def get_progress():
     }
 
 
+@router.post("/progress/reset")
+def reset_progress():
+    """Clear all workshop progress so the room can start fresh (re-running the workshop, or
+    clearing a demo deployment). Export outcomes.json first if you need to keep the record —
+    this cannot be undone. Returns how many steps were cleared."""
+    cleared = store.reset()
+    return {"ok": True, "cleared": cleared}
+
+
 def _save_progress(step_id, pillar_id, status, result, updated_by, notes=None):
     store.save(step_id, pillar_id, status, result, updated_by, notes)
 
