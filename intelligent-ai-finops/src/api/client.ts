@@ -12,13 +12,19 @@ export interface OptimizeResult {
 // Sharpen a prompt before the three Compare lanes run on it. Never throws for
 // the caller's flow - on failure we return the original so the run continues.
 export async function optimizePrompt(prompt: string, model?: string): Promise<OptimizeResult> {
-  const res = await fetch('/api/optimize', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, model }),
-  });
-  if (!res.ok) throw new Error(`POST /api/optimize failed: ${res.status}`);
-  return res.json();
+  // Honors the "never throws" contract: on any failure return the original prompt
+  // so the Compare run degrades gracefully instead of aborting.
+  try {
+    const res = await fetch('/api/optimize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, model }),
+    });
+    if (!res.ok) throw new Error(`POST /api/optimize failed: ${res.status}`);
+    return res.json();
+  } catch {
+    return { optimized: prompt, changed: false, note: 'optimizer unavailable — using the original prompt' };
+  }
 }
 
 export async function getConfig(): Promise<AppConfig> {

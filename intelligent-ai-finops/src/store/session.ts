@@ -82,14 +82,14 @@ export const useSession = create<SessionState>((set) => ({
 
   runs: [],
   logRun: (r) =>
-    set((s) => ({
-      queries: s.queries + 1,
-      spendUsd: s.spendUsd + r.costUsd,
-      baseUsd: s.baseUsd + r.baselineUsd,
-      // A real run marks the session no longer a pristine sample (but stays seeded).
-      sampleActive: s.sampleActive,
-      runs: [{ ...r, id: `run-${++_seq}`, ts: Date.now() }, ...s.runs].slice(0, 200),
-    })),
+    set((s) => {
+      // Cap the log AND derive the headline totals from the SAME capped array, so
+      // the Cost tab's per-model / per-tier breakdown always reconciles with the
+      // KPI tiles (they diverged once >200 requests accrued). A real run also
+      // marks the session as no longer a pristine sample.
+      const runs = [{ ...r, id: `run-${++_seq}`, ts: Date.now() }, ...s.runs].slice(0, 200);
+      return { ...totals(runs), runs, sampleActive: false };
+    }),
 
   seeded: false,
   sampleActive: false,

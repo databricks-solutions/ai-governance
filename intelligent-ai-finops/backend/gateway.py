@@ -172,11 +172,13 @@ def _budget_ceiling(consumed_pct: float, downgrade_at: float | None = None,
     open_only_at = open_only_at if open_only_at is not None else b.get("open_only_at_pct", 80)
     dg = downgrade_action if downgrade_action in (*_VALID_TIERS, "block") else "large-oss"
     oo = open_only_action if open_only_action in (*_VALID_TIERS, "block") else "small-oss"
-    # Higher threshold wins first.
-    if consumed_pct >= open_only_at:
-        return oo, f"Budget {consumed_pct:.0f}% consumed (≥{open_only_at}%) - {_action_label(oo)}."
-    if consumed_pct >= downgrade_at:
-        return dg, f"Budget {consumed_pct:.0f}% consumed (≥{downgrade_at}%) - {_action_label(dg)}."
+    # Apply the action for the HIGHEST threshold spend has crossed, regardless of
+    # which field holds the larger number - so an inverted config (e.g. downgrade
+    # set above open-only) still behaves sensibly and matches the % shown.
+    crossed = [(t, a) for (t, a) in ((downgrade_at, dg), (open_only_at, oo)) if consumed_pct >= t]
+    if crossed:
+        thresh, action = max(crossed, key=lambda x: x[0])
+        return action, f"Budget {consumed_pct:.0f}% consumed (≥{thresh:.0f}%) - {_action_label(action)}."
     return "frontier", ""
 
 

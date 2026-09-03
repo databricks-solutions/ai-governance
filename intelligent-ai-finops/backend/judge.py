@@ -11,6 +11,7 @@ profile. This is the live path.
 from __future__ import annotations
 
 import json
+import re
 
 from . import models
 
@@ -48,14 +49,24 @@ def score_and_reason(prompt: str, answer: str, model_id: str | None = None) -> t
     # same way run-to-run, which is what makes the scoring feel consistent.
     result = models.live_query(judge, _RUBRIC.format(prompt=prompt, answer=answer), max_tokens=600, temperature=0.0)
     text = result["answer"] or ""
-    value, reason = 0.0, ""
+    value: float | None = None
+    reason = ""
     try:
         i, j = text.find("{"), text.rfind("}")
         parsed = json.loads(text[i : j + 1])
-        value = float(parsed.get("score", 0))
+        value = float(parsed.get("score"))
         reason = str(parsed.get("reason", "") or "").strip()
     except (ValueError, KeyError, TypeError):
-        pass
+        # Salvage a bare 1-10 number if the model didn't return clean JSON.
+        m = re.search(r"\b(10(?:\.0)?|[1-9](?:\.\d)?)\b", text)
+        if m:
+            value = float(m.group(1))
+    if value is None:
+        # Couldn't determine a score at all - use a neutral midpoint (NOT 1.0, which
+        # would wrongly crown or kill a lane in the winner rule) and surface the
+        # parse failure in the reason.
+        value = 5.0
+        reason = reason or "Judge response could not be parsed; neutral score applied."
     value = max(1.0, min(10.0, value))
     _log_to_mlflow(judge.id, prompt, answer, value, result["cost_usd"])
     return round(value, 1), reason

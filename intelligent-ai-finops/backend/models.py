@@ -273,7 +273,10 @@ def live_query(m: Model, prompt: str, max_tokens: int = _MAX_TOKENS, system: str
         convo = convo + [{"role": "assistant", "content": part},
                          {"role": "user", "content": _CONTINUE}]
 
-    answer = "".join(parts).strip()
+    # Join continuation rounds with a space so the last word of one round and the
+    # first of the next don't fuse ("...plan.The main..."). Single-round answers
+    # (the common case) are unaffected.
+    answer = " ".join(parts).strip()
     return {
         "answer": answer,
         "input_tokens": in_tok,
