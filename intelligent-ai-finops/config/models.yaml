@@ -1,0 +1,61 @@
+# Model registry - three categories. Pricing is REAL, not illustrative:
+# each model carries its official Databricks FMAPI DBU-per-1M-token rate card
+# (input/output), and the app converts to dollars with the workspace $/DBU
+# (FINOPS_DBU_TO_USD, default 0.07 = the published AWS/GCP Model Serving list
+# rate, matching system.billing.list_prices).
+#
+#   $ / 1M tokens = dbu_per_1m × $/DBU
+#
+# Rate-card source: Databricks Foundation Model Serving pricing
+#   https://www.databricks.com/product/pricing/foundation-model-serving
+#   https://www.databricks.com/product/pricing/proprietary-foundation-model-serving
+# Rates captured 2026-09 from the proprietary FMAPI rate card (global endpoint,
+# DBUs per 1M tokens); confirm against the page for your region/contract.
+# Only models with a published pay-per-token rate are listed (e.g. DeepSeek
+# v4 Pro is omitted - no public DBU rate).
+models:
+  # ---- Frontier (proprietary flagships with a published rate card) -----
+  - { id: databricks-claude-opus-4-1,  short: claude-opus-4-1,  tier: frontier, dbu_in_per_1m: 214.286, dbu_out_per_1m: 1071.429 }
+  - { id: databricks-claude-opus-4-5,  short: claude-opus-4-5,  tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
+  - { id: databricks-claude-opus-4-6,  short: claude-opus-4-6,  tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
+  - { id: databricks-claude-opus-4-7,  short: claude-opus-4-7,  tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
+  - { id: databricks-claude-opus-4-8,  short: claude-opus-4-8,  tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
+  - { id: databricks-claude-opus-5,    short: claude-opus-5,    tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
+  - { id: databricks-claude-sonnet-4,  short: claude-sonnet-4,  tier: frontier, dbu_in_per_1m: 42.857,  dbu_out_per_1m: 214.286 }
+  - { id: databricks-claude-sonnet-4-5, short: claude-sonnet-4-5, tier: frontier, dbu_in_per_1m: 42.857, dbu_out_per_1m: 214.286 }
+  - { id: databricks-claude-sonnet-4-6, short: claude-sonnet-4-6, tier: frontier, dbu_in_per_1m: 42.857, dbu_out_per_1m: 214.286 }
+  - { id: databricks-claude-sonnet-5,  short: claude-sonnet-5,  tier: frontier, dbu_in_per_1m: 28.571,  dbu_out_per_1m: 142.857 }
+  - { id: databricks-gpt-5,            short: gpt-5,            tier: frontier, dbu_in_per_1m: 17.857,  dbu_out_per_1m: 142.857 }
+  - { id: databricks-gpt-5-2,          short: gpt-5-2,          tier: frontier, dbu_in_per_1m: 25.000,  dbu_out_per_1m: 200.000 }
+  - { id: databricks-gpt-5-4,          short: gpt-5-4,          tier: frontier, dbu_in_per_1m: 35.714,  dbu_out_per_1m: 214.286 }
+  - { id: databricks-gpt-5-6-sol,      short: gpt-5-6-sol,      tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 428.571 }
+  - { id: databricks-gemini-2-5-pro,   short: gemini-2-5-pro,   tier: frontier, dbu_in_per_1m: 22.321,  dbu_out_per_1m: 178.571 }
+  - { id: databricks-gemini-3-1-pro,   short: gemini-3-1-pro,   tier: frontier, dbu_in_per_1m: 35.714,  dbu_out_per_1m: 214.286 }
+
+  # ---- Large open-weight OSS -------------------------------------------
+  - { id: databricks-llama-4-maverick,           short: llama-4-maverick, tier: large-oss, dbu_in_per_1m: 7.143, dbu_out_per_1m: 21.429 }
+  # qwen35-122b-a10b omitted: it is a thinking model whose reasoning cannot be
+  # disabled on Databricks FMAPI (no thinking/chat_template_kwargs knob accepted),
+  # so it burns the whole token budget on hidden reasoning and returns no clean
+  # answer. The instruct variant below (qwen3-next-80b) answers directly.
+  - { id: databricks-gpt-oss-120b,               short: gpt-oss-120b,     tier: large-oss, dbu_in_per_1m: 2.143, dbu_out_per_1m: 8.571 }
+  - { id: databricks-meta-llama-3-3-70b-instruct, short: llama-3.3-70b,   tier: large-oss, dbu_in_per_1m: 7.143, dbu_out_per_1m: 21.429 }
+  - { id: databricks-qwen3-next-80b-a3b-instruct, short: qwen3-next-80b,  tier: large-oss, dbu_in_per_1m: 2.143, dbu_out_per_1m: 17.143 }
+  # Open-weight flagships (Kimi K3, GLM 5.3, DeepSeek V4 Pro). These are OSS models,
+  # so they sit in the OSS tiers by provenance - frontier is reserved for
+  # proprietary flagships only. (Kimi K3 is priced like a proprietary flagship, so
+  # it is the priciest large-OSS option and is rarely the cheapest-that-clears pick.)
+  # GLM 5.2 is omitted: it is a thinking model with no thinking-off knob on FMAPI,
+  # so it burns its budget on hidden reasoning and returns no clean answer - same
+  # issue as qwen35-122b.
+  - { id: databricks-kimi-k3,                     short: kimi-k3,          tier: large-oss, dbu_in_per_1m: 42.857, dbu_out_per_1m: 214.286 }
+  - { id: databricks-glm-5-3,                     short: glm-5.3,          tier: large-oss, dbu_in_per_1m: 20.000, dbu_out_per_1m: 62.857 }
+  - { id: databricks-deepseek-v4-pro-0813,        short: deepseek-v4-pro,  tier: large-oss, dbu_in_per_1m: 18.857, dbu_out_per_1m: 56.571 }
+
+  # ---- Small open source -----------------------------------------------
+  - { id: databricks-meta-llama-3-1-8b-instruct, short: llama-3.1-8b, tier: small-oss, dbu_in_per_1m: 2.143, dbu_out_per_1m: 6.429 }
+  - { id: databricks-gpt-oss-20b,                short: gpt-oss-20b,  tier: small-oss, dbu_in_per_1m: 1.000, dbu_out_per_1m: 4.286 }
+  - { id: databricks-gemma-3-12b,                short: gemma-3-12b,  tier: small-oss, dbu_in_per_1m: 2.143, dbu_out_per_1m: 7.143 }
+  # Cheap "flash" variants of the open-weight flagships.
+  - { id: databricks-glm-5-3-flash,              short: glm-5.3-flash,     tier: small-oss, dbu_in_per_1m: 2.143, dbu_out_per_1m: 7.143 }
+  - { id: databricks-deepseek-v4-flash-0731,     short: deepseek-v4-flash, tier: small-oss, dbu_in_per_1m: 2.000, dbu_out_per_1m: 4.000 }

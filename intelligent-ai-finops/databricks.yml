@@ -1,0 +1,48 @@
+# Databricks Asset Bundle — one-command deploy of the Intelligent AI FinOps app
+# to any workspace.
+#
+#   1. npm install && npm run build      # produce ./dist (the built frontend)
+#   2. databricks bundle deploy -t dev --profile <your-profile>
+#   3. databricks bundle run intelligent_ai_finops -t dev --profile <your-profile>
+#
+# The app runs in demo mode by default (no serving-endpoint setup needed). Flip
+# FINOPS_DEMO_MODE=false in config/app-env or the app.yaml to hit live endpoints.
+bundle:
+  name: intelligent-ai-finops
+
+# Only the runtime files are uploaded. node_modules / src / build config are
+# excluded so the Apps builder never runs `npm install`; dist is force-included
+# because .gitignore excludes it locally.
+sync:
+  include:
+    - dist/**
+  exclude:
+    - node_modules
+    - src
+    - .venv
+    - __pycache__
+    - package.json
+    - package-lock.json
+    - vite.config.ts
+    - tsconfig.json
+    - tsconfig.tsbuildinfo
+    - tailwind.config.ts
+    - postcss.config.js
+    # Anchor to the repo root so ONLY the Vite template index.html is excluded -
+    # an unanchored `index.html` also matches dist/index.html (the SPA entry
+    # point) and silently ships a broken build.
+    - /index.html
+
+resources:
+  apps:
+    intelligent_ai_finops:
+      name: intelligent-ai-finops
+      description: "Intelligent AI FinOps — governed multi-model routing on Databricks (FMAPI + Unity AI Gateway)."
+      source_code_path: .
+
+targets:
+  dev:
+    mode: development
+    default: true
+    # host comes from --profile (or DATABRICKS_HOST); nothing workspace-specific
+    # is hardcoded, so this bundle deploys to any workspace.

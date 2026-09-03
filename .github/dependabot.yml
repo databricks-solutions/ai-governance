@@ -10,6 +10,14 @@ updates:
     directory: "/workshop_app/frontend"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/intelligent-ai-finops"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/intelligent-ai-finops"
+    schedule:
+      interval: "weekly"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

@@ -151,6 +151,34 @@ self-contained `reference_queries.py` that reproduces the app's SQL/API checks s
 one or more ported deep-dive notebooks. They are plain notebooks — clone this repo into Databricks
 (Repos or **Workspace → Import**), open one, set the widgets, and run. No bundle, no deploy.
 
+## 💸 Intelligent AI FinOps — smart model routing (standalone app)
+
+A separate, self-contained Databricks App ([`intelligent-ai-finops/`](intelligent-ai-finops)) that
+makes the **Cost** pillar tangible: a routing layer that sends each query to the **cheapest model
+that still clears a quality bar**, then shows the cost and the savings — on the same **Unity AI
+Gateway + Model Serving** surface. Four views: **Compare models** side by side (live streaming +
+LLM-as-judge), **Context routing** (route by complexity + budget across the models you allow),
+**Cost & savings** (spend by model/tier, the share of traffic kept off the frontier, observability,
+and a forward projection), and **How it works** (the end-to-end request flow). No warehouse,
+catalog, or Lakebase dependency — the FastAPI backend *is* the app container and all config is two
+bundled YAML files.
+
+It **ships in live mode** (real Model Serving calls, real tokens/latency, a real LLM-as-judge). Set
+`FINOPS_DEMO_MODE=true` in `app.yaml` for a **zero-setup, fully offline demo** (synthesised numbers,
+no endpoints required) — useful on venue wifi or a bare workspace.
+
+```bash
+cd intelligent-ai-finops
+npm install && npm run build                                       # build the frontend (dist/)
+databricks bundle deploy -t dev --profile <profile>               # create the app + upload
+databricks bundle run intelligent_ai_finops -t dev --profile <profile>   # start it
+```
+
+Nothing workspace-specific is hardcoded — the target comes from `--profile`. For live mode, the
+endpoints in `config/models.yaml` must exist in the workspace and the app's service principal must
+have **CAN QUERY** on them (otherwise deploy with `FINOPS_DEMO_MODE=true`). Full details in
+[`intelligent-ai-finops/README.md`](intelligent-ai-finops/README.md).
+
 ## Repository layout
 
 ```
@@ -167,6 +195,12 @@ accelerators/           Reference notebooks, one folder per accelerator:
   coding-agents/          reference_queries.py + rate_limiting.py + usage_tracking_finops.py + openai_agents_sdk.py
   external-providers/     reference_queries.py + traffic_routing.py + fallbacks.py
   policies-and-guardrails/ reference_queries.py + guardrail_benchmark.py + apply_guardrails.py
+
+intelligent-ai-finops/  Standalone smart-routing FinOps app (React + FastAPI Databricks App)
+  backend/                FastAPI — routing, compare lanes, LLM-as-judge, FMAPI invocation
+  src/                    React + Vite + TS frontend (Compare · Context routing · Cost · How it works)
+  config/                 models.yaml (DBU rate card) · policy.yaml (thresholds + budget)
+  databricks.yml          Asset Bundle (bundle deploy)
 ```
 
 ## Maintainers
