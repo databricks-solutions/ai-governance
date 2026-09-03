@@ -21,6 +21,14 @@ export default function Outcomes({
   progress: ProgressMap;
   onProgressChange: () => void;
 }) {
+  // Which accelerator to show alongside the core. Default to the in-scope one when a scope was
+  // imported (exactly one accelerator still has non-N/A steps); otherwise show core only.
+  const [selectedAccel, setSelectedAccel] = useState<string>(() => {
+    const accs = accelerators ?? [];
+    const withApplicable = accs.filter((a) => a.steps.some((s) => !stepOutcome(progress[s.id]).na));
+    return withApplicable.length === 1 ? withApplicable[0].id : "";
+  });
+
   if (!pillars) {
     return (
       <div className="flex h-screen items-center justify-center text-muted">
@@ -29,7 +37,10 @@ export default function Outcomes({
     );
   }
 
-  const groups = [...pillars, ...(accelerators ?? [])];
+  // Filter view only: core pillars always show; the dropdown adds one accelerator's outcomes.
+  const accels = accelerators ?? [];
+  const selectedGroup = accels.find((a) => a.id === selectedAccel) || null;
+  const groups = [...pillars, ...(selectedGroup ? [selectedGroup] : [])];
   let done = 0;
   let applicable = 0;
   let na = 0;
@@ -107,6 +118,25 @@ export default function Outcomes({
           </p>
         </div>
 
+        {accels.length > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-navy/10 bg-white p-4">
+            <span className="text-sm font-semibold text-navy">Accelerator</span>
+            <select
+              value={selectedAccel}
+              onChange={(e) => setSelectedAccel(e.target.value)}
+              className="rounded-lg border border-navy/20 bg-oat px-3 py-2 text-sm text-navy"
+            >
+              <option value="">None (core only)</option>
+              {accels.map((a) => (
+                <option key={a.id} value={a.id}>{a.title}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted">
+              Shows the 15 core outcomes plus the selected accelerator's — pick the one this workshop runs.
+            </span>
+          </div>
+        )}
+
         <div className="flex flex-col gap-6">
           {groups.map((g) => {
             const c = groupCounts(g.steps, progress);
@@ -127,7 +157,12 @@ export default function Outcomes({
                         idx > 0 && "border-t border-navy/[0.07]",
                       )}
                     >
-                      <span className="min-w-0 flex-1 text-sm font-medium text-navy">{step.title}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-navy">{step.title}</div>
+                        {step.outcome && (
+                          <div className="mt-0.5 text-xs leading-relaxed text-muted">{step.outcome}</div>
+                        )}
+                      </div>
                       <OutcomeControls
                         stepId={step.id}
                         pillarId={g.id}

@@ -11,6 +11,8 @@ export interface StepManual {
 export interface Step {
   id: string;
   title: string;
+  /** One-line "We can …" outcome statement shown under the title. */
+  outcome?: string;
   concept?: string;
   /** Key of a diagram to render under the concept — see VISUALS in StepCard. */
   visual?: string;

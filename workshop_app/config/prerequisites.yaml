@@ -89,6 +89,13 @@ groups:
           separate logins. Optional, but it makes those moments land — shared logins prove nothing.
         who: Technical champion
         optional: true
+      - id: uc_foundation_models
+        item: Confirm Unity Catalog is enabled with foundation models available
+        why: >-
+          The workshop governs models, tools, and agents as Unity Catalog assets, so UC must be on
+          and the account's foundation models reachable. This is usually already true wherever the
+          Gateway is enabled — confirm it so the Choice steps have something to inventory and govern.
+        who: Technical champion
       - id: mcp_previews
         item: Enable the MCP previews (Service policies and Managed MCP)
         why: >-
@@ -97,6 +104,23 @@ groups:
           server: the provided `system.ai.github` service is a ready-to-use, read-only example
           the workshop governs out of the box (it worked cleanly at a recent workshop). Bring a
           real MCP server only if you already run one and want to govern it specifically.
+        who: Account admin
+        optional: true
+      - id: external_storage_catalog
+        item: Provide an external-storage catalog for inference tables
+        why: >-
+          The guardrail and PII steps (and the Policies & Guardrails accelerator) log request/response
+          payloads to **inference tables**, which need a catalog backed by external storage. Only
+          needed if those steps are in scope — tell us and we'll confirm the catalog can host them.
+        who: Technical champion
+        optional: true
+      - id: egress_allowlist
+        item: Allowlist network egress for external providers / external MCP
+        why: >-
+          If we route external providers (Bedrock, OpenAI, Anthropic) or an external/custom MCP server
+          through the Gateway, the workspace must be allowed to reach them. Only needed if the External
+          Providers or MCP accelerators are in scope — share any egress-control (firewall/PrivateLink)
+          constraints ahead of time so routing doesn't fail live.
         who: Account admin
         optional: true
 

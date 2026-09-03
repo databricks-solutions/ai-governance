@@ -95,6 +95,9 @@ export default function StepCard({
             )}
           </div>
           <h3 className="text-lg font-semibold text-navy">{step.title}</h3>
+          {step.outcome && (
+            <p className="mt-1 text-sm leading-relaxed text-muted">{step.outcome}</p>
+          )}
         </div>
       </div>
 
