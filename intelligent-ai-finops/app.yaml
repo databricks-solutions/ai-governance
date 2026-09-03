@@ -1,0 +1,17 @@
+# Databricks Apps entrypoint. FastAPI serves the built React frontend (./dist)
+# as static files and exposes /api. Build the frontend (`npm run build`) before
+# deploying so ./dist exists.
+command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+env:
+  # Live: Compare calls real Model Serving (FMAPI) with the selected model +
+  # prompt — real answer, tokens, latency, and a real LLM-as-judge score.
+  # Set "true" for a fully offline demo (synthesised numbers, placeholder answer).
+  - name: FINOPS_DEMO_MODE
+    value: "false"
+  - name: FINOPS_JUDGE_ENABLED
+    value: "true"
+  # $ per DBU used to convert the FMAPI DBU rate card to dollars. 0.07 is the
+  # published AWS/GCP Model Serving list rate; set to your negotiated $/DBU.
+  - name: FINOPS_DBU_TO_USD
+    value: "0.07"

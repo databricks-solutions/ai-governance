@@ -1,0 +1,20 @@
+# Routing policy - thresholds, budget caps, fallback chain (§4).
+# This is YOUR policy, defined here, not handed down by a vendor.
+thresholds:
+  small_max: 40       # complexity < 40  → small open source
+  large_max: 75       # complexity < 75  → large open-weight OSS (else frontier)
+
+budget:
+  monthly_cap_usd: 12000
+  downgrade_at_pct: 55   # ≥55% consumed → cap the ceiling at large open-weight OSS
+  open_only_at_pct: 80   # ≥80% consumed → cap at small open source (cheapest)
+
+fallback:
+  on: [429, 500, 502, 503, timeout]
+  timeout_ms: 8000
+
+rate_limits:
+  calls_per_minute_per_user: 120
+
+cache:
+  similarity_threshold: 0.94

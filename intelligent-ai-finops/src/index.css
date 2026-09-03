@@ -1,0 +1,70 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 14px/1.55 var(--f-body);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+  /* Focus is always visible; lava is allowed here as the focus ring per the
+     prototype (an interaction signal, not decoration). */
+  :focus-visible {
+    outline: 2px solid var(--lava);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Every figure is mono with tabular numerals (§9). */
+  .num {
+    font-family: var(--f-data);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+  .eyebrow {
+    font: 600 10px/1 var(--f-body);
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+}
+
+/* Phase swap for the scroll-reactive story panel. */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ROI line draw-in. */
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Marching-ants flow along the architecture edges. */
+@keyframes dashflow {
+  to { stroke-dashoffset: -28; }
+}
+
+/* Flowing dot along a routing-step connector. */
+@keyframes flowX {
+  0% { transform: translateX(0); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(24px); opacity: 0; }
+}
