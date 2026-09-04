@@ -13,6 +13,8 @@ export interface Step {
   title: string;
   /** One-line "We can …" outcome statement shown under the title. */
   outcome?: string;
+  /** Preview outcome — shown with a "Coming soon" badge, no Try-It yet. */
+  coming_soon?: boolean;
   concept?: string;
   /** Key of a diagram to render under the concept — see VISUALS in StepCard. */
   visual?: string;

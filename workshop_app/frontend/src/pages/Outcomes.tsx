@@ -132,7 +132,7 @@ export default function Outcomes({
               ))}
             </select>
             <span className="text-xs text-muted">
-              Shows the 15 core outcomes plus the selected accelerator's — pick the one this workshop runs.
+              Shows the core outcomes plus the selected accelerator's — pick the one this workshop runs.
             </span>
           </div>
         )}

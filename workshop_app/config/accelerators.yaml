@@ -231,8 +231,8 @@ accelerators:
           test: mcp_telemetry
 
   - id: acc_agent_registry
-    title: "Choice: Agent Registry"
-    tagline: Make agents first-class UC assets — registered, versioned, owned, traced, and governed like any endpoint.
+    title: "Choice: Agents"
+    tagline: Register an agent as a governed UC service, then version, own, trace, and govern it like any endpoint — the hands-on path behind the "Register an agent service" core step (Coming Soon).
     steps:
       - id: acc_agent_inventory
         title: Inventory registered agents & tools

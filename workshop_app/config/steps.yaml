@@ -321,6 +321,26 @@ pillars:
           label: Query usage by project tag
           test: usage_by_project
 
+      - id: cost_team_governance
+        title: "Cost: Team-level budgets & visibility"
+        outcome: "We can show budget alerts and spend/usage visibility managed by team leads and FinOps — not just the account admin — so each team owns its own consumption."
+        concept: |
+          Governance sticks when the people who own a budget can see and manage it without going
+          through an account admin. Two moves make that real:
+
+          - **Self-service visibility.** A team lead runs `queries/budget_status.sql` (and
+            `usage_by_project.sql`) filtered to their own team's model service or tag — their
+            spend, their attribution, no admin required. Hand them the query, not the console.
+          - **Delegated ownership.** Server-side tags on each team's model service make spend
+            attributable and budgetable per team, so every AI spend spike ties back to a named
+            owner and an approved use case — the business-case discipline FinOps asks for.
+
+          This reads the 30-day spend a team's budget governs, run the way a team lead would run
+          it, to prove the visibility works without account-admin access.
+        action:
+          label: Show a team's budgeted spend (self-service, no admin)
+          test: budget_status
+
   - id: control
     title: Control
     tagline: Policies, guardrails, identity propagation, and the telemetry that records them.
@@ -409,6 +429,24 @@ pillars:
         action:
           label: Query denied calls & scan for secrets
           test: audit_scan
+
+      - id: control_agent_service
+        title: "Control: Register an agent service"
+        outcome: "We can register an agent as a governed Unity Catalog service — owned, versioned, and policy-attachable like a model service."
+        coming_soon: true
+        concept: |
+          The end state for agent governance: an **agent service** is a Unity Catalog securable,
+          just like a model service — owned, versioned, discoverable, and an attachment point for
+          the same guardrails, rate limits, and service policies. Registering agents this way puts
+          them in one inventory alongside models and MCP, governed by UC grants rather than living
+          as ungoverned endpoints.
+
+          **Coming Soon.** Agents-in-Unity-Catalog is still stabilizing, so there is no live Try-It
+          here yet. Today you register agents as MLflow/UC models and govern the serving endpoint
+          directly — the **Agents** accelerator walks through that hands-on. This core step becomes
+          interactive once agent services are GA.
+        manual:
+          label: See the Agents accelerator to register & govern agents today
 
       # Trimmed from the core for the 3-hour format, and re-addable on request:
       #   - control_coding_agents  -> lives in the Coding Agents accelerator (deeper treatment).
