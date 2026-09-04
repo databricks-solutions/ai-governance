@@ -11,6 +11,10 @@ export interface StepManual {
 export interface Step {
   id: string;
   title: string;
+  /** One-line "We can …" outcome statement shown under the title. */
+  outcome?: string;
+  /** Preview outcome — shown with a "Coming soon" badge, no Try-It yet. */
+  coming_soon?: boolean;
   concept?: string;
   /** Key of a diagram to render under the concept — see VISUALS in StepCard. */
   visual?: string;
@@ -109,6 +113,8 @@ export interface PrereqItem {
   who?: string;
   /** Only needed for a specific scope (a named accelerator, external providers, …). */
   optional?: boolean;
+  /** Hard blocker — the workshop cannot run until this is met. */
+  blocker?: boolean;
 }
 export interface PrereqGroup {
   id: string;
@@ -120,6 +126,8 @@ export interface PrereqGroup {
 export interface Prerequisites {
   lead_time_note?: string;
   groups: PrereqGroup[];
+  /** Shareable Google Doc generated from the same prerequisites.yaml (kept in sync). */
+  google_doc_url?: string | null;
   /** False when reportlab is missing from the deployment — hide the PDF button rather than 503. */
   pdf_available: boolean;
   pdf_unavailable_reason?: string | null;
@@ -147,6 +155,21 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => j<{ ok: boolean }>(r)),
+
+  // Clear ALL workshop progress so the room can start fresh. Cannot be undone — export first.
+  resetProgress: () =>
+    fetch("/api/progress/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).then((r) => j<{ ok: boolean; cleared: number }>(r)),
+
+  // Apply a scope.json from the internal app: pre-mark out-of-scope accelerators N/A.
+  importScope: (scope: unknown) =>
+    fetch("/api/scope/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(scope),
+    }).then((r) => j<{ ok: boolean; na_marked: number; in_scope_accelerators: string[]; focus_pillars: string[] }>(r)),
 
   // Set the hand-marked outcome flags (Done / N/A / Add-to-POC). The full desired state is sent
   // each time (Done and N/A are mutually exclusive; `poc` is independent).

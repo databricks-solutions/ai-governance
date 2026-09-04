@@ -94,7 +94,17 @@ export default function StepCard({
               </span>
             )}
           </div>
-          <h3 className="text-lg font-semibold text-navy">{step.title}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold text-navy">{step.title}</h3>
+            {step.coming_soon && (
+              <span className="rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-navy">
+                Coming soon
+              </span>
+            )}
+          </div>
+          {step.outcome && (
+            <p className="mt-1 text-sm leading-relaxed text-muted">{step.outcome}</p>
+          )}
         </div>
       </div>
 

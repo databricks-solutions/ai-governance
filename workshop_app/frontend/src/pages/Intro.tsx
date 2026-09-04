@@ -1,4 +1,5 @@
-import { Layers, Lock, DollarSign, ArrowRight, Rocket, FileDown } from "lucide-react";
+import { useRef, useState } from "react";
+import { Layers, Lock, DollarSign, ArrowRight, Rocket, FileDown, Upload, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
 import Markdown, { inline } from "@/components/Markdown";
@@ -14,6 +15,7 @@ export default function Intro({
   accelerators,
   progress,
   go,
+  onProgressChange,
 }: {
   intro: { title: string; body: string; deploy?: DeployGuide };
   pillars: Pillar[];
@@ -21,11 +23,14 @@ export default function Intro({
   accelerators?: Pillar[];
   progress: ProgressMap;
   go: (r: string) => void;
+  onProgressChange: () => void;
 }) {
   return (
     <>
       <PageHeader title={intro.title} />
       <div className="mx-auto max-w-4xl space-y-12 px-8 py-12 lg:px-14">
+        <ScopeImport onImported={onProgressChange} />
+
         {/* The invite artifact: a one-page overview to share with people BEFORE they open the
             app — hence it lives at the top of the landing page. */}
         <section className="flex flex-col gap-4 rounded-2xl border border-lava/20 bg-oat p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -131,6 +136,59 @@ export default function Intro({
         </section>
       </div>
     </>
+  );
+}
+
+// Import the scope.json exported by the internal sales-play app: it pre-marks out-of-scope
+// accelerators N/A so the room opens focused on the core + the recommended add-on. Lives at the
+// top of the Walkthrough because scope is the first thing to set before working the steps.
+function ScopeImport({ onImported }: { onImported: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState("");
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setToast("");
+    try {
+      const scope = JSON.parse(await file.text());
+      const res = await api.importScope(scope);
+      const focus = res.focus_pillars?.length ? ` Focus: ${res.focus_pillars.join(", ")}.` : "";
+      setToast(`Scope applied — ${res.na_marked} step(s) marked N/A.${focus}`);
+      onImported();
+    } catch (err) {
+      setToast(`Import failed: ${err}`);
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-3 rounded-2xl border border-navy/10 bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 className="text-lg font-semibold text-navy">Start from a recommended scope</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
+          Import the <code className="rounded bg-navy/5 px-1">scope.json</code> from the account's
+          maturity assessment to pre-mark out-of-scope accelerators N/A — the room opens focused on
+          the core and the recommended accelerator. Optional; you can also scope by hand.
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-col items-start gap-1">
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:border-navy/50 disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          Import scope.json
+        </button>
+        <input ref={fileRef} type="file" accept="application/json,.json" onChange={onFile} className="hidden" />
+        {toast && <span className="text-xs text-muted">{toast}</span>}
+      </div>
+    </section>
   );
 }
 

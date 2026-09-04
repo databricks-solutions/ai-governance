@@ -5,6 +5,11 @@
 # steps.yaml) so it can be tailored per customer without a code change. Rendered on the
 # Prerequisites page and exported as a PDF with real checkboxes (GET /api/export/prerequisites.pdf).
 #
+# THIS FILE IS THE SINGLE SOURCE OF TRUTH for the prerequisites. The matching Google Doc is
+# generated from it (so the two never drift) via the internal repo's generator:
+#   python scripts/generate_google.py workshop_app/config/prerequisites.yaml --prereqs
+# Link the resulting Doc back here in `google_doc_url` so the app points at the shareable copy.
+#
 # Two groups only — long lead time and short lead time — and only the essentials. Every item is
 # tagged by persona in `who`. The workshop needs as few as THREE people:
 #   - Account admin      — enables platform capabilities and runs the account-level grants.
@@ -18,6 +23,10 @@
 #   why       what it buys you / what it unblocks. Plain language, customer-facing.
 #   who       the persona who owns it (Account admin / Business champion / Technical champion)
 #   optional  true if only some customers need it; say who/when in `why`
+
+# Shareable Google Doc generated from this file (see the generator note in the header). Kept in
+# sync by regenerating whenever this YAML changes.
+google_doc_url: https://docs.google.com/document/d/12CnGW0qXCAfrL_lH8r1vPezdQvAzm5OL4GKGVdKePPE/edit
 
 lead_time_note: >-
   These are the prerequisites for your AI Governance Workshop — getting them in place ahead of
@@ -37,6 +46,14 @@ groups:
       the ones that stall a workshop if we leave them to the day. Getting them done early is the
       single biggest thing you can do to make the session go smoothly.
     items:
+      - id: account_admin_available
+        item: Confirm an account admin is available for the setup (and ideally the session)
+        why: >-
+          The items that stall a workshop — enabling the Gateway, the MCP previews, and the two
+          `system` grants — can **only** be done by an account admin. Name that person now so the
+          long-lead work doesn't wait on tracking someone down, and ideally have them join for the
+          session so anything missing can be fixed in the room.
+        who: Account admin
       - id: uaig_enabled
         item: Turn on Unity AI Gateway for the account and this workspace
         why: >-
@@ -44,6 +61,7 @@ groups:
           is enabled, so it is the first thing to confirm. It is enabled at the **account** level
           (Account Console → Settings), not per workspace.
         who: Account admin
+        blocker: true
       - id: beta_readiness
         item: Confirm your org can use Beta features — and flag CSP
         why: >-
@@ -68,8 +86,10 @@ groups:
         why: >-
           The app deploys into a catalog you choose and runs every live check through the warehouse.
           A serverless warehouse starts fastest. The catalog must already exist — the app creates
-          only its own schema inside it.
+          only its own schema inside it. Without Unity Catalog there is nothing to govern and the
+          workshop cannot run.
         who: Technical champion
+        blocker: true
       - id: pilot_users
         item: Line up a few pilot users from your identity provider
         why: >-
@@ -77,6 +97,13 @@ groups:
           separate logins. Optional, but it makes those moments land — shared logins prove nothing.
         who: Technical champion
         optional: true
+      - id: uc_foundation_models
+        item: Confirm Unity Catalog is enabled with foundation models available
+        why: >-
+          The workshop governs models, tools, and agents as Unity Catalog assets, so UC must be on
+          and the account's foundation models reachable. This is usually already true wherever the
+          Gateway is enabled — confirm it so the Choice steps have something to inventory and govern.
+        who: Technical champion
       - id: mcp_previews
         item: Enable the MCP previews (Service policies and Managed MCP)
         why: >-
@@ -87,6 +114,44 @@ groups:
           real MCP server only if you already run one and want to govern it specifically.
         who: Account admin
         optional: true
+      - id: external_storage_catalog
+        item: Provide an external-storage catalog for inference tables
+        why: >-
+          The guardrail and PII steps (and the Policies & Guardrails accelerator) log request/response
+          payloads to **inference tables**, which need a catalog backed by external storage. Only
+          needed if those steps are in scope — tell us and we'll confirm the catalog can host them.
+        who: Technical champion
+        optional: true
+      - id: egress_allowlist
+        item: Allowlist network egress for external providers / external MCP
+        why: >-
+          If we route external providers (Bedrock, OpenAI, Anthropic) or an external/custom MCP server
+          through the Gateway, the workspace must be allowed to reach them. Only needed if the External
+          Providers or MCP accelerators are in scope — share any egress-control (firewall/PrivateLink)
+          constraints ahead of time so routing doesn't fail live.
+        who: Account admin
+        optional: true
+      - id: external_providers_and_key
+        item: Identify existing external providers and get a test API key (if you want to route them)
+        why: >-
+          The whole idea is to be ready to *test*, not just talk. Tell us which external providers you
+          already use (Bedrock, OpenAI, Anthropic, Azure OpenAI, self-hosted) and — if you'd like to
+          govern them — bring at least one **test API key** we can store in a secret scope and route
+          live through the Gateway. This is what makes the External Providers accelerator real instead
+          of a slide; without a key we can only describe it. Only needed if external providers are in
+          scope. Pairs with the egress allowlist above.
+        who: Account admin
+        optional: true
+      - id: private_networking
+        item: Identify private-networking requirements and test connectivity ahead of time
+        why: >-
+          Tell us about any private networking (PrivateLink / VPC / firewall egress rules, NCC, storage
+          firewalls) and let's **test it before the session**. This matters most for the two things
+          that are easy to get wrong live: **inference tables** (guardrail/PII logging writes to
+          external storage) and **end-to-end tracing / audit** (the telemetry must actually reach the
+          system tables and any SIEM). Confirming the paths early means the Control steps prove
+          something instead of timing out.
+        who: Account admin
 
   - id: short_lead
     title: Short lead time — the day before (with us, if you like)
@@ -124,5 +189,30 @@ groups:
           There are six optional ~3-hour deep dives (MCP, agent registry, coding agents, external
           providers, policies & guardrails, and skills). Pick the one matching your top priority —
           we won't run all of them, there isn't time.
+        who: Business champion
+        optional: true
+      - id: target_mcp_or_agent
+        item: Have a target agent or MCP server to govern (Agents / MCP accelerators)
+        why: >-
+          The Agents and MCP accelerators land best on something you actually run — bring one target
+          agent or MCP server to register and govern. If you'd rather see the mechanics first, the
+          provided read-only `system.ai.github` MCP works out of the box. Only needed if those
+          accelerators are in scope.
+        who: Technical champion
+        optional: true
+      - id: coding_agent_configured
+        item: Point a coding agent at the Gateway for one developer (Coding Agents accelerator)
+        why: >-
+          The Coding Agents accelerator proves per-developer attribution and a live rate-limit 429,
+          so it needs at least one real coding agent (Claude Code, Cursor, etc.) configured against
+          the Gateway ahead of time. Only needed if that accelerator is in scope.
+        who: Technical champion
+        optional: true
+      - id: security_stakeholder
+        item: Invite a security / compliance stakeholder for the Control hour
+        why: >-
+          The Control pillar — guardrails, policies, audit — turns from a demo into a real evaluation
+          when the person who owns security or compliance sign-off is in the room to watch it fire.
+          Optional, but it's what makes Control land with the buyer who cares most.
         who: Business champion
         optional: true

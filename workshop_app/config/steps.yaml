@@ -94,7 +94,8 @@ pillars:
     tagline: Any model, tool, or agent behind one control plane, addressed as a UC securable.
     steps:
       - id: choice_connect
-        title: Connect to the workspace
+        title: "Choice: Connect to the workspace"
+        outcome: "The app reaches your workspace and SQL warehouse and reads its config — the base every later step runs on."
         concept: |
           This app runs as a Databricks App with its own service principal. Confirm it can reach
           your SQL warehouse and read its config — every later step depends on both.
@@ -106,7 +107,8 @@ pillars:
           test: workspace_context
 
       - id: choice_list_endpoints
-        title: Inventory your endpoints — and flag v1 vs v3
+        title: "Choice: Inventory endpoints & flag v1 vs v3"
+        outcome: "We can inventory every serving endpoint and agent, and split recent traffic into the legacy (v1) vs governed (v3) path to expose the migration backlog."
         concept: |
           Two views of the same surface. First, **every serving endpoint** on this workspace:
           foundation models, external models, and custom ones — the inventory you are about to
@@ -129,7 +131,8 @@ pillars:
           test: endpoint_inventory_v1_v3
 
       - id: choice_model_services
-        title: Put a model behind a governed name (a model service)
+        title: "Choice: Put a model behind a governed name"
+        outcome: "We can stand a model up as a Unity Catalog model service (catalog.schema.service) with a stable client contract and UC-grant access."
         concept: |
           Controls used to hang off a **workspace serving endpoint**: the endpoint name was the
           application contract and access was a workspace ACL. They now hang off a **model
@@ -164,12 +167,54 @@ pillars:
           label: Show model services & the client contract
           test: model_services
 
+      - id: choice_default_access
+        title: "Choice: Choose which models teams can access"
+        outcome: "We can choose which models each team and the wider organization can access — governed by Unity Catalog grants, not per-developer API keys."
+        concept: |
+          Choice starts with deciding **which models each team and the wider organization can
+          reach** — and enforcing it centrally. Provided model services are **closed by default**:
+          callable only by an identity granted `EXECUTE` (directly or inherited). So access is a
+          UC grant you can reason about — grant a team the models it should have, withhold the
+          rest — not a per-developer API key sprayed across the org.
+
+          The question is never "what is everyone exposed to?" but "what can *this* identity
+          reach?" — the same question you'd ask of a pilot user before rollout. This reads the
+          **effective permissions** for the app's own identity against the model services and
+          reports which it can actually call. It is read-only — it reports reach, it never changes
+          a grant.
+        action:
+          label: Show which models this identity can access (effective access)
+          test: default_access
+
+      - id: choice_smart_routing
+        title: "Choice: Automate the right choice"
+        outcome: "We can use custom or smart routing to automate model choice — each request goes to the right model without the caller picking it (smart-routing example coming soon)."
+        coming_soon: true
+        concept: |
+          Choice isn't only *which* models are available — it's making the **right choice
+          automatically**. Instead of every caller hard-coding a frontier model, a router sends
+          each request to the model that fits it: cheapest-sufficient for simple asks, a frontier
+          model for the hard ones. The router changes; the governed control plane does not.
+
+          Two ways to own the routing policy, both governed through the same Gateway:
+
+          - **Smart routing (Databricks-managed)** — the Gateway selects a model per request.
+            Enabled per account; Beta.
+          - **Custom router** — a classifier you own scores each request and routes it to the
+            cheapest model that clears a defined bar.
+
+          **Coming Soon.** A live smart-routing Try-It lands here once the managed router is GA on
+          this account. Today you can quantify the routing case in **Cost → Project routing
+          savings**, and stand up a custom router yourself — this core step becomes interactive
+          when smart routing is available.
+
   - id: cost
     title: Cost
     tagline: Project routing cost, cap spend and throughput, and attribute each request.
     steps:
       - id: cost_model_panel
-        title: The models and their prices
+        title: "Cost: Models & prices"
+        outcome: "We can see the models available to route across and their per-token prices — the basis for routing ROI."
         concept: |
           The Cost pillar reduces spend by sending each request to an appropriately priced
           model rather than defaulting every request to a frontier model. Routing can be owned
@@ -190,7 +235,8 @@ pillars:
           test: routing_panel
 
       - id: cost_routing_compare
-        title: Projected monthly cost by model
+        title: "Cost: Project routing savings"
+        outcome: "We can run prompts across models, measure the tokens each returns, and project the monthly savings from routing each request to the cheapest sufficient model."
         concept: |
           This step runs the configured prompts against all three models, measures the tokens
           each returns, and multiplies the per-request cost by the monthly request volume set
@@ -207,7 +253,8 @@ pillars:
           test: routing_compare
 
       - id: cost_spend_by_model
-        title: Where the money actually goes
+        title: "Cost: Spend by model"
+        outcome: "We can read 30-day estimated USD spend per model to see where the money actually goes — and where a routing policy has the most leverage."
         concept: |
           `system.ai_gateway.external_model_spend` reports **estimated USD directly** (no
           price-list join needed) for external-provider traffic through the Gateway. Break it
@@ -218,7 +265,8 @@ pillars:
           test: gateway_spend_by_model
 
       - id: cost_rate_limits
-        title: Rate limits — the hard control
+        title: "Cost: Rate limits (the hard control)"
+        outcome: "We can enforce QPM/TPM rate limits per service, user, and group and see HTTP 429 when exceeded — the ceiling that reliably holds today."
         concept: |
           Two controls, easily conflated. **Rate limits** cap *throughput* — exceeding one
           returns HTTP 429 immediately. They are GA. **Budgets** cap *spend*, and today they
@@ -237,7 +285,8 @@ pillars:
           deep_link: serving_endpoint
 
       - id: cost_budgets
-        title: Budgets & spend thresholds
+        title: "Cost: Budgets & thresholds"
+        outcome: "We can set account budgets with alert thresholds and read the spend they govern, pairing them with rate limits for a hard ceiling."
         concept: |
           Budgets are scoped to the account and configured in the account console, with
           shared and per-user thresholds. **Alerts are GA; hard blocking is rolling out** —
@@ -265,7 +314,8 @@ pillars:
           deep_link: account_budgets
 
       - id: cost_usage
-        title: Usage & cost by project — and how tagging works
+        title: "Cost: Attribute usage by team/tag"
+        outcome: "We can split AI usage by model service and tag to attribute spend to teams — distinguishing caller request-tags from budget-safe server-side tags."
         concept: |
           `system.ai_gateway.usage` rolls tokens up by project tag — the basis for attributing
           and forecasting AI spend. First, how a request gets tagged, because it decides what you
@@ -297,12 +347,33 @@ pillars:
           label: Query usage by project tag
           test: usage_by_project
 
+      - id: cost_team_governance
+        title: "Cost: Team-level budgets & visibility"
+        outcome: "We can show budget alerts and spend/usage visibility managed by team leads and FinOps — not just the account admin — so each team owns its own consumption."
+        concept: |
+          Governance sticks when the people who own a budget can see and manage it without going
+          through an account admin. Two moves make that real:
+
+          - **Self-service visibility.** A team lead runs `queries/budget_status.sql` (and
+            `usage_by_project.sql`) filtered to their own team's model service or tag — their
+            spend, their attribution, no admin required. Hand them the query, not the console.
+          - **Delegated ownership.** Server-side tags on each team's model service make spend
+            attributable and budgetable per team, so every AI spend spike ties back to a named
+            owner and an approved use case — the business-case discipline FinOps asks for.
+
+          This reads the 30-day spend a team's budget governs, run the way a team lead would run
+          it, to prove the visibility works without account-admin access.
+        action:
+          label: Show a team's budgeted spend (self-service, no admin)
+          test: budget_status
+
   - id: control
     title: Control
     tagline: Policies, guardrails, identity propagation, and the telemetry that records them.
     steps:
       - id: control_governed_endpoint
-        title: Create a governed endpoint
+        title: "Control: Create a governed endpoint"
+        outcome: "We can put a control layer in front of a model — fallback, inference-table logging, usage tracking, and the attach point for guardrails and rate limits."
         concept: |
           A governed endpoint puts a control layer in front of a model: a fallback for
           resilience, an inference table logging every payload, usage tracking, and the
@@ -315,7 +386,8 @@ pillars:
           test: verify_governed_endpoint
 
       - id: control_endpoint_acl
-        title: Who is allowed to call it
+        title: "Control: Who is allowed to call it"
+        outcome: "We can review endpoint ACLs (CAN_QUERY / CAN_VIEW / CAN_MANAGE) and spot over-broad or shadow-endpoint grants."
         concept: |
           The access question, at endpoint grain: **`CAN_QUERY`**, `CAN_VIEW`, and
           `CAN_MANAGE`. Two things to read carefully in the result:
@@ -333,7 +405,8 @@ pillars:
           test: endpoint_acl
 
       - id: control_guardrails
-        title: Guardrails on a model service
+        title: "Control: Guardrails that fire"
+        outcome: "We can screen inputs and outputs for PII and unsafe content and prove a blocked prompt is actually stopped."
         concept: |
           Guardrails screen inputs and outputs for PII, unsafe content, and blocked keywords.
           Configure PII and safety filters in the AI Gateway UI — there is no full CRUD API yet.
@@ -352,7 +425,8 @@ pillars:
           test: guardrail_activity
 
       - id: control_mcp_policy
-        title: Contextual policy for an MCP service
+        title: "Control: Contextual MCP policy"
+        outcome: "We can attach a UC SQL service policy that allows read tools and denies write tools, running as the calling user (on-behalf-of)."
         concept: |
           MCP services expose tools to agents. A **service policy** is a UC SQL function that
           inspects each tool call and returns ALLOW or DENY — allow reads, deny writes.
@@ -372,7 +446,8 @@ pillars:
           test: test_mcp_policy
 
       - id: control_audit
-        title: Audit & secret-leak detection
+        title: "Control: Audit & secret-leak scan"
+        outcome: "We can query the audit trail for denied and failed calls and scan tool arguments for secret-shaped strings."
         concept: |
           `system.access.audit` records who called what and whether a policy fired. This scans
           recent denied and failed calls, and looks for secret-shaped strings (`sk-`, `AKIA`,
@@ -380,6 +455,24 @@ pillars:
         action:
           label: Query denied calls & scan for secrets
           test: audit_scan
+
+      - id: control_agent_service
+        title: "Control: Register an agent service"
+        outcome: "We can register an agent as a governed Unity Catalog service — owned, versioned, and policy-attachable like a model service."
+        coming_soon: true
+        concept: |
+          The end state for agent governance: an **agent service** is a Unity Catalog securable,
+          just like a model service — owned, versioned, discoverable, and an attachment point for
+          the same guardrails, rate limits, and service policies. Registering agents this way puts
+          them in one inventory alongside models and MCP, governed by UC grants rather than living
+          as ungoverned endpoints.
+
+          **Coming Soon.** Agents-in-Unity-Catalog is still stabilizing, so there is no live Try-It
+          here yet. Today you register agents as MLflow/UC models and govern the serving endpoint
+          directly — the **Agents** accelerator walks through that hands-on. This core step becomes
+          interactive once agent services are GA.
+        manual:
+          label: See the Agents accelerator to register & govern agents today
 
       # Trimmed from the core for the 3-hour format, and re-addable on request:
       #   - control_coding_agents  -> lives in the Coding Agents accelerator (deeper treatment).

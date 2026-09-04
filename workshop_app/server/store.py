@@ -168,3 +168,16 @@ def set_outcome(
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         _persist()
+
+
+def reset() -> int:
+    """Clear all workshop progress and rewrite the (now empty) file — used to start the room
+    fresh, e.g. re-running the workshop or clearing a demo deployment. Returns how many steps
+    were cleared. Write-through like every other mutation; never raises (a failed persist keeps
+    the cleared in-memory state and is logged)."""
+    with _LOCK:
+        n = len(_MEM)
+        _MEM.clear()
+        _persist()
+        log.info("Progress store reset (%d step(s) cleared).", n)
+        return n

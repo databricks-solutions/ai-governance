@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle } from "lucide-react";
+import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle, ExternalLink } from "lucide-react";
 import { api, type Prerequisites as Prereqs } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import { cn } from "@/lib/cn";
@@ -64,6 +64,8 @@ export default function Prerequisites() {
   const all = data.groups.flatMap((g) => g.items);
   const required = all.filter((i) => !i.optional);
   const doneRequired = required.filter((i) => checked[i.id]).length;
+  const blockers = all.filter((i) => i.blocker);
+  const blockersUnmet = blockers.filter((i) => !checked[i.id]);
 
   return (
     <div>
@@ -86,31 +88,56 @@ export default function Prerequisites() {
             workshop progress, so they stay out of the exported outcomes.
           </div>
         </div>
-        {data.pdf_available ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {data.google_doc_url && (
             <a
-              href={api.brochurePdfUrl()}
+              href={data.google_doc_url}
+              target="_blank"
+              rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white px-4 py-2 text-sm font-semibold text-navy hover:border-navy/40"
             >
-              <FileText className="h-4 w-4" /> Workshop brochure (PDF)
+              <ExternalLink className="h-4 w-4" /> Prerequisites (Google Doc)
             </a>
-            <a
-              href={api.prerequisitesPdfUrl()}
-              className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
-            >
-              <FileDown className="h-4 w-4" /> Download checklist (PDF)
-            </a>
-          </div>
-        ) : (
-          <div className="flex items-start gap-2 text-xs text-muted">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#B7791F]" />
-            <span>
-              PDF export unavailable on this deployment.
-              {data.pdf_unavailable_reason ? ` (${data.pdf_unavailable_reason})` : ""}
-            </span>
-          </div>
-        )}
+          )}
+          {data.pdf_available ? (
+            <>
+              <a
+                href={api.brochurePdfUrl()}
+                className="inline-flex items-center gap-2 rounded-full border border-navy/20 bg-white px-4 py-2 text-sm font-semibold text-navy hover:border-navy/40"
+              >
+                <FileText className="h-4 w-4" /> Workshop brochure (PDF)
+              </a>
+              <a
+                href={api.prerequisitesPdfUrl()}
+                className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
+              >
+                <FileDown className="h-4 w-4" /> Download checklist (PDF)
+              </a>
+            </>
+          ) : (
+            <div className="flex items-start gap-2 text-xs text-muted">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#B7791F]" />
+              <span>
+                PDF export unavailable on this deployment.
+                {data.pdf_unavailable_reason ? ` (${data.pdf_unavailable_reason})` : ""}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {blockers.length > 0 && (
+        <div className="mb-8 flex items-start gap-3 rounded-2xl border border-lava/40 bg-lava/[0.05] p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-lava" />
+          <div className="text-sm leading-relaxed text-navy">
+            <span className="font-semibold">
+              Hard blockers — {blockersUnmet.length} of {blockers.length} still open.
+            </span>{" "}
+            The workshop cannot run until these are met: without Unity Catalog and the Unity AI
+            Gateway there is nothing to govern. Confirm them (checked below) before scheduling.
+          </div>
+        </div>
+      )}
 
       {data.lead_time_note && (
         <p className="mb-8 whitespace-pre-line text-sm leading-relaxed text-muted">{data.lead_time_note}</p>
@@ -161,6 +188,11 @@ export default function Prerequisites() {
                           >
                             {item.item}
                           </span>
+                          {item.blocker && (
+                            <span className="rounded bg-lava/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lava">
+                              hard blocker
+                            </span>
+                          )}
                           {item.optional && (
                             <span className="rounded bg-navy/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
                               scope-dependent
