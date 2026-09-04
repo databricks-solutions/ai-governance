@@ -46,6 +46,14 @@ groups:
       the ones that stall a workshop if we leave them to the day. Getting them done early is the
       single biggest thing you can do to make the session go smoothly.
     items:
+      - id: account_admin_available
+        item: Confirm an account admin is available for the setup (and ideally the session)
+        why: >-
+          The items that stall a workshop — enabling the Gateway, the MCP previews, and the two
+          `system` grants — can **only** be done by an account admin. Name that person now so the
+          long-lead work doesn't wait on tracking someone down, and ideally have them join for the
+          session so anything missing can be fixed in the room.
+        who: Account admin
       - id: uaig_enabled
         item: Turn on Unity AI Gateway for the account and this workspace
         why: >-
@@ -123,6 +131,27 @@ groups:
           constraints ahead of time so routing doesn't fail live.
         who: Account admin
         optional: true
+      - id: external_providers_and_key
+        item: Identify existing external providers and get a test API key (if you want to route them)
+        why: >-
+          The whole idea is to be ready to *test*, not just talk. Tell us which external providers you
+          already use (Bedrock, OpenAI, Anthropic, Azure OpenAI, self-hosted) and — if you'd like to
+          govern them — bring at least one **test API key** we can store in a secret scope and route
+          live through the Gateway. This is what makes the External Providers accelerator real instead
+          of a slide; without a key we can only describe it. Only needed if external providers are in
+          scope. Pairs with the egress allowlist above.
+        who: Account admin
+        optional: true
+      - id: private_networking
+        item: Identify private-networking requirements and test connectivity ahead of time
+        why: >-
+          Tell us about any private networking (PrivateLink / VPC / firewall egress rules, NCC, storage
+          firewalls) and let's **test it before the session**. This matters most for the two things
+          that are easy to get wrong live: **inference tables** (guardrail/PII logging writes to
+          external storage) and **end-to-end tracing / audit** (the telemetry must actually reach the
+          system tables and any SIEM). Confirming the paths early means the Control steps prove
+          something instead of timing out.
+        who: Account admin
 
   - id: short_lead
     title: Short lead time — the day before (with us, if you like)
@@ -160,5 +189,30 @@ groups:
           There are six optional ~3-hour deep dives (MCP, agent registry, coding agents, external
           providers, policies & guardrails, and skills). Pick the one matching your top priority —
           we won't run all of them, there isn't time.
+        who: Business champion
+        optional: true
+      - id: target_mcp_or_agent
+        item: Have a target agent or MCP server to govern (Agents / MCP accelerators)
+        why: >-
+          The Agents and MCP accelerators land best on something you actually run — bring one target
+          agent or MCP server to register and govern. If you'd rather see the mechanics first, the
+          provided read-only `system.ai.github` MCP works out of the box. Only needed if those
+          accelerators are in scope.
+        who: Technical champion
+        optional: true
+      - id: coding_agent_configured
+        item: Point a coding agent at the Gateway for one developer (Coding Agents accelerator)
+        why: >-
+          The Coding Agents accelerator proves per-developer attribution and a live rate-limit 429,
+          so it needs at least one real coding agent (Claude Code, Cursor, etc.) configured against
+          the Gateway ahead of time. Only needed if that accelerator is in scope.
+        who: Technical champion
+        optional: true
+      - id: security_stakeholder
+        item: Invite a security / compliance stakeholder for the Control hour
+        why: >-
+          The Control pillar — guardrails, policies, audit — turns from a demo into a real evaluation
+          when the person who owns security or compliance sign-off is in the room to watch it fire.
+          Optional, but it's what makes Control land with the buyer who cares most.
         who: Business champion
         optional: true
