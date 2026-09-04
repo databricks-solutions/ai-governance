@@ -190,10 +190,11 @@ def import_scope(body: ScopeImport):
     """Apply a scope.json from the internal app: mark every out-of-scope accelerator's steps N/A
     (and any explicit na_steps) so the room opens focused on the core + the recommended add-on.
     The mirror of the outcomes.json this app exports back. Re-runnable; clears nothing else."""
-    accels = {a["id"]: a for a in accelerators_content()["accelerators"]}
+    accelerator_groups = accelerators_content()["accelerators"]
+    accels = {a["id"]: a for a in accelerator_groups}
     # step_id -> its group id, across core pillars and accelerators, to resolve na_steps.
     group_of = {s["id"]: g["id"]
-                for g in workshop_content()["pillars"] + accelerators_content()["accelerators"]
+                for g in workshop_content()["pillars"] + accelerator_groups
                 for s in g["steps"]}
     na = 0
     for acc_id in body.na_accelerators:
