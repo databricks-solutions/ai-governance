@@ -38,6 +38,11 @@ _LOCK = threading.RLock()
 # `poc` (bool) are the hand-set outcome flags set from a step card or the outcomes checklist.
 _MEM: dict[str, dict[str, Any]] = {}
 
+# The imported workshop-recommendations doc (scope schema v2) from the internal app or the
+# sheet-driven export: the four-decision plan, blocking prerequisites, recommended accelerator.
+# Stored in its own volume file so it never mixes with the flat {step_id: record} progress map.
+_RECS: dict[str, Any] = {}
+
 # Sentinel so set_outcome can tell "leave this flag unchanged" from "clear it to None/False".
 _UNSET = object()
 
@@ -60,6 +65,17 @@ def _file_path() -> str:
         )
     volume = _vol_cfg().get("name", "workshop_state")
     fname = _vol_cfg().get("file", "progress.json")
+    return f"/Volumes/{catalog}/{schema}/{volume}/{fname}"
+
+
+def _recs_file_path() -> str:
+    """Sibling of the progress file on the same volume, for the imported recommendations doc."""
+    cat = get_config().get("catalog", {}) or {}
+    catalog, schema = cat.get("name"), cat.get("schema")
+    if not catalog or not schema:
+        raise RuntimeError("catalog.name / catalog.schema must be set to locate the volume.")
+    volume = _vol_cfg().get("name", "workshop_state")
+    fname = _vol_cfg().get("recommendations_file", "recommendations.json")
     return f"/Volumes/{catalog}/{schema}/{volume}/{fname}"
 
 
@@ -92,6 +108,16 @@ def load() -> None:
             log.info("Progress store loaded from %s (%d step(s)).", path, len(_MEM))
         except Exception as e:  # noqa: BLE001 — any failure just means we start empty
             log.info("Progress store starting empty (%s).", str(e)[:200])
+        # Imported recommendations doc (best-effort; absent until a scope is imported).
+        try:
+            resp = get_workspace_client().files.download(_recs_file_path())
+            raw = resp.contents.read()
+            data = json.loads(raw) if raw else {}
+            _RECS.clear()
+            if isinstance(data, dict):
+                _RECS.update(data)
+        except Exception as e:  # noqa: BLE001
+            log.info("No imported recommendations yet (%s).", str(e)[:200])
 
 
 def _persist() -> None:
@@ -103,6 +129,29 @@ def _persist() -> None:
         get_workspace_client().files.upload(path, io.BytesIO(body), overwrite=True)
     except Exception as e:  # noqa: BLE001
         log.warning("Could not persist progress to the volume (kept in memory): %s", str(e)[:200])
+
+
+def _persist_recs() -> None:
+    """Rewrite the recommendations file. Caller holds _LOCK. Never raises (logged; memory wins)."""
+    try:
+        body = json.dumps(_RECS, separators=(",", ":")).encode("utf-8")
+        get_workspace_client().files.upload(_recs_file_path(), io.BytesIO(body), overwrite=True)
+    except Exception as e:  # noqa: BLE001
+        log.warning("Could not persist recommendations to the volume (kept in memory): %s", str(e)[:200])
+
+
+def get_recommendations() -> dict[str, Any]:
+    """The imported workshop-recommendations doc (a copy), or {} if none imported yet."""
+    with _LOCK:
+        return json.loads(json.dumps(_RECS))
+
+
+def set_recommendations(doc: dict[str, Any]) -> None:
+    """Store the imported recommendations doc (the panel reads it back). Write-through."""
+    with _LOCK:
+        _RECS.clear()
+        _RECS.update(doc or {})
+        _persist_recs()
 
 
 def get() -> dict[str, dict[str, Any]]:
@@ -179,5 +228,7 @@ def reset() -> int:
         n = len(_MEM)
         _MEM.clear()
         _persist()
+        _RECS.clear()          # a fresh room drops the imported recommendations too
+        _persist_recs()
         log.info("Progress store reset (%d step(s) cleared).", n)
         return n

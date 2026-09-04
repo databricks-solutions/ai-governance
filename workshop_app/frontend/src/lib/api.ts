@@ -123,6 +123,27 @@ export interface PrereqGroup {
   intro?: string;
   items: PrereqItem[];
 }
+// The imported workshop-recommendations doc (scope schema v2) — the four-decision plan the
+// internal app / sheet export produces. Shown read-only in the Recommendations panel.
+export type PlanAction = "blocking_prerequisite" | "prove_in_workshop" | "explore_in_accelerator" | "validate_in_poc";
+export interface WorkshopRecommendations {
+  schema_version?: number;
+  source?: string;
+  overall?: { score: number | null; level: { level: number; label: string } | null; readiness_pct: number | null } | null;
+  focus_pillars?: string[];
+  recommended_accelerator?: { id: string; title: string; outcome: string; pillar_id: string; pillar_title: string } | null;
+  in_scope_accelerators?: string[];
+  na_accelerators?: string[];
+  validated_steps?: string[];
+  blocking_prerequisites?: { id: string; prompt: string; score: number; prereq: string; blocker: boolean; scoped?: string | null }[];
+  plan?: {
+    pillar_id: string; pillar_title: string; id: string; prompt: string;
+    type: string; kind: string; score: number; action: PlanAction; blocker: boolean; detail: string;
+  }[];
+  plan_summary?: { blocking_prerequisite: number; prove_in_workshop: number; explore_in_accelerator: number; validate_in_poc: number };
+  notes?: string;
+}
+
 export interface Prerequisites {
   lead_time_note?: string;
   groups: PrereqGroup[];
@@ -163,13 +184,19 @@ export const api = {
       headers: { "Content-Type": "application/json" },
     }).then((r) => j<{ ok: boolean; cleared: number }>(r)),
 
-  // Apply a scope.json from the internal app: pre-mark out-of-scope accelerators N/A.
+  // Apply a workshop-recommendations doc (scope.json) from the internal app or the sheet export:
+  // pre-mark out-of-scope accelerators + proven-mature core outcomes N/A, and store the plan.
   importScope: (scope: unknown) =>
     fetch("/api/scope/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(scope),
-    }).then((r) => j<{ ok: boolean; na_marked: number; in_scope_accelerators: string[]; focus_pillars: string[] }>(r)),
+    }).then((r) => j<{ ok: boolean; na_marked: number; validated_marked: number;
+                       in_scope_accelerators: string[]; focus_pillars: string[];
+                       blocking_prerequisites: number }>(r)),
+
+  // The imported recommendations doc (four-decision plan + blocking prerequisites), or {} if none.
+  recommendations: () => fetch("/api/recommendations").then((r) => j<WorkshopRecommendations>(r)),
 
   // Set the hand-marked outcome flags (Done / N/A / Add-to-POC). The full desired state is sent
   // each time (Done and N/A are mutually exclusive; `poc` is independent).

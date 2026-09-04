@@ -176,23 +176,32 @@ def reset_progress():
 
 
 class ScopeImport(BaseModel):
-    # The scope.json the internal sales-play app exports (schema_version 1). Extra keys ignored.
+    # The workshop-recommendations doc the internal app (or the sheet export) produces. v2 carries
+    # the full four-decision plan; v1 fields still work. Unknown keys are ignored by Pydantic.
     schema_version: int | None = None
+    source: str | None = None
     focus_pillars: list[str] = []
     in_scope_accelerators: list[str] = []
     na_accelerators: list[str] = []
     na_steps: list[str] = []
+    validated_steps: list[str] = []                 # core outcomes proven-mature (all 5s) — skip live
+    recommended_accelerator: dict | None = None
+    blocking_prerequisites: list[dict] = []
+    plan: list[dict] = []
+    plan_summary: dict = {}
+    overall: dict | None = None
     notes: str | None = None
 
 
 @router.post("/scope/import")
 def import_scope(body: ScopeImport):
-    """Apply a scope.json from the internal app: mark every out-of-scope accelerator's steps N/A
-    (and any explicit na_steps) so the room opens focused on the core + the recommended add-on.
-    The mirror of the outcomes.json this app exports back. Re-runnable; clears nothing else."""
+    """Apply a workshop-recommendations doc from the internal app (or the sheet export): pre-mark
+    out-of-scope accelerators' steps N/A, pre-mark proven-mature core outcomes N/A ("validate in
+    POC" — skip live), and store the four-decision plan so the Recommendations panel can show it.
+    Re-runnable; clears nothing else. The mirror, in reverse, of the outcomes.json this app exports."""
     accelerator_groups = accelerators_content()["accelerators"]
     accels = {a["id"]: a for a in accelerator_groups}
-    # step_id -> its group id, across core pillars and accelerators, to resolve na_steps.
+    # step_id -> its group id, across core pillars and accelerators, to resolve na/validated steps.
     group_of = {s["id"]: g["id"]
                 for g in workshop_content()["pillars"] + accelerator_groups
                 for s in g["steps"]}
@@ -209,9 +218,27 @@ def import_scope(body: ScopeImport):
         if pid:
             store.set_outcome(step_id, pid, outcome="na")
             na += 1
-    return {"ok": True, "na_marked": na,
+    # Proven-mature core outcomes (every mapped statement scored 5): skip live, validate in POC.
+    validated = 0
+    for step_id in body.validated_steps:
+        pid = group_of.get(step_id)
+        if pid:
+            store.set_outcome(step_id, pid, outcome="na")
+            validated += 1
+
+    # Persist the doc so /api/recommendations (the panel) can read the plan + prerequisites back.
+    store.set_recommendations(body.model_dump())
+    return {"ok": True, "na_marked": na, "validated_marked": validated,
             "in_scope_accelerators": body.in_scope_accelerators,
-            "focus_pillars": body.focus_pillars}
+            "focus_pillars": body.focus_pillars,
+            "blocking_prerequisites": len(body.blocking_prerequisites)}
+
+
+@router.get("/recommendations")
+def get_recommendations():
+    """The imported workshop-recommendations doc (four-decision plan, blocking prerequisites,
+    recommended accelerator) — {} until a scope is imported. Read by the Recommendations panel."""
+    return store.get_recommendations()
 
 
 def _save_progress(step_id, pillar_id, status, result, updated_by, notes=None):
