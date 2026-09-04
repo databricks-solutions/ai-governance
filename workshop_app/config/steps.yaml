@@ -168,19 +168,45 @@ pillars:
           test: model_services
 
       - id: choice_default_access
-        title: "Choice: Lock down who can call models"
-        outcome: "We can confirm model services are closed by default and reachable only by granted identities — access is a Unity Catalog grant, not a per-developer key."
+        title: "Choice: Choose which models teams can access"
+        outcome: "We can choose which models each team and the wider organization can access — governed by Unity Catalog grants, not per-developer API keys."
         concept: |
-          Provided model services are **closed by default**: callable only by an identity granted
-          `EXECUTE` (directly or inherited). So the question is never "what is everyone exposed to?"
-          but "what can *this* identity reach?" — the same question you'd ask of a pilot user before
-          rollout. This reads the **effective permissions** for the app's own identity against the
-          model services and reports which it can actually call. It is read-only — it reports reach,
-          it never changes a grant. The takeaway: access to AI assets is a UC grant you can reason
-          about, not a per-developer API key sprayed across the org.
+          Choice starts with deciding **which models each team and the wider organization can
+          reach** — and enforcing it centrally. Provided model services are **closed by default**:
+          callable only by an identity granted `EXECUTE` (directly or inherited). So access is a
+          UC grant you can reason about — grant a team the models it should have, withhold the
+          rest — not a per-developer API key sprayed across the org.
+
+          The question is never "what is everyone exposed to?" but "what can *this* identity
+          reach?" — the same question you'd ask of a pilot user before rollout. This reads the
+          **effective permissions** for the app's own identity against the model services and
+          reports which it can actually call. It is read-only — it reports reach, it never changes
+          a grant.
         action:
-          label: Show who can call the models (effective access)
+          label: Show which models this identity can access (effective access)
           test: default_access
+
+      - id: choice_smart_routing
+        title: "Choice: Automate the right choice"
+        outcome: "We can use custom or smart routing to automate model choice — each request goes to the right model without the caller picking it (smart-routing example coming soon)."
+        coming_soon: true
+        concept: |
+          Choice isn't only *which* models are available — it's making the **right choice
+          automatically**. Instead of every caller hard-coding a frontier model, a router sends
+          each request to the model that fits it: cheapest-sufficient for simple asks, a frontier
+          model for the hard ones. The router changes; the governed control plane does not.
+
+          Two ways to own the routing policy, both governed through the same Gateway:
+
+          - **Smart routing (Databricks-managed)** — the Gateway selects a model per request.
+            Enabled per account; Beta.
+          - **Custom router** — a classifier you own scores each request and routes it to the
+            cheapest model that clears a defined bar.
+
+          **Coming Soon.** A live smart-routing Try-It lands here once the managed router is GA on
+          this account. Today you can quantify the routing case in **Cost → Project routing
+          savings**, and stand up a custom router yourself — this core step becomes interactive
+          when smart routing is available.
 
   - id: cost
     title: Cost
