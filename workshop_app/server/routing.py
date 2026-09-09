@@ -60,6 +60,8 @@ _DEFAULT_MODELS = {
         "endpoint": "databricks-claude-sonnet-4-5",
         "label": "Claude Sonnet 4.5",
         "tier": "frontier",
+        "open_weight": False,
+        "provider": "Anthropic (proprietary)",
         "price": {"unit": "usd", "in": 3.0, "out": 15.0},
         "oneliner": "Frontier model — highest quality, highest cost. Reserve it for genuinely hard work.",
     },
@@ -67,6 +69,8 @@ _DEFAULT_MODELS = {
         "endpoint": "databricks-meta-llama-3-3-70b-instruct",
         "label": "Llama 3.3 70B",
         "tier": "strong-oss",
+        "open_weight": True,
+        "provider": "Meta (open weight)",
         "price": {"unit": "dbu", "in": 14.286, "out": 42.857},
         "oneliner": "Strong open-weight model — near-frontier on many tasks at a fraction of the cost.",
     },
@@ -74,6 +78,8 @@ _DEFAULT_MODELS = {
         "endpoint": "databricks-meta-llama-3-1-8b-instruct",
         "label": "Llama 3.1 8B",
         "tier": "small-oss",
+        "open_weight": True,
+        "provider": "Meta (open weight)",
         "price": {"unit": "dbu", "in": 2.143, "out": 6.429},
         "oneliner": "Small open-weight model — cheapest and fastest; fine for simple, well-defined tasks.",
     },
@@ -148,6 +154,16 @@ def sample_prompts() -> list[str]:
     return [str(single)] if single else list(_DEFAULT_PROMPTS)
 
 
+def task_tag(prompt_index: int) -> str:
+    """Stable `task` tag for one sample prompt, sent on every model call for that prompt.
+
+    Each sample prompt is one unit of work ("task"). Because every prompt is run against every
+    model, tagging by task makes system.ai_gateway.usage answer "which model was most efficient
+    for THIS task" — the basis for the cost_task_usage step.
+    """
+    return f"routing_task_{prompt_index + 1}"
+
+
 def models() -> dict:
     """The model panel, with per-key endpoint overrides from config/workshop.yaml."""
     overrides = _routing_cfg().get("endpoints", {}) or {}
@@ -206,12 +222,28 @@ def request_tags() -> dict:
     return tags
 
 
-def query(model_key: str, prompt: str, max_tokens: int | None = None) -> dict:
+def open_weight_keys() -> list[str]:
+    """Panel keys whose model is open-weight (as opposed to a proprietary frontier model).
+
+    Drives the `use_open_weight_model` step: the whole point of the governed control plane is
+    that both classes are addressed identically, so the workshop proves an open-weight frontier
+    model runs through the same path, grants, and attribution as a proprietary one.
+    """
+    M = models()
+    return [k for k in PANEL_ORDER if M[k].get("open_weight")]
+
+
+def query(model_key: str, prompt: str, max_tokens: int | None = None,
+          extra_tags: dict | None = None) -> dict:
     """Call one model and return the answer plus measured tokens, latency, and cost.
 
     Calls the Gateway path (`/ai-gateway/mlflow/v1/chat/completions`) with an FQN or endpoint
     name in `model`, rather than the SDK's `serving_endpoints.query()`, because query() targets
     the legacy invocations path and cannot set the request-tag header.
+
+    `extra_tags` are merged into the request tags on top of the project tags — the routing steps
+    use it to stamp a per-prompt `task` tag, so system.ai_gateway.usage can be sliced by task and
+    by the model that handled it (the `cost_task_usage` step).
 
     Never raises: an endpoint that is missing or throttled becomes an `error` field so a
     live workshop shows a clear message on one card instead of failing the whole step.
@@ -220,6 +252,8 @@ def query(model_key: str, prompt: str, max_tokens: int | None = None) -> dict:
     max_tokens = max_tokens or DEFAULT_MAX_TOKENS
     w = get_workspace_client()
     tags = request_tags()
+    if extra_tags:
+        tags = {**tags, **{str(k): str(v) for k, v in extra_tags.items() if v is not None}}
     start = time.monotonic()
     base = {"model_key": model_key, "label": m["label"], "tier": m["tier"],
             "endpoint": m["endpoint"], "request_tags": tags,
@@ -262,7 +296,8 @@ def compare(prompt: str) -> dict:
     whether the cheap model was actually good enough.
     """
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(PANEL_ORDER)) as ex:
-        results = list(ex.map(lambda k: query(k, prompt), PANEL_ORDER))
+        results = list(ex.map(
+            lambda k: query(k, prompt, extra_tags={"task": "compare_adhoc"}), PANEL_ORDER))
     priced = [r for r in results if not r["error"]]
     spread = None
     if len(priced) > 1:
@@ -296,7 +331,13 @@ def evaluate() -> dict:
 
     def _run(t):
         kind, pi, k, prompt = t
-        return (kind, pi, k, query(k, prompt) if kind == "model" else classify(prompt))
+        # Stamp each per-prompt model call with a `task` tag so system.ai_gateway.usage can be
+        # sliced by task x model in the cost_task_usage step. The classifier call is routing
+        # overhead, not the task's own work, so it stays untagged to keep the task's token count
+        # equal to the answer work.
+        return (kind, pi, k,
+                query(k, prompt, extra_tags={"task": task_tag(pi)}) if kind == "model"
+                else classify(prompt))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(tasks) or 1)) as ex:
         done = list(ex.map(_run, tasks))
@@ -437,7 +478,7 @@ def route(prompt: str) -> dict:
     """
     c = classify(prompt)
     chosen_key = COMPLEXITY_TO_MODEL.get(c["complexity"], "frontier")
-    answer = query(chosen_key, prompt)
+    answer = query(chosen_key, prompt, extra_tags={"task": "routed_adhoc"})
 
     routed_cost = c["classifier_cost_usd"] + answer["cost_usd"]
     frontier_cost = cost_usd("frontier", answer["input_tokens"], answer["output_tokens"])

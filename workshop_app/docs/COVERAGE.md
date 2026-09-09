@@ -61,7 +61,7 @@ explicit so an SA can report against the POC DOC without re-deriving it.
 
 | POC DOC pillar | Its primary measure | Our steps |
 |---|---|---|
-| **Cost** | Budget alerts wired; cost-per-team SQL returns a table | `cost_budgets`, `cost_rate_limits`, `cost_tags`, `cost_usage`, `cost_spend_by_model`, + the routing ROI trio |
+| **Cost** | Budget alerts wired; cost-per-team SQL returns a table | `cost_budgets`, `cost_rate_limits`, `cost_tags`, `cost_usage`, `cost_task_usage`, `cost_spend_by_model`, + the routing ROI trio |
 | **Usage** | Discovery dashboard + monitoring live | `cost_usage`, `control_coding_agents`, `control_traces` |
 | **Access** | RBAC + ABAC + identity-aware invocation enforced at the Gateway | `control_mcp_policy`, `control_guardrails`, `mcp_grants`, `mcp_obo` (accelerator) |
 | **Inventory** | Every endpoint, agent, MCP server registered and owned in UC | `choice_list_endpoints`, `choice_model_services`, `choice_agent_registry`, `mcp_inventory` |
@@ -82,6 +82,7 @@ Two POC DOC items we do **not** cover, deliberately:
 | Client contract change (base URL + FQN together) | `choice_model_services` | ✅ **Added** |
 | No in-place rename / staged cutover | `choice_model_services` concept | ✅ Framed |
 | Discover the model surface | `choice_list_endpoints` | ✅ |
+| Proprietary **and** open-weight frontier models on one control plane | `use_open_weight_model` | ✅ **Added** |
 | Agents & tools as UC assets | `choice_agent_registry` | ✅ |
 | Service policies (ALLOW/DENY/ASK, ON CALL/ON RESULT) | `control_mcp_policy`, MCP accelerator | ✅ |
 | Guardrails on a model service | `control_guardrails` | ✅ |
@@ -89,6 +90,7 @@ Two POC DOC items we do **not** cover, deliberately:
 | Budgets + thresholds | `cost_budgets` | ✅ |
 | Server-side vs. request tags | `cost_tags` | ⚠️ **Partial** — see §4 |
 | `system.ai_gateway.usage` telemetry | `cost_usage`, `control_coding_agents` | ✅ |
+| Cost per task — most efficient model per unit of work | `cost_task_usage` | ✅ **Added** |
 | External-model spend in USD | `cost_spend_by_model` | ✅ |
 | Inference tables / payload logging | `control_guardrails` verify, `acc_pg_readiness` | ✅ |
 | Audit trail | `control_audit` | ✅ |
