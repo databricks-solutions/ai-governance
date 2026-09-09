@@ -55,9 +55,11 @@ GATEWAY_CHAT_PATH = "/ai-gateway/mlflow/v1/chat/completions"
 # Fallback panel, used when config/workshop.yaml has no `cost.routing` block. Prices are
 # public list rates per million tokens; `unit` says how to convert. Endpoints are the
 # pay-per-token FMAPI names available on most workspaces.
+# Endpoints are v3 UC model services (catalog.schema.service), addressed by name on the governed
+# Gateway path. Override per key with `cost.routing.endpoints` in config/workshop.yaml.
 _DEFAULT_MODELS = {
     "frontier": {
-        "endpoint": "databricks-claude-sonnet-4-5",
+        "endpoint": "system.ai.claude-sonnet-4-5",
         "label": "Claude Sonnet 4.5",
         "tier": "frontier",
         "open_weight": False,
@@ -66,7 +68,7 @@ _DEFAULT_MODELS = {
         "oneliner": "Frontier model — highest quality, highest cost. Reserve it for genuinely hard work.",
     },
     "mid": {
-        "endpoint": "databricks-meta-llama-3-3-70b-instruct",
+        "endpoint": "system.ai.meta-llama-3-3-70b-instruct",
         "label": "Llama 3.3 70B",
         "tier": "strong-oss",
         "open_weight": True,
@@ -75,7 +77,7 @@ _DEFAULT_MODELS = {
         "oneliner": "Strong open-weight model — near-frontier on many tasks at a fraction of the cost.",
     },
     "cheap": {
-        "endpoint": "databricks-meta-llama-3-1-8b-instruct",
+        "endpoint": "system.ai.meta-llama-3-1-8b-instruct",
         "label": "Llama 3.1 8B",
         "tier": "small-oss",
         "open_weight": True,
