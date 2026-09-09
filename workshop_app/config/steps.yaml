@@ -190,31 +190,33 @@ pillars:
 
       - id: use_open_weight_model
         title: "Choice: Use proprietary and open-weight frontier models"
-        outcome: "We can run the latest open-weight frontier models (Llama, GPT-OSS, DeepSeek) alongside proprietary ones (Claude, GPT) through one governed control plane — same grants, policies, and attribution — so model choice is never a single-vendor bet."
+        outcome: "We can run the latest open-weight frontier models (GLM, GPT-OSS, DeepSeek, Llama) alongside proprietary ones (Claude, GPT) as v3 Unity Catalog model services on one governed control plane — same grants, policies, and attribution — so model choice is never a single-vendor bet."
         concept: |
           Choice is not a single-vendor bet. Through the Gateway, **proprietary frontier models**
-          (Claude, GPT) and **open-weight frontier models** (Llama, GPT-OSS, DeepSeek) are
-          addressed the same way — a model name against the same `/ai-gateway` path — and carry
-          the same UC grants, the same guardrails and rate limits, and the same request-tag
-          attribution. So a team picks the best model for each task, and swapping proprietary for
-          open-weight (or the reverse) is a config change, not a re-platforming.
+          (Claude, GPT) and **open-weight frontier models** (GLM, GPT-OSS, DeepSeek, Llama) are
+          addressed the same way — as a **v3 Unity Catalog model service**
+          (`catalog.schema.service`, e.g. `system.ai.glm-5-3-flash`) on the governed
+          `/ai-gateway` path — and carry the same UC grants, the same guardrails and rate limits,
+          and the same request-tag attribution. So a team picks the best model for each task, and
+          swapping proprietary for open-weight (or the reverse) is a config change, not a
+          re-platforming.
 
           Two things this proves for a governance program:
 
-          - **No lock-in.** The control plane, the client contract, and the telemetry are
+          - **No lock-in.** The v3 model-service contract, the grants, and the telemetry are
             identical regardless of who trained the model. You are governing *access to models*,
             not betting the platform on one lab.
           - **Data residency and cost latitude.** An open-weight model served on your own
-            Databricks compute keeps the payload inside your account and bills in DBUs — an option
-            you keep open precisely because it rides the same governed path as everything else.
+            Databricks compute keeps the payload inside your account — an option you keep open
+            precisely because it rides the same governed v3 path as everything else.
 
-          This Try-It calls the configured **open-weight** model over the governed Gateway path
-          and shows it answered, tokened, and attributed exactly like a proprietary model — with
-          the full panel split into open-weight vs proprietary so the room can see both classes
-          are live on the same control plane. Point `cost.routing.endpoints` in
-          `config/workshop.yaml` at the models your organization actually uses.
+          This Try-It calls the configured open-weight model service
+          (`gateway.open_weight_model_service` in `config/workshop.yaml`, default
+          `system.ai.glm-5-3-flash`) over the v3 Gateway path and shows it answered, tokened, and
+          attributed exactly like a proprietary model. Point it at whichever open-weight model
+          service your organization uses.
         action:
-          label: Call an open-weight model through the governed Gateway
+          label: Call an open-weight model service (v3) through the governed Gateway
           test: use_open_weight_model
 
       - id: choice_smart_routing

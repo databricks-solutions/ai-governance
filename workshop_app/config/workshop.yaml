@@ -26,6 +26,10 @@ gateway:
   ootb_endpoint: databricks-claude-sonnet-4-5
   # Alternate model used by the routing-agent cost demo (Cost pillar).
   cheap_endpoint: databricks-meta-llama-3-3-70b-instruct
+  # Open-weight model called by the "Use proprietary and open-weight frontier models" step
+  # (Choice). A v3 Unity Catalog model service (catalog.schema.service) invoked over the governed
+  # gateway path — proving an open-weight model is addressed exactly like a proprietary one.
+  open_weight_model_service: system.ai.glm-5-3-flash
 
 # The governed endpoint the workshop creates and layers controls onto (Control pillar).
 governed_endpoint:

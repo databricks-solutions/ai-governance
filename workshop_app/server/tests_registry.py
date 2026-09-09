@@ -111,8 +111,8 @@ API_DOCS: dict[str, dict[str, str]] = {
         "api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway config on agent-like endpoints)"},
     "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
     "use_open_weight_model": {
-        "api": "POST /ai-gateway/mlflow/v1/chat/completions (an open-weight model)",
-        "note": "Same governed path, grants, and request-tag attribution as a proprietary model."},
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions with model=<catalog.schema.service> (a v3 open-weight model service)",
+        "note": "Same governed v3 path, grants, and request-tag attribution as a proprietary model."},
     "endpoint_inventory_v1_v3": {"api": "SQL: system.ai_gateway.usage (service_name NULL = v1)"},
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
@@ -2124,46 +2124,47 @@ def t_guardrail_block_shape() -> TestResult:
 
 
 def t_use_open_weight_model() -> TestResult:
-    """Prove an open-weight frontier model runs through the same governed control plane.
+    """Prove an open-weight model runs as a v3 UC model service on the same control plane.
 
     Choice is not a single-vendor bet. Proprietary frontier models (Claude, GPT) and open-weight
-    ones (Llama, GPT-OSS, DeepSeek) are addressed identically through the Gateway — same UC
-    grants, same policies, same request-tag attribution — so a team can pick the best model per
-    task and switch without changing the client contract. This invokes the configured open-weight
-    model over the Gateway path and reports the panel split, so the room sees both classes are
-    available and governed the same way.
+    ones (GLM, GPT-OSS, DeepSeek, Llama) are addressed identically through the Gateway — a Unity
+    Catalog model-service name (`catalog.schema.service`) on the v3 path, same grants, same
+    request-tag attribution. This calls the configured open-weight model service over that v3 path
+    and shows it answered, tagged like any proprietary model. The model service is set by
+    `gateway.open_weight_model_service` in config/workshop.yaml (default system.ai.glm-5-3-flash).
     """
-    M = routing.models()
-    panel = [{"key": k, "label": M[k]["label"], "endpoint": M[k]["endpoint"],
-              "provider": M[k].get("provider"),
-              "open_weight": bool(M[k].get("open_weight"))} for k in routing.PANEL_ORDER]
-    ow_keys = routing.open_weight_keys()
-    if not ow_keys:
-        return _todo(
-            "No open-weight model is configured. Point one of `cost.routing.endpoints` in "
-            "config/workshop.yaml at an open-weight model (e.g. a Llama endpoint), then re-run.",
-            panel=panel)
-    key = ow_keys[0]
+    svc = (get_config().get("gateway", {}) or {}).get("open_weight_model_service") \
+        or "system.ai.glm-5-3-flash"
     prompt = "In one sentence, what is a model serving endpoint?"
-    r = routing.query(key, prompt, max_tokens=128, extra_tags={"task": "open_weight_probe"})
+    # GLM (and other reasoning models) spend tokens on hidden reasoning before the answer, so give
+    # the budget room — too small a max_tokens returns usage but empty content.
+    r = routing.invoke_model(svc, prompt, max_tokens=512,
+                             extra_tags={"task": "open_weight_probe"}, label=svc)
+    is_v3 = routing.is_model_service(svc)
     if r["error"]:
         return _fail(
-            f"The open-weight model `{r['endpoint']}` did not answer — check it is available on "
-            "this workspace.", error=r["error"], model=r["label"], panel=panel)
-    proprietary = [p for p in panel if not p["open_weight"]]
+            f"The open-weight model service `{svc}` did not answer over the governed v3 gateway "
+            "path — check it exists (GET /api/2.1/unity-catalog/model-services) and this identity "
+            "has EXECUTE on it.", error=r["error"], model_service=svc, path_version=r["path_version"])
+    if not (r["answer"] or "").strip():
+        return _todo(
+            f"`{svc}` responded but returned no text ({r['output_tokens']} completion tokens, "
+            "likely all spent on reasoning). Raise max_tokens for this model.",
+            model_service=svc, output_tokens=r["output_tokens"], path_version=r["path_version"])
     return _ok(
-        f"Open-weight model `{r['label']}` ({r['endpoint']}) answered through the governed "
-        f"Gateway path in {r['duration_s']}s ({r['input_tokens']}+{r['output_tokens']} tokens), "
-        "tagged and attributed exactly like a proprietary model.",
-        model=r["label"], endpoint=r["endpoint"], answer=r["answer"],
+        f"Open-weight model service `{svc}` answered over the governed "
+        f"{'v3' if is_v3 else 'v1'} Gateway path in {r['duration_s']}s "
+        f"({r['input_tokens']}+{r['output_tokens']} tokens) — addressed as a Unity Catalog model "
+        "service, the same contract, grants, and request-tag attribution a proprietary model uses.",
+        model_service=svc, path_version=r["path_version"], answer=r["answer"],
         input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
-        cost_usd=round(r["cost_usd"], 8), request_tags=r["request_tags"],
-        gateway_path=routing.GATEWAY_CHAT_PATH, panel=panel,
+        duration_s=r["duration_s"], request_tags=r["request_tags"],
+        gateway_path=routing.GATEWAY_CHAT_PATH,
         interpretation=(
-            f"{len(ow_keys)} open-weight and {len(proprietary)} proprietary model(s) are "
-            "available on the same control plane, addressed the same way. Model choice is a "
-            "config change, not a re-platforming — and never a single-vendor lock-in."),
-        pricing_note=routing.pricing_note())
+            "An open-weight model (GLM) is governed identically to Claude or GPT: same v3 UC "
+            "model-service contract, same gateway path, same attribution. Model choice — "
+            "proprietary or open weight — is a config change, never a re-platforming or a "
+            "single-vendor lock-in."))
 
 
 def t_cost_task_usage() -> TestResult:

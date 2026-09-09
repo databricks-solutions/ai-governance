@@ -233,13 +233,51 @@ def open_weight_keys() -> list[str]:
     return [k for k in PANEL_ORDER if M[k].get("open_weight")]
 
 
+def _merge_tags(extra_tags: dict | None) -> dict:
+    tags = request_tags()
+    if extra_tags:
+        tags = {**tags, **{str(k): str(v) for k, v in extra_tags.items() if v is not None}}
+    return tags
+
+
+def is_model_service(model: str) -> bool:
+    """True if `model` is a UC model-service FQN (catalog.schema.service) — the v3 contract.
+
+    A dotted name names a Unity Catalog model service and rides the governed v3 path; a bare
+    `databricks-...` (or any undotted) name is a legacy workspace endpoint on the v1 path. Both
+    go through the same `/ai-gateway/mlflow/v1/chat/completions` URL — v1 vs v3 is decided by what
+    you put in `model`, not by the URL.
+    """
+    return "." in (model or "") and not (model or "").startswith("databricks-")
+
+
+def _invoke(model: str, prompt: str, max_tokens: int, tags: dict) -> dict:
+    """Low-level Gateway chat call. Raises on failure; callers add cost/labels and catch.
+
+    Uses the Gateway path with a model name/FQN in `model`, not the SDK's
+    `serving_endpoints.query()`, because query() targets the legacy invocations path and cannot
+    set the request-tag header.
+    """
+    w = get_workspace_client()
+    resp = w.api_client.do(
+        "POST", GATEWAY_CHAT_PATH,
+        headers={"Content-Type": "application/json", "Accept": "application/json",
+                 REQUEST_TAGS_HEADER: json.dumps(tags)},
+        body={"model": model,
+              "messages": [{"role": "user", "content": prompt}],
+              "max_tokens": max_tokens},
+    )
+    usage = (resp or {}).get("usage") or {}
+    choices = (resp or {}).get("choices") or []
+    content = (choices[0].get("message") or {}).get("content") if choices else None
+    return {"answer": _extract_text(content),
+            "input_tokens": usage.get("prompt_tokens") or 0,
+            "output_tokens": usage.get("completion_tokens") or 0}
+
+
 def query(model_key: str, prompt: str, max_tokens: int | None = None,
           extra_tags: dict | None = None) -> dict:
-    """Call one model and return the answer plus measured tokens, latency, and cost.
-
-    Calls the Gateway path (`/ai-gateway/mlflow/v1/chat/completions`) with an FQN or endpoint
-    name in `model`, rather than the SDK's `serving_endpoints.query()`, because query() targets
-    the legacy invocations path and cannot set the request-tag header.
+    """Call one panel model and return the answer plus measured tokens, latency, and cost.
 
     `extra_tags` are merged into the request tags on top of the project tags — the routing steps
     use it to stamp a per-prompt `task` tag, so system.ai_gateway.usage can be sliced by task and
@@ -250,42 +288,44 @@ def query(model_key: str, prompt: str, max_tokens: int | None = None,
     """
     m = models()[model_key]
     max_tokens = max_tokens or DEFAULT_MAX_TOKENS
-    w = get_workspace_client()
-    tags = request_tags()
-    if extra_tags:
-        tags = {**tags, **{str(k): str(v) for k, v in extra_tags.items() if v is not None}}
+    tags = _merge_tags(extra_tags)
     start = time.monotonic()
     base = {"model_key": model_key, "label": m["label"], "tier": m["tier"],
             "endpoint": m["endpoint"], "request_tags": tags,
-            "gateway_path": GATEWAY_CHAT_PATH}
+            "gateway_path": GATEWAY_CHAT_PATH,
+            "path_version": "v3" if is_model_service(m["endpoint"]) else "v1"}
     try:
-        resp = w.api_client.do(
-            "POST", GATEWAY_CHAT_PATH,
-            headers={"Content-Type": "application/json", "Accept": "application/json",
-                     REQUEST_TAGS_HEADER: json.dumps(tags)},
-            body={"model": m["endpoint"],
-                  "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": max_tokens},
-        )
-        duration = time.monotonic() - start
-        usage = (resp or {}).get("usage") or {}
-        in_tok = usage.get("prompt_tokens") or 0
-        out_tok = usage.get("completion_tokens") or 0
-        choices = (resp or {}).get("choices") or []
-        content = (choices[0].get("message") or {}).get("content") if choices else None
-        return {
-            **base,
-            "answer": _extract_text(content),
-            "input_tokens": in_tok,
-            "output_tokens": out_tok,
-            "duration_s": round(duration, 2),
-            "cost_usd": cost_usd(model_key, in_tok, out_tok),
-            "error": None,
-        }
+        r = _invoke(m["endpoint"], prompt, max_tokens, tags)
+        return {**base, **r, "duration_s": round(time.monotonic() - start, 2),
+                "cost_usd": cost_usd(model_key, r["input_tokens"], r["output_tokens"]),
+                "error": None}
     except Exception as e:  # noqa: BLE001 — surface endpoint errors per-card, don't fail the step
         return {**base, "answer": None, "input_tokens": 0, "output_tokens": 0,
                 "duration_s": round(time.monotonic() - start, 2), "cost_usd": 0.0,
                 "error": str(e)[:300]}
+
+
+def invoke_model(model: str, prompt: str, max_tokens: int | None = None,
+                 extra_tags: dict | None = None, label: str | None = None) -> dict:
+    """Call an arbitrary model by name/FQN over the governed Gateway path.
+
+    For steps that target a specific model service (a UC FQN `catalog.schema.service`, v3) rather
+    than a routing-panel tier — e.g. the open-weight-model step. `path_version` reports v3 vs v1
+    from the model name. Never raises; on failure the result carries an `error` field. Cost is
+    not computed here (the panel price list only covers the routing tiers).
+    """
+    max_tokens = max_tokens or DEFAULT_MAX_TOKENS
+    tags = _merge_tags(extra_tags)
+    start = time.monotonic()
+    base = {"model": model, "label": label or model, "request_tags": tags,
+            "gateway_path": GATEWAY_CHAT_PATH,
+            "path_version": "v3" if is_model_service(model) else "v1"}
+    try:
+        r = _invoke(model, prompt, max_tokens, tags)
+        return {**base, **r, "duration_s": round(time.monotonic() - start, 2), "error": None}
+    except Exception as e:  # noqa: BLE001 — surface per-card, don't fail the step
+        return {**base, "answer": None, "input_tokens": 0, "output_tokens": 0,
+                "duration_s": round(time.monotonic() - start, 2), "error": str(e)[:300]}
 
 
 def compare(prompt: str) -> dict:
