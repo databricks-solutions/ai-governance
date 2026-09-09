@@ -5,6 +5,10 @@
 #     --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
 #   databricks bundle run ai_governance_workshop_app -t dev -p <profile>
 #
+# catalog and schema now have DEFAULTS (uaigw_fe / workshop — our internal hosted instance), so a
+# bare deploy targets that instance. On a CUSTOMER workspace ALWAYS override the catalog with
+# --var="catalog=<your-catalog>" — uaigw_fe will not exist there. Only warehouse_id has no default.
+#
 # `deploy` builds the frontend (artifacts step below), creates the schema + volume, creates the
 # app AND grants the app's own service principal on the schema/volume in ONE pass (the grant
 # references the app resource's service_principal_client_id, so Terraform orders it). `run`
@@ -59,19 +63,25 @@ sync:
     - "frontend/src"
 
 variables:
-  # Required, with no default. A bundle command missing one of these fails immediately
+  # warehouse_id is required with NO default: a command missing it fails immediately
   # ("no value assigned to required variable ...") rather than deploying an app that looks
   # fine and then fails every governance step in front of the customer.
   warehouse_id:
     description: "SQL warehouse id the app uses. Find one: databricks warehouses list"
+  # catalog/schema default to our internal hosted instance (uaigw_fe / workshop) so repeat
+  # deploys of it need no --var. The bundle creates the schema INSIDE this catalog; the catalog
+  # itself must already exist. On a CUSTOMER workspace ALWAYS pass --var="catalog=<your-catalog>"
+  # (uaigw_fe will not exist there) — the default is a convenience for the internal instance, not
+  # a value a customer should ship into.
   catalog:
-    description: "Existing UC catalog to create the workshop schema in, e.g. main."
+    description: "UC catalog to create the workshop schema in. Default uaigw_fe (internal instance); customers override, e.g. --var=catalog=main."
+    default: uaigw_fe
   workshop_group:
     description: "Group granted CAN_USE on the app so attendees can open it."
     default: users
   schema:
-    description: "UC schema for workshop artifacts (policy function, inference tables)."
-    default: ai_governance_workshop
+    description: "UC schema for workshop artifacts (policy function, inference tables, progress volume)."
+    default: workshop
   progress_volume:
     description: "UC volume (in the workshop schema) that stores the progress JSON file."
     default: workshop_state
@@ -162,13 +172,13 @@ targets:
     #
     # `dev` serves BOTH customer self-deploys (their own workspace + --var warehouse_id/catalog,
     # see README / PREREQUISITES.md) AND our single internal hosted instance on the shared Unity
-    # AI Gateway stable FEVM. Deploy/refresh the hosted instance with:
-    #   databricks bundle deploy -t dev -p fevm-uaigw-stable \
-    #     --var="warehouse_id=9ac8efcd98a76929" --var="catalog=uaigw_fe"
-    #   databricks bundle run ai_governance_workshop_app -t dev -p fevm-uaigw-stable \
-    #     --var="warehouse_id=9ac8efcd98a76929" --var="catalog=uaigw_fe"
-    # (Host comes from --profile. The old shm-skunkworks instance was removed so uaigw is the
-    # single authoritative deployment.)
+    # AI Gateway stable FEVM. catalog=uaigw_fe and schema=workshop are the variable defaults now,
+    # so refreshing the hosted instance only needs the warehouse_id:
+    #   databricks bundle deploy -t dev -p fevm-uaigw-stable --var="warehouse_id=9ac8efcd98a76929"
+    #   databricks bundle run ai_governance_workshop_app -t dev -p fevm-uaigw-stable --var="warehouse_id=9ac8efcd98a76929"
+    # (Pass --var="catalog=..." / "schema=..." only to override the defaults. Host comes from
+    # --profile. The old shm-skunkworks instance was removed so uaigw is the single authoritative
+    # deployment.)
     default: true
   prod:
     mode: production

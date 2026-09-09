@@ -18,7 +18,7 @@ workspace:
 # `--var="catalog=<your-catalog>"` so the bundle and the app agree.
 catalog:
   name: ""                        # e.g. main — must match the bundle's `catalog` variable
-  schema: ai_governance_workshop
+  schema: workshop                # matches the bundle's `schema` default (databricks.yml)
 
 # Foundation Model endpoints the workshop references (Choice pillar).
 gateway:
