@@ -48,14 +48,17 @@ an MCP policy function, etc.).
 Beyond the core workshop, six optional **~3-hour accelerators** each get their own page (same
 concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
-- **MCP Servers** — on-behalf-of auth to a managed/external MCP.
-- **Agent Registry** — register, version, and own a representative agent.
-- **Coding Agents** — govern dev-agent traffic with per-developer attribution
-  and code-secret detection.
-- **External Providers** — route Bedrock/OpenAI/Anthropic through the Gateway;
-  migrate one shadow workload.
-- **Policies & Guardrails** — safety filter on input/output, custom PII-leakage
-  judge, red-team dataset.
+Each accelerator is **additive** to the core — it only covers what the core does not. IDs are
+stable (`acc_*`), so the internal app's scope import still resolves them.
+
+- **MCPs** — managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, telemetry.
+- **Agents** — register, version, own, trace, evaluate, and manage an agent's lifecycle.
+- **Coding** — route dev-agent traffic through the Gateway, add **smart routing** and
+  **Omnigent** above the harness, prove it lands there, and attribute per developer.
+- **Providers** — everything specific to an outside provider (Bedrock/OpenAI/Anthropic):
+  add it, secure its credentials, bind it, migrate + attribute it, verify its cost, ban/fail it over.
+- **Policies** — mask vs block, block delivery, path coverage, effectiveness benchmarking,
+  prompt-injection, groundedness, custom per-use-case policies.
 - **Skills** — build, govern, and deploy Agent Skills in Genie Code with registry control.
 
 Run the one that matches the customer's priority (the accelerator overview and links live on

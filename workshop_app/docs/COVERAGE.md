@@ -95,8 +95,8 @@ Two POC DOC items we do **not** cover, deliberately:
 | Inference tables / payload logging | `control_guardrails` verify, `acc_pg_readiness` | ✅ |
 | Audit trail | `control_audit` | ✅ |
 | MCP: managed vs. external, 3 planes, OBO | MCP accelerator (9 steps) | ✅ |
-| Coding agents through the Gateway | `control_coding_agents`, Coding Agents accelerator | ✅ |
-| Model **provider** services (external creds) | External Providers accelerator | ⚠️ **Partial** — see §4 |
+| Coding agents through the Gateway | `control_coding_agents`, Coding accelerator | ✅ |
+| Model **provider** services (external creds) | Providers accelerator | ⚠️ **Partial** — see §4 |
 | UC foundation (metastore, bindings, groups) | Prerequisites doc | ⚠️ Prereq, not a step |
 | Inventory the current estate | — | ❌ **Deliberate** — see §5 |
 | Network / PrivateLink / NCC egress | — | ❌ **Deliberate** — see §5 |
@@ -131,7 +131,7 @@ trustworthy budget filter, because **request tags are caller-controlled** and mu
 financial enforcement boundary. The step now needs one sentence on that distinction rather
 than a new step — noted as a content edit, not a gap.
 
-**Model provider services.** Covered in the External Providers accelerator, not core. The
+**Model provider services.** Covered in the Providers accelerator, not core. The
 target workspace has **zero** registered, so a core step would report "action needed" for most
 customers. Correct place for it is the accelerator, where a provider is actually configured.
 
@@ -174,7 +174,7 @@ that can't be made live, and the network team usually isn't in the room.
 → Adoption Guide §9; follow-up item.
 
 **Model provider services.** The object for centralizing external-provider credentials.
-Requires real provider credentials to be meaningful, so it sits in the External Providers
+Requires real provider credentials to be meaningful, so it sits in the Providers
 accelerator. → Adoption Guide §3.
 
 **Passthrough mode.** An escape hatch that *loses* token/cost tracking, token rate limits,
@@ -230,7 +230,7 @@ breadth nobody absorbs in half a day.
 **Already cut:** `control_lakewatch`. Lakewatch is not enabled on most accounts, so a core
 step named after it checked readiness for a product the room could not use — and the
 telemetry it probed is already proven by `cost_usage` and `control_audit`. The check itself
-survives as `telemetry_readiness` in the Agent Registry accelerator, where telemetry is the
+survives as `telemetry_readiness` in the Agents accelerator, where telemetry is the
 point. Recovered ~10 minutes.
 
 **Since added**, from the enablement-doc gap analysis (`GAP_ANALYSIS_ENABLEMENT.md`), spending

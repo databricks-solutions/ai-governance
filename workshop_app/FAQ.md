@@ -82,12 +82,15 @@ with a deep link to the exact place in the workspace to complete them.
 
 ## What are the six accelerators?
 
-- **MCP Server Setup & Testing** — on-behalf-of auth to a managed/external MCP.
-- **Agent Registry Setup & Testing** — register, version, and own a representative agent.
-- **Coding Agent Setup & Testing** — govern dev-agent traffic with per-developer attribution
-  and code-secret detection.
-- **External Provider Setup & Testing** — route Bedrock/OpenAI/Anthropic through the Gateway.
-- **Policies & Guardrails (PII & Safety)** — safety filter, custom PII-leakage judge, red-team dataset.
+Each is **additive** to the core — it covers only what the core workshop does not:
+
+- **MCPs** — managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, telemetry.
+- **Agents** — register, version, own, trace, evaluate, and manage an agent's lifecycle.
+- **Coding** — route dev-agent traffic through the Gateway, add smart routing and Omnigent above
+  the harness, prove it lands there, and attribute per developer.
+- **Providers** — add an outside provider (Bedrock/OpenAI/Anthropic), secure credentials, bind it,
+  migrate + attribute it, verify cost, ban/fail it over.
+- **Policies** — mask vs block, block delivery, path coverage, effectiveness, prompt-injection, groundedness, custom policies.
 - **Skills** — build, govern, and deploy Agent Skills in Genie Code with a tiered registry.
 
 ## What do I get at the end?

@@ -1,5 +1,13 @@
 # Accelerator build plan — from box-checking to compelling
 
+> **Update (2026-09-09):** the six accelerators were renamed to single words — **MCPs, Providers,
+> Skills, Agents, Coding, Policies** (config IDs kept stable as `acc_*`) — and each was made
+> *additive* to the core: steps that merely re-ran a core control's test were removed (Agents:
+> ACL/guardrail/audit; Coding: budget/secret-scan/guardrail; Providers: inventory/guardrail/
+> rate-limits; Policies: basic-block/activity-review). **Coding** also gained **smart routing**
+> and **Omnigent** (meta-harness) steps. The names and per-accelerator counts below reflect the
+> earlier rebuild, not this trim — see `config/accelerators.yaml` for the current list.
+
 The core workshop proves the control plane across choice / cost / control. The **accelerators**
 are optional ~3-hour deep dives. One of them (**MCP Servers**, 10 steps) is strong; the other
 five are thin — mostly `list` / `manual` / `readiness` steps that don't *prove* anything a

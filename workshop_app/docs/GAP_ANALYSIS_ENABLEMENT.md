@@ -157,7 +157,7 @@ alone leaves the path open, so `default_access` checks both securables.
 
 ## MUST HAVE — ACCELERATOR
 
-### Coding Agents accelerator
+### Coding accelerator
 
 **4. `ucode` as the onboarding path — MUST HAVE**
 The doc makes `ucode` the *recommended* consumer path with a full command set
@@ -178,7 +178,7 @@ The doc is emphatic: OAuth 1-hour auto-refresh is preferred; PAT is legacy and c
 `all-apis` — the broadest possible token. Our app runs as a service principal, so this is
 positioning + a `ucode` demo, not a test.
 
-### Policies & Guardrails accelerator
+### Policies accelerator
 
 **7. Built-in policies — MUST HAVE, with a caveat I tested**
 The enablement doc lists **four** built-ins including `block_pii`; the MCP field guide says
@@ -211,7 +211,7 @@ demo two policies interacting. That interaction is where customers get surprised
 We only demo BLOCK. MASK is the more common production choice — it lets the request through
 with PII redacted. One config change on the same step.
 
-### External Providers accelerator
+### Providers accelerator
 
 **10. Secret handling — MUST HAVE**
 `databricks secrets put-secret <scope> <key> --string-value ...`, and never inline a provider
@@ -268,9 +268,9 @@ Core is **20 steps**, still inside 4 hours: items 1–2 spend the budget recover
 `control_lakewatch`, and item 3 costs no time.
 
 **Do next (accelerators, no core time):**
-4. `ucode` walkthrough + the 429 demo → Coding Agents
-5. Policy ranking, fail-closed, MASK vs BLOCK → Policies & Guardrails
-6. Secrets + `ISOLATED` binding → External Providers
+4. `ucode` walkthrough + the 429 demo → Coding
+5. Policy ranking, fail-closed, MASK vs BLOCK → Policies
+6. Secrets + `ISOLATED` binding → Providers
 
 **Fork per customer:** everything in NICE TO HAVE.
 

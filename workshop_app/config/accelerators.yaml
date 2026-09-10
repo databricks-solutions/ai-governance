@@ -303,7 +303,7 @@ accelerators:
 
   - id: acc_coding_agent
     title: "Coding"
-    tagline: "Additive to the core cost/control steps: route dev-agent traffic through the gateway, prove it actually lands there, attribute per developer, and prove the 429 bites on the path agents really use."
+    tagline: "Additive to the core cost/control steps: route dev-agent traffic through the gateway, add smart routing and Omnigent above the harness, prove it actually lands there, attribute per developer, and prove the 429 bites on the path agents really use."
     steps:
       - id: acc_coding_route
         title: Route coding-agent traffic through the Gateway
@@ -335,6 +335,45 @@ accelerators:
         action:
           label: Check where coding-agent traffic is actually landing
           test: coding_agent_route_check
+      - id: acc_coding_smart_routing
+        title: Smart routing for coding-agent traffic
+        outcome: "We can let Databricks-managed smart routing pick the model per coding request — cheap for boilerplate, frontier for the hard reasoning — without the developer choosing, and without changing the client."
+        concept: |
+          A coding agent defaults every request to one frontier model. **Smart routing**
+          (Databricks-managed) instead selects a model **per request** behind the same governed
+          gateway — a cheap model for boilerplate and simple edits, a frontier model for the hard
+          reasoning — so spend drops without the developer picking a model or the client changing.
+
+          It is enabled per account and consumed through the coding harnesses (**`ucode`** and
+          **Omnigent**, next), governed by the same rate limits, guardrails, and per-developer
+          attribution as any other gateway traffic. It is **Beta**, and there is no
+          chat-completions API to invoke it directly from this app — so quantify the payoff in the
+          core **Cost → Project routing savings** step (which estimates the smart-routing figure),
+          then enable it for the harness here and route a session through it.
+        manual:
+          label: Enable smart routing for the coding harness (account setting); route a session through it
+      - id: acc_coding_omnigent
+        title: Omnigent — the meta-harness above coding agents
+        outcome: "We can put Omnigent above Claude Code / Codex / Cursor as one governed routing layer, so model choice happens above the harness while attribution and controls stay on the gateway."
+        concept: |
+          **Omnigent** is a meta-harness that sits above the individual coding harnesses (Claude
+          Code, Codex, Cursor, and custom agents). Instead of each developer wiring each tool to
+          the gateway one by one, Omnigent routes **above the harness** — applying smart routing
+          and a single governed path — while every request still lands on the same gateway with
+          its rate limits, guardrails, and per-developer attribution intact.
+
+          Two reasons it matters for a coding rollout:
+
+          - **One integration point.** Point Omnigent at the governed gateway once and every
+            harness underneath inherits routing + governance — rather than N per-tool setups that
+            drift apart.
+          - **Routing where the work is.** Model selection happens at the layer that sees the
+            task, so the cheap-vs-frontier decision is made per request across every coding tool.
+
+          Omnigent is **Beta** (an OSS version is available); position it as the managed routing
+          layer for coding agents and stand it up against the governed gateway.
+        manual:
+          label: Put Omnigent in front of the coding harnesses, pointed at the governed gateway
       - id: acc_coding_attribution
         title: Per-developer attribution
         outcome: "We can attribute coding-agent spend and usage per developer with no tagging required."
