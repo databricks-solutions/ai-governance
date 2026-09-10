@@ -224,17 +224,6 @@ def request_tags() -> dict:
     return tags
 
 
-def open_weight_keys() -> list[str]:
-    """Panel keys whose model is open-weight (as opposed to a proprietary frontier model).
-
-    Drives the `use_open_weight_model` step: the whole point of the governed control plane is
-    that both classes are addressed identically, so the workshop proves an open-weight frontier
-    model runs through the same path, grants, and attribution as a proprietary one.
-    """
-    M = models()
-    return [k for k in PANEL_ORDER if M[k].get("open_weight")]
-
-
 def _merge_tags(extra_tags: dict | None) -> dict:
     tags = request_tags()
     if extra_tags:
@@ -555,6 +544,8 @@ def panel() -> dict:
             "key": key, "label": m["label"], "tier": m["tier"], "endpoint": m["endpoint"],
             "oneliner": m["oneliner"], "price_unit": m["price"]["unit"],
             "usd_in_per_mtok": round(in_usd, 4), "usd_out_per_mtok": round(out_usd, 4),
+            "open_weight": bool(m.get("open_weight")), "provider": m.get("provider"),
+            "path_version": "v3" if is_model_service(m["endpoint"]) else "v1",
         })
     return {
         "models": out,

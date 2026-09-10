@@ -2140,7 +2140,6 @@ def t_use_open_weight_model() -> TestResult:
     # the budget room — too small a max_tokens returns usage but empty content.
     r = routing.invoke_model(svc, prompt, max_tokens=512,
                              extra_tags={"task": "open_weight_probe"}, label=svc)
-    is_v3 = routing.is_model_service(svc)
     if r["error"]:
         return _fail(
             f"The open-weight model service `{svc}` did not answer over the governed v3 gateway "
@@ -2153,7 +2152,7 @@ def t_use_open_weight_model() -> TestResult:
             model_service=svc, output_tokens=r["output_tokens"], path_version=r["path_version"])
     return _ok(
         f"Open-weight model service `{svc}` answered over the governed "
-        f"{'v3' if is_v3 else 'v1'} Gateway path in {r['duration_s']}s "
+        f"{r['path_version']} Gateway path in {r['duration_s']}s "
         f"({r['input_tokens']}+{r['output_tokens']} tokens) — addressed as a Unity Catalog model "
         "service, the same contract, grants, and request-tag attribution a proprietary model uses.",
         model_service=svc, path_version=r["path_version"], answer=r["answer"],
@@ -2187,26 +2186,36 @@ def t_cost_task_usage() -> TestResult:
         if rows:
             tasks = {r.get("task") for r in rows}
             models_seen = {r.get("model") for r in rows}
-            # Per task, the model with the fewest average tokens per request is the most
-            # token-efficient — the cheapest model that actually did that unit of work.
+            # "Most efficient model" is only a meaningful comparison for a task that ran against
+            # MORE THAN ONE model — e.g. the routing tasks, which send every prompt to every tier.
+            # Single-model tasks (an ad-hoc route, the open-weight probe) would trivially "win"
+            # with their one model, so exclude them rather than present a non-comparison as a
+            # verdict. Per qualifying task, the lowest average-tokens row is the cheapest model.
+            models_per_task: dict[str, set] = {}
             best: dict[str, dict] = {}
             for r in rows:
                 t, avg = r.get("task"), r.get("avg_tokens_per_request")
+                models_per_task.setdefault(t, set()).add(r.get("model"))
                 if avg is None:
                     continue
                 if t not in best or float(avg) < float(best[t]["avg_tokens_per_request"]):
                     best[t] = {"model": r.get("model"), "avg_tokens_per_request": avg}
-            most_efficient = [{"task": t, **v} for t, v in best.items()]
+            most_efficient = [{"task": t, **v} for t, v in best.items()
+                              if len(models_per_task.get(t, ())) > 1]
+            compared = len(most_efficient)
             return _ok(
                 f"{len(tasks)} task(s) across {len(models_seen)} model(s) attributed by the "
-                "`task` request tag — the most token-efficient model per task is highlighted.",
+                f"`task` request tag; {compared} task(s) ran against multiple models, so their "
+                "most token-efficient model is highlighted.",
                 rows=rows, tasks=sorted(str(t) for t in tasks),
                 most_efficient_per_task=most_efficient,
                 interpretation=(
-                    "Each task ran against every model, so the lowest average-tokens row per "
-                    "task is the cheapest model that did that work. Read it alongside the answers "
-                    "from Cost → Project routing savings to weigh cost against quality. Token "
-                    "counts are exact; convert to dollars with your negotiated rate."),
+                    "For a task that ran against multiple models (the routing tasks send every "
+                    "prompt to every tier), the lowest average-tokens row is the cheapest model "
+                    "that did that work — read it alongside the answers from Cost → Project "
+                    "routing savings to weigh cost against quality. Single-model tasks are "
+                    "attributed but omitted from the comparison. Token counts are exact; convert "
+                    "to dollars with your negotiated rate."),
                 sql=sql)
         # No rows is a real (and common) outcome, not a pass. Report the table watermark so
         # "not ingested yet" is distinguishable from "no task tags were sent".
