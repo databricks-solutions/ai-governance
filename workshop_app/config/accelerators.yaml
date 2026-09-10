@@ -22,8 +22,8 @@ overview:
 
 accelerators:
   - id: acc_mcp
-    title: "Choice: MCP Servers"
-    tagline: Managed vs external MCP, UC permissions, on-behalf-of identity, and policies.
+    title: "MCPs"
+    tagline: "Additive to the core MCP-policy step: managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, and telemetry."
     steps:
       - id: acc_mcp_two_kinds
         title: Two kinds of MCP — and UC objects as tools
@@ -231,8 +231,8 @@ accelerators:
           test: mcp_telemetry
 
   - id: acc_agent_registry
-    title: "Choice: Agents"
-    tagline: Register an agent as a governed UC service, then version, own, trace, and govern it like any endpoint — the hands-on path behind the "Register an agent service" core step (Coming Soon).
+    title: "Agents"
+    tagline: "Additive to the core agent-service step (Coming Soon): register an agent as a governed UC asset, then version, own, trace, evaluate, and manage its lifecycle."
     steps:
       - id: acc_agent_inventory
         title: Inventory registered agents & tools
@@ -282,37 +282,6 @@ accelerators:
         action:
           label: Check limits/guardrails/usage tracking on agent endpoints
           test: agent_sp_attribution
-      - id: acc_agent_acl
-        title: Who can call the agent endpoint
-        outcome: "We can review who is allowed to call the agent endpoint and spot over-broad grants."
-        concept: |
-          An agent endpoint has an ACL like any serving endpoint: `CAN_QUERY`, `CAN_VIEW`,
-          `CAN_MANAGE`. A broad group with `CAN_QUERY` means the agent is open to everyone;
-          `CAN_MANAGE` lets someone reconfigure or strip controls off it. Review the ACL and
-          keep manage rights with platform admins.
-        action:
-          label: Show the agent endpoint ACL
-          test: endpoint_acl
-      - id: acc_agent_guardrails
-        title: Guardrails on the agent endpoint
-        outcome: "We can prove guardrails fire on the agent endpoint, not just on model endpoints."
-        concept: |
-          Agents are often assumed to inherit a model's guardrails, but a custom agent endpoint
-          may have none attached. Send a prompt that should be blocked and confirm the guardrail
-          fires on the agent's own endpoint.
-        action:
-          label: Send a blocked prompt to the agent endpoint
-          test: test_guardrail
-      - id: acc_agent_audit
-        title: Agent activity in the audit trail
-        outcome: "We can see agent activity in the audit trail and scan it for leaked secrets."
-        concept: |
-          Agent calls land in `system.access.audit` alongside every other governed call. Query
-          recent denied/failed agent activity and scan the arguments for secret-shaped strings,
-          so the agent fleet is auditable like the rest of the estate.
-        action:
-          label: Query agent activity & scan for secrets
-          test: audit_scan
       - id: acc_agent_eval
         title: Evaluate the agent with MLflow judges
         outcome: "We can score the agent's quality with MLflow LLM-as-judge evaluations."
@@ -333,8 +302,8 @@ accelerators:
           label: Promote/retire versions in Unity Catalog
 
   - id: acc_coding_agent
-    title: "Cost: Coding Agents"
-    tagline: Route dev-agent traffic through the gateway, prove it is actually governed, attribute per developer, and cap the spend.
+    title: "Coding"
+    tagline: "Additive to the core cost/control steps: route dev-agent traffic through the gateway, prove it actually lands there, attribute per developer, and prove the 429 bites on the path agents really use."
     steps:
       - id: acc_coding_route
         title: Route coding-agent traffic through the Gateway
@@ -407,31 +376,6 @@ accelerators:
         verify:
           label: Send a burst and look for a 429
           test: rate_limit_429_demo
-      - id: acc_coding_budget
-        title: Cap the spend with a budget
-        outcome: "We can cap coding-agent spend with a budget and read 30-day spend per developer."
-        concept: |
-          Attribution shows who is spending; a budget bounds it. Set a budget with alert
-          thresholds — and a hard cap where available — in the account console, then read the
-          30-day spend the gateway records per model and user.
-
-          Alerts are GA; hard "block usage" caps are rolling out, so confirm hard enforcement on
-          the account before promising it.
-        manual:
-          label: Open account-console budgets
-          deep_link: account_budgets
-        action:
-          label: Show 30-day spend by model and user
-          test: budget_status
-      - id: acc_coding_secrets
-        title: Code-secret detection
-        outcome: "We can detect secret-shaped strings leaked by coding agents in the audit log."
-        concept: |
-          Coding agents can leak API keys and tokens in prompts. Scan recent activity for
-          secret-shaped strings (`sk-…`, `AKIA…`, `ghp_…`) to prove detection is in place.
-        verify:
-          label: Scan for leaked secrets in the audit log
-          test: audit_scan
       - id: acc_coding_model_choice
         title: Pin the approved model list
         outcome: "We can pin which models coding agents are allowed to call to an approved list."
@@ -452,30 +396,11 @@ accelerators:
         action:
           label: Classify the service's tools read vs write
           test: mcp_readonly_enforcement
-      - id: acc_coding_guardrails
-        title: Guardrails on the coding path
-        outcome: "We can prove guardrails fire on the path coding agents actually use."
-        concept: |
-          Coding agents send code and sometimes secrets or customer data in prompts. Confirm the
-          safety/PII guardrail actually fires by sending a prompt that should be blocked through
-          the governed endpoint the agents use.
-        action:
-          label: Send a blocked prompt through the coding path
-          test: test_guardrail
 
   - id: acc_external_provider
-    title: "Choice: External Providers"
-    tagline: Route Bedrock, OpenAI, and Anthropic through the gateway with credentials in secrets and access bound to approved workspaces.
+    title: "Providers"
+    tagline: "Additive to the core — everything specific to bringing an OUTSIDE provider (Bedrock, OpenAI, Anthropic) under governance: add it, secure its credentials, bind it, migrate and attribute its traffic, verify its cost, ban it, or fail it over."
     steps:
-      - id: acc_ext_inventory
-        title: Inventory current provider access
-        outcome: "We can map how external providers are reached today across serving endpoints."
-        concept: |
-          Map how external providers are reached today (direct keys, another proxy). The
-          target is a single governed path; this lists the serving endpoints that exist.
-        action:
-          label: List serving endpoints
-          test: list_endpoints
       - id: acc_ext_route
         title: Route a provider through the Gateway
         outcome: "We can route Bedrock/OpenAI/Anthropic through a governed endpoint so they inherit limits, guardrails, and logging."
@@ -534,26 +459,6 @@ accelerators:
           keys.
         manual:
           label: Disable a provider/model family in the AI Gateway
-      - id: acc_ext_guardrails
-        title: Guardrails on external routes
-        outcome: "We can prove guardrails fire on external-provider routes."
-        concept: |
-          Routing an external provider through the gateway is only a win if the controls apply.
-          Send a prompt that should be blocked through the external-model endpoint and confirm
-          the guardrail fires there, the same as on a native model service.
-        action:
-          label: Send a blocked prompt to the external route
-          test: test_guardrail
-      - id: acc_ext_rate_limits
-        title: Rate limits on external routes
-        outcome: "We can enforce rate limits on external-provider routes."
-        concept: |
-          External provider spend is easy to run away with. Confirm QPM/TPM rate limits are
-          enforced on the external-model endpoint so a runaway client hits HTTP 429 rather than a
-          surprise invoice.
-        action:
-          label: Show enforced rate limits on the external route
-          test: rate_limits
       - id: acc_ext_spend
         title: Spend by external provider
         outcome: "We can read spend by external provider to see where the money goes."
@@ -575,22 +480,9 @@ accelerators:
           label: Configure fallback/traffic-split (see fallbacks.py)
 
   - id: acc_policies_guardrails
-    title: "Control: Policies & Guardrails"
-    tagline: Prove guardrails actually work — block vs mask, how a block is delivered, path coverage, and effectiveness.
+    title: "Policies"
+    tagline: "Additive to the core guardrail step: mask vs block, how a block is delivered, path coverage, effectiveness benchmarking, prompt-injection, groundedness, and custom per-use-case policies."
     steps:
-      - id: acc_pg_guardrail
-        title: Safety & PII guardrail on input and output
-        outcome: "We can configure safety & PII guardrails on input and output and prove a prompt is blocked."
-        concept: |
-          Configure the Gateway safety filter and PII detection on the governed endpoint
-          (input and output), then send a prompt that should be blocked to prove it fires. A
-          block is the pass condition here.
-        manual:
-          label: Configure guardrails in the AI Gateway UI
-          deep_link: serving_endpoint
-        action:
-          label: Send a blocked prompt (expect block)
-          test: test_guardrail
       - id: acc_pg_mask_vs_block
         title: Mask vs block
         outcome: "We can tell whether PII is blocked, masked, or passed through intact."
@@ -643,15 +535,6 @@ accelerators:
         verify:
           label: Check guardrail + judge readiness (payloads, telemetry)
           test: pii_safety_readiness
-      - id: acc_pg_review
-        title: Review guardrail activity
-        outcome: "We can review which guardrails fired and for whom."
-        concept: |
-          Every blocked request lands in the inference table. Review which guardrails fired
-          and for whom.
-        action:
-          label: Show guardrail activity
-          test: guardrail_activity
       - id: acc_pg_prompt_injection
         title: Prompt-injection & jailbreak
         outcome: "We can enable prompt-injection / jailbreak protection and prove it blocks a jailbreak."
@@ -692,8 +575,8 @@ accelerators:
           label: Attach different policies per use case/agent
 
   - id: acc_skills
-    title: "Control: Skills"
-    tagline: Build, govern, and deploy Agent Skills in Genie Code — a runtime allowlist and a tiered registry.
+    title: "Skills"
+    tagline: "Not in the core at all: build, govern, and deploy Agent Skills in Genie Code — a runtime allowlist and a tiered registry."
     steps:
       - id: acc_skills_what
         title: What an Agent Skill is — and the three instruction layers
