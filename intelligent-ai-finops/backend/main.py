@@ -228,6 +228,29 @@ def save_router_policy(body: RouterPolicyIn):
     return JSONResponse({"ok": True, "saved": saved, "policy": payload})
 
 
+# ---- Admin gateway config (Context-routing tab) --------------------------
+# The full admin-configured state for the Context-routing tab (auto-classifier
+# on/off, the 3 category model picks, keyword criteria, governance ticks, and the
+# per-request option toggles). Persisted to Lakebase so the USER persona - which
+# only types a question - inherits exactly what the admin set. Stored as an opaque
+# blob (the frontend owns the shape); degrades to in-memory only if Lakebase is down.
+@app.get("/api/gateway/appconfig")
+def get_app_config():
+    from . import lakebase
+    saved = lakebase.get("app_admin_config", max_age_s=10 ** 9)
+    return JSONResponse(saved or {})
+
+
+@app.post("/api/gateway/appconfig")
+async def save_app_config(request: Request):
+    from . import lakebase
+    body = await request.json()
+    if not isinstance(body, dict):
+        return JSONResponse({"ok": False, "error": "expected a JSON object"}, status_code=400)
+    saved = lakebase.put("app_admin_config", body)
+    return JSONResponse({"ok": True, "saved": saved})
+
+
 @app.get("/api/setup/readiness")
 def setup_readiness():
     """Deployment readiness: green/red checks (warehouse, system tables, serving
@@ -272,164 +295,6 @@ def gateway_cache_clear():
     semcache.clear()
     return JSONResponse({"ok": True, **semcache.stats()})
 
-
-@app.post("/api/gateway/optimize/ab")
-async def optimize_ab(request: Request):
-    """Prove output-shaping nets positive: serve the SAME prompt unshaped vs shaped
-    (same routing, semantic cache off so both hit the model), and return the real
-    output-token/cost delta plus an LLM-as-judge quality score for each - so the
-    saving is MEASURED, not estimated, and you can see quality held."""
-    from . import judge as judge_mod
-    from . import models as reg
-    from . import proxy
-    body = await request.json()
-    prompt = (body.get("prompt") or "").strip()
-    model = body.get("model") or "finops-auto"
-    words = int(body.get("targetWords") or 150)
-    judge_model = body.get("judgeModel") or None  # None → judge.py default (cheapest frontier)
-    who = (request.headers.get("x-forwarded-email")
-           or request.headers.get("x-forwarded-preferred-username") or "proxy-user")
-    if not prompt:
-        return JSONResponse(status_code=400, content={"error": {"message": "prompt required"}})
-    msgs = [{"role": "user", "content": prompt}]
-    base = {"semanticCache": {"enabled": False}}
-    try:
-        r_un, f_un = proxy.serve(msgs, requested_model=model, options={**base, "optimize": {"enabled": False}}, user=who)
-        r_sh, f_sh = proxy.serve(msgs, requested_model=model, options={**base, "optimize": {"enabled": True, "targetWords": words}}, user=who)
-    except proxy.ProxyError as e:
-        return JSONResponse(status_code=e.status, content={"error": {"message": e.message, "code": e.code}})
-    a_un = r_un["choices"][0]["message"]["content"]
-    a_sh = r_sh["choices"][0]["message"]["content"]
-
-    def _quality(answer: str):
-        # Score with the CHOSEN judge model (both answers use the same one so it's a
-        # fair comparison). score_and_reason lets us DROP the neutral 5.0 the judge
-        # emits when it can't parse, so a parse failure never looks like a quality drop.
-        try:
-            v, reason = judge_mod.score_and_reason(prompt, answer, model_id=judge_model)
-            if "could not be parsed" in (reason or ""):
-                return None
-            return v
-        except Exception:  # noqa: BLE001 - quality scoring is best-effort
-            return None
-
-    q_un = _quality(a_un)
-    q_sh = _quality(a_sh)
-    # Resolve the judge for display: the chosen model, else the default (cheapest frontier).
-    try:
-        judge_short = reg.by_id(judge_model).short if judge_model else reg.cheapest_of_tier("frontier").short
-    except Exception:  # noqa: BLE001
-        judge_short = judge_model or "frontier"
-    saved_usd = max(0.0, f_un["costUsd"] - f_sh["costUsd"])
-    saved_pct = round(saved_usd / f_un["costUsd"] * 100, 1) if f_un["costUsd"] > 0 else 0.0
-    return JSONResponse({
-        "judge": judge_short,
-        "unshaped": {"outputTokens": f_un["outputTokens"], "costUsd": f_un["costUsd"],
-                     "servedBy": f_un["servedBy"]["short"], "quality": q_un, "answer": a_un},
-        "shaped": {"outputTokens": f_sh["outputTokens"], "costUsd": f_sh["costUsd"],
-                   "servedBy": f_sh["servedBy"]["short"], "quality": q_sh, "answer": a_sh, "targetWords": words},
-        "savedOutputTokens": max(0, f_un["outputTokens"] - f_sh["outputTokens"]),
-        "savedUsd": saved_usd, "savedPct": saved_pct,
-    })
-
-
-@app.post("/api/smartrouting/ab")
-async def smartrouting_ab(request: Request):
-    """Smart Routing ON vs OFF on the SAME prompt - the 'visible and auditable' story.
-
-    ON = the FinOps router picks the cheapest candidate that clears the quality bar
-    (the real proxy path) and returns the routing DECISION (task-type family, language
-    family, complexity label, rationale). OFF = a fixed frontier model, as if you always
-    called the flagship. Both answers are scored by the same judge, so the cost delta AND
-    the quality delta are MEASURED, not asserted.
-    """
-    from . import judge as judge_mod
-    from . import models as reg
-    from . import proxy, smartrouting
-    body = await request.json()
-    prompt = (body.get("prompt") or "").strip()
-    candidates = body.get("models") or None       # ON candidate pool (defaults to full registry)
-    frontier = body.get("frontierModel") or None   # OFF baseline (defaults to priciest frontier)
-    router_model = body.get("routerModel") or None
-    judge_model = body.get("judgeModel") or None
-    who = (request.headers.get("x-forwarded-email")
-           or request.headers.get("x-forwarded-preferred-username") or "proxy-user")
-    if not prompt:
-        return JSONResponse(status_code=400, content={"error": {"message": "prompt required"}})
-    # Default OFF baseline: the priciest frontier - the "we always call the flagship" case.
-    if not frontier:
-        fr = [m for m in reg.registry() if m.tier == "frontier"]
-        frontier = (max(fr, key=lambda m: m.price_out_per_1m).id if fr else reg.frontier_model().id)
-    msgs = [{"role": "user", "content": prompt}]
-    base = {"semanticCache": {"enabled": False}}  # both sides hit the model (fair A/B)
-    on_opts = dict(base)
-    if candidates:
-        on_opts["models"] = candidates
-    if router_model:
-        on_opts["routerModel"] = router_model
-    try:
-        r_on, f_on = proxy.serve(msgs, requested_model="finops-auto", options=on_opts, user=who)
-        r_off, f_off = proxy.serve(msgs, requested_model=frontier, options=dict(base), user=who)
-    except proxy.ProxyError as e:
-        return JSONResponse(status_code=e.status, content={"error": {"message": e.message, "code": e.code}})
-
-    a_on = r_on["choices"][0]["message"]["content"]
-    a_off = r_off["choices"][0]["message"]["content"]
-
-    def _quality(answer: str):
-        try:
-            v, reason = judge_mod.score_and_reason(prompt, answer, model_id=judge_model)
-            return None if "could not be parsed" in (reason or "") else v
-        except Exception:  # noqa: BLE001 - quality scoring is best-effort
-            return None
-
-    q_on, q_off = _quality(a_on), _quality(a_off)
-    try:
-        classifier_short = reg.by_id(router_model).short if router_model else None
-    except Exception:  # noqa: BLE001
-        classifier_short = router_model
-    dec = smartrouting.decision(
-        prompt, f_on["complexity"], f_on["requiredTier"], f_on["requiredTierLabel"],
-        f_on["servedBy"]["short"], f_on["servedBy"]["tier"], classifier_short, f_on.get("matchedRule"))
-    try:
-        judge_short = reg.by_id(judge_model).short if judge_model else reg.cheapest_of_tier("frontier").short
-    except Exception:  # noqa: BLE001
-        judge_short = judge_model or "frontier"
-    saved = max(0.0, f_off["costUsd"] - f_on["costUsd"])
-    saved_pct = round(saved / f_off["costUsd"] * 100, 1) if f_off["costUsd"] > 0 else 0.0
-
-    def _side(f, answer, quality):
-        return {"model": f["servedBy"]["short"], "tier": f["servedBy"]["tier"],
-                "costUsd": f["costUsd"], "latencyMs": f["latencyMs"], "quality": quality,
-                "inputTokens": f["inputTokens"], "outputTokens": f["outputTokens"], "answer": answer}
-
-    return JSONResponse({
-        "decision": dec,
-        "judge": judge_short,
-        "on": _side(f_on, a_on, q_on),
-        "off": _side(f_off, a_off, q_off),
-        "savedUsd": saved,
-        "savedPct": saved_pct,
-        "qualityDelta": (round(q_on - q_off, 1) if (q_on is not None and q_off is not None) else None),
-    })
-
-
-@app.post("/api/eval/run")
-async def eval_run(request: Request):
-    """Bring-your-own evaluation set: run each prompt through the router vs a frontier
-    baseline, judge both, and aggregate quality retention + cost savings. Validates
-    Smart Routing holds quality for the customer's own workload. Best-effort MLflow log."""
-    from . import evalset
-    body = await request.json()
-    prompts = body.get("prompts") or []
-    if isinstance(prompts, str):
-        prompts = [p for p in prompts.splitlines()]
-    who = (request.headers.get("x-forwarded-email")
-           or request.headers.get("x-forwarded-preferred-username") or "eval-user")
-    return JSONResponse(evalset.run_eval(
-        prompts, candidates=body.get("models") or None,
-        frontier=body.get("frontierModel") or None,
-        judge_model=body.get("judgeModel") or None, user=who))
 
 
 @app.post("/v1/chat/completions")

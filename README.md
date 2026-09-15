@@ -158,11 +158,15 @@ makes the **Cost** pillar tangible: the app *is* the gateway. It exposes an Open
 `POST /v1/chat/completions` proxy (`finops-auto`) that classifies each prompt, routes it to the
 **cheapest model that still clears a quality bar**, and enforces app-level guardrails, rate limits,
 a semantic cache, fallback, and a live budget, all on the same **Unity AI Gateway + Model Serving**
-surface. Six views: **Compare models** side by side (live streaming + LLM-as-judge), **Smart
-routing** (route by complexity + budget across the models you allow), **Cost & savings** (real spend
-from `system.ai_gateway.usage` / `system.serving`, the routed-vs-frontier counterfactual, coding-agent
-spend, chargeback, and a projection), **Gateway API** (the live proxy with its routing receipt and
-semantic-cache stats), **Why Databricks**, and **How it works** (the end-to-end request flow).
+surface. Five views: **Compare models** side by side (live streaming + LLM-as-judge, models grouped
+into Small / Medium / Complex size categories, with all-in routed-vs-most-capable economics that net
+the router cost), **Context routing** (the live `finops-auto` proxy: an auto-classifier that routes
+across every deployed model, or a manual mode where an admin picks the model per category and writes
+keyword criteria — plus governance features (guardrails, rate limits, access control, inference
+tables, fallback), semantic cache, output shaping, and the routing receipt; a user persona just asks
+and inherits the admin's persisted settings), **Cost & savings** (real spend from
+`system.ai_gateway.usage` / `system.serving`, the routed-vs-frontier counterfactual, coding-agent
+spend, chargeback, and a projection), **Why Databricks**, and **How it works** (the end-to-end request flow).
 
 It **ships in live mode** (real Model Serving calls, real tokens/latency, real system-table cost).
 Set `FINOPS_DEMO_MODE=true` for a **zero-setup, fully offline demo** (synthesised numbers, no

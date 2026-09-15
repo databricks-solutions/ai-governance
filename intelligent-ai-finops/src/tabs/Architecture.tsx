@@ -204,9 +204,9 @@ export function Architecture() {
         <div className="flex flex-wrap items-center gap-5 text-[11px] text-white/65">
           <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-white/50" /> request / response stream</span>
           <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-lava" /> routing decision</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-[3px] rounded-[2px] bg-moss" /> small OSS</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-[3px] rounded-[2px] bg-amber" /> large OSS</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-[3px] rounded-[2px] bg-plum" /> frontier</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-[3px] rounded-[2px] bg-moss" /> Small</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-[3px] rounded-[2px] bg-amber" /> Medium</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-[3px] rounded-[2px] bg-plum" /> Complex</span>
         </div>
       </div>
     </div>

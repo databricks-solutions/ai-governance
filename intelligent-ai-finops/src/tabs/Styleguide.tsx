@@ -37,9 +37,9 @@ export function Styleguide() {
       <div>
         <div className="eyebrow mb-3">Pill</div>
         <Card className="flex flex-wrap items-center gap-2.5 p-5">
-          <Pill variant="tier-frontier" dot>frontier</Pill>
-          <Pill variant="tier-large" dot>large OSS</Pill>
-          <Pill variant="tier-small" dot>small OSS</Pill>
+          <Pill variant="tier-frontier" dot>Complex</Pill>
+          <Pill variant="tier-large" dot>Medium</Pill>
+          <Pill variant="tier-small" dot>Small</Pill>
           <Pill variant="neutral">neutral</Pill>
           <Pill variant="accent">best value</Pill>
         </Card>

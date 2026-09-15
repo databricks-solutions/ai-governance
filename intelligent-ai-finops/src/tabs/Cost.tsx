@@ -150,7 +150,7 @@ function RealCost({ data, rangeDays, setRangeDays }: { data: CostOverview; range
           <Kpi label="Total spend" value={usd(spend)} accent="#FF6A54" />
           <Kpi label="Requests" value={reqs.toLocaleString()} />
           <Kpi label="Avg cost / query" value={perQ(avg)} />
-          <Kpi label="Potential savings" value={usd(potentialSaved)} sub={`route frontier → OSS (−${dr.savedLargePct}%)`} accent="#4FD79E" />
+          <Kpi label="Potential savings" value={usd(potentialSaved)} sub={`route Complex → smaller (−${dr.savedLargePct}%)`} accent="#4FD79E" />
         </div>
       </section>
 
@@ -201,9 +201,9 @@ function RealCost({ data, rangeDays, setRangeDays }: { data: CostOverview; range
               ))}
             </div>
             <div className="mt-3 rounded-lg bg-moss/10 p-3 ring-1 ring-moss/25">
-              <p className="text-[12px] leading-[1.5] text-white/75"><span className="num font-bold text-[#93D3AB]">{fs.smallerPct}%</span> of requests used a smaller open model; <span className="num font-semibold text-white/70">{100 - fs.smallerPct}%</span> went to the frontier.</p>
+              <p className="text-[12px] leading-[1.5] text-white/75"><span className="num font-bold text-[#93D3AB]">{fs.smallerPct}%</span> of requests used a smaller model; <span className="num font-semibold text-white/70">{100 - fs.smallerPct}%</span> went to the most capable.</p>
               <p className="mt-2 border-t border-white/10 pt-2 text-[11px] leading-[1.5] text-white/55">
-                Retrospective: the frontier handled <span className="num text-white/75">{num0(dr.requests)}</span> requests costing <span className="num text-lava">{usd(dr.frontierSpendUsd)}</span>. Routine <span className="text-white/70">"how-to / summarize / code / reset"</span> asks rarely need it - the same work on <b className="text-[#93D3AB]">large OSS</b> would be ~<span className="num">{usd(dr.ifLargeUsd)}</span> (<span className="text-[#93D3AB]">−{dr.savedLargePct}%</span>), on <b className="text-[#93D3AB]">small OSS</b> ~<span className="num">{usd(dr.ifSmallUsd)}</span> (<span className="text-[#93D3AB]">−{dr.savedSmallPct}%</span>).
+                Retrospective: the frontier handled <span className="num text-white/75">{num0(dr.requests)}</span> requests costing <span className="num text-lava">{usd(dr.frontierSpendUsd)}</span>. Routine <span className="text-white/70">"how-to / summarize / code / reset"</span> asks rarely need it - the same work on <b className="text-[#93D3AB]">Medium</b> would be ~<span className="num">{usd(dr.ifLargeUsd)}</span> (<span className="text-[#93D3AB]">−{dr.savedLargePct}%</span>), on <b className="text-[#93D3AB]">Small</b> ~<span className="num">{usd(dr.ifSmallUsd)}</span> (<span className="text-[#93D3AB]">−{dr.savedSmallPct}%</span>).
               </p>
             </div>
           </div>
@@ -264,7 +264,7 @@ function RealCost({ data, rangeDays, setRangeDays }: { data: CostOverview; range
           </div>
           {!projOpen && <p className="text-[12.5px] leading-[1.5] text-white/50">Scale today's real per-query cost to your traffic and see the routed-down projection. <button onClick={() => setProjOpen(true)} className="font-semibold text-[#7FB6F2] hover:underline">Expand</button>.</p>}
           {projOpen && (<>
-            <p className="mb-4 max-w-[70ch] text-[12.5px] leading-[1.5] text-white/55">At today's measured <span className="num text-white/80">{perQ(avg)}</span> / query, scaled across your traffic - versus the same traffic with routine frontier work routed down to OSS.</p>
+            <p className="mb-4 max-w-[70ch] text-[12.5px] leading-[1.5] text-white/55">At today's measured <span className="num text-white/80">{perQ(avg)}</span> / query, scaled across your traffic - versus the same traffic with routine top-tier work routed down to smaller models.</p>
             <div className="grid grid-cols-2 gap-4 max-[520px]:grid-cols-1">
               <VizSlider label="Monthly active users" value={users} min={100} max={200000} step={100} onChange={setUsers} accent="accent-[#B487D0]" />
               <VizSlider label="Queries / user / month" value={perUserQ} min={1} max={2000} step={1} onChange={setPerUserQ} accent="accent-lava" />
@@ -278,7 +278,7 @@ function RealCost({ data, rangeDays, setRangeDays }: { data: CostOverview; range
             <div className="mt-4 rounded-2xl bg-white/[0.04] p-4 ring-1 ring-white/10">
               <RoiChart roi={roi as Roi} frontierColor="#7C8BF5" routedColor="#4FD79E" />
               <div className="mt-3 grid grid-cols-3 gap-2">
-                <VizStat label="Today (mostly frontier) / yr" value={compact(roi.monthly.frontier * 12)} color="#9AA8F7" />
+                <VizStat label="Today (mostly top-tier) / yr" value={compact(roi.monthly.frontier * 12)} color="#9AA8F7" />
                 <VizStat label="Routed / yr" value={compact(roi.monthly.routed * 12)} />
                 <VizStat label="Saved / yr" value={compact(roi.savedYr)} color="#4FD79E" />
               </div>
@@ -553,7 +553,7 @@ function DemoCost({ loadingReal = false }: { loadingReal?: boolean }) {
           <div className="rounded-2xl bg-white/[0.04] p-4 ring-1 ring-white/10">
             <div className="mb-3 font-body text-[11px] font-semibold uppercase tracking-[.16em] text-white/45">Requests by tier</div>
             {empty ? (
-              <EmptyMini text="The routing spread across small / large / frontier appears here." />
+              <EmptyMini text="The routing spread across Small / Medium / Complex appears here." />
             ) : (
               <>
                 <div className="flex h-3 overflow-hidden rounded-full bg-white/[0.06]">
@@ -576,7 +576,7 @@ function DemoCost({ loadingReal = false }: { loadingReal?: boolean }) {
                 {/* Retrospective: how traffic split FM vs OSS, and what routing avoided. */}
                 <div className="mt-3 rounded-lg bg-moss/10 p-3 ring-1 ring-moss/25">
                   <p className="text-[12px] leading-[1.5] text-white/75">
-                    <span className="num font-bold text-[#93D3AB]">{smallerSharePct}%</span> of requests were served by a smaller open model instead of Claude / a frontier model - only <span className="num font-semibold text-white/70">{frontierSharePct}%</span> needed the frontier.
+                    <span className="num font-bold text-[#93D3AB]">{smallerSharePct}%</span> of requests were served by a smaller model instead of the most capable - only <span className="num font-semibold text-white/70">{frontierSharePct}%</span> needed the top tier.
                   </p>
                   <div className="mt-2.5 flex flex-col gap-1.5">
                     {byTier.map((t) => {
@@ -593,7 +593,7 @@ function DemoCost({ loadingReal = false }: { loadingReal?: boolean }) {
                     })}
                   </div>
                   <p className="mt-2 text-[11px] leading-[1.5] text-white/55">
-                    Retrospective: the frontier handled <span className="num text-white/75">{frontierReqCount}</span> request{frontierReqCount === 1 ? '' : 's'}; routing kept the other <span className="num text-[#93D3AB]">{smallerSharePct}%</span> on OSS, avoiding <span className="num text-[#93D3AB]">{usd(savedSession)}</span> vs sending everything to the frontier.
+                    Retrospective: the top tier handled <span className="num text-white/75">{frontierReqCount}</span> request{frontierReqCount === 1 ? '' : 's'}; routing kept the other <span className="num text-[#93D3AB]">{smallerSharePct}%</span> on smaller models, avoiding <span className="num text-[#93D3AB]">{usd(savedSession)}</span> vs sending everything to the most capable.
                   </p>
                 </div>
               </>
@@ -717,7 +717,7 @@ function DemoCost({ loadingReal = false }: { loadingReal?: boolean }) {
           )}
           {projOpen && (<>
           <p className="mb-4 max-w-[70ch] text-[12.5px] leading-[1.5] text-white/55">
-            Projected at <span className="num text-white/80">{routedPerQuery != null ? perQ(routedPerQuery) : '-'}</span> / query{measured ? ' (routed blend of the models you ran)' : ' (registry-estimated routed blend)'} across your traffic. The chart plots cumulative spend over 12 months versus routing every query to a frontier model.
+            Projected at <span className="num text-white/80">{routedPerQuery != null ? perQ(routedPerQuery) : '-'}</span> / query{measured ? ' (routed blend of the models you ran)' : ' (registry-estimated routed blend)'} across your traffic. The chart plots cumulative spend over 12 months versus routing every query to the most capable model.
           </p>
 
           <div className="grid grid-cols-2 gap-4 max-[520px]:grid-cols-1">
@@ -738,13 +738,13 @@ function DemoCost({ loadingReal = false }: { loadingReal?: boolean }) {
               <RoiChart roi={roi} frontierColor="#7C8BF5" routedColor="#4FD79E" />
               {!roi && (
                 <div className="absolute inset-0 grid place-items-center px-6 text-center">
-                  <p className="max-w-[42ch] text-[12.5px] leading-[1.5] text-white/45">A routed-vs-frontier projection appears once there's a measurable gap between routing and frontier-only cost.</p>
+                  <p className="max-w-[42ch] text-[12.5px] leading-[1.5] text-white/45">A routed-vs-top-tier projection appears once there's a measurable gap between routing and always using the most capable model.</p>
                 </div>
               )}
             </div>
             {roi && (
               <div className="mt-3 grid grid-cols-3 gap-2">
-                <VizStat label="Frontier-only / yr" value={compact(roi.monthly.frontier * 12)} color="#9AA8F7" />
+                <VizStat label="Most capable / yr" value={compact(roi.monthly.frontier * 12)} color="#9AA8F7" />
                 <VizStat label="Routed / yr" value={compact(roi.monthly.routed * 12)} />
                 <VizStat label="Saved / yr" value={compact(roi.savedYr)} color="#4FD79E" />
               </div>
@@ -860,7 +860,7 @@ function Counterfactual({ cf }: { cf: Counterfactual }) {
         {/* Downgrade sliders */}
         <div className="mt-4 grid grid-cols-2 gap-4 max-[520px]:grid-cols-1">
           <VizSlider label="Frontier → cheaper tier (%)" value={frac['frontier']} min={0} max={100} step={5} onChange={(v) => setFrac((s) => ({ ...s, frontier: v }))} accent="accent-[#B487D0]" />
-          <VizSlider label="Large OSS → small OSS (%)" value={frac['large-oss']} min={0} max={100} step={5} onChange={(v) => setFrac((s) => ({ ...s, 'large-oss': v }))} accent="accent-[#67C7E8]" />
+          <VizSlider label="Medium → Small (%)" value={frac['large-oss']} min={0} max={100} step={5} onChange={(v) => setFrac((s) => ({ ...s, 'large-oss': v }))} accent="accent-[#67C7E8]" />
         </div>
 
         {/* Per-tier detail */}

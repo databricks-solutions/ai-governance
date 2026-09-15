@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { StageConfigPanel, ConfigCard } from '../components/StageConfigPanel';
@@ -6,10 +6,11 @@ import { QuestionLibrary } from '../components/QuestionLibrary';
 import { RoutingSteps } from '../components/RoutingViz';
 import { useSession } from '../store/session';
 import { useConfig } from '../api/useConfig';
-import { smartRoutingAb, type RoutingDecision, type SmartRoutingAb, type SmartRoutingSide } from '../api/client';
+import { gatewayChat, getCacheStats, getAppConfig, saveAppConfig,
+  type FinopsReceipt, type CacheStats, type AppAdminConfig } from '../api/client';
 import type { Tier, Band, ModelDef } from '../api/types';
 import { TIER_LABEL, TIER_SHORT, TIER_ORDER, TIER_META } from '../api/types';
-import { formatMoney, formatScore } from '../lib/format';
+import { formatMoney, formatScore, formatTokens } from '../lib/format';
 
 // Tab 2 - the Unity Gateway box. Drag a predefined question (or type your
 // own) into the gateway; pick the 2-3 candidate models and tick the governance
@@ -21,18 +22,24 @@ const usd = (n: number) => formatMoney(n);
 // language with the Compare tab.
 type Complexity = 'small' | 'medium' | 'complex';
 const CX_META: Record<Complexity, { label: string; hex: string; blurb: string }> = {
-  small: { label: 'Small', hex: '#93D3AB', blurb: 'Trivial lookups and short tasks - routes to a small open-weight model.' },
-  medium: { label: 'Medium', hex: '#E3B876', blurb: 'Multi-step reasoning and analysis - routes to a large open-weight model.' },
-  complex: { label: 'Complex', hex: '#B487D0', blurb: 'Open-ended architecture and strategy - routes to a frontier model.' },
+  small: { label: 'Small', hex: '#93D3AB', blurb: 'Trivial lookups and short tasks - routes to a Small model.' },
+  medium: { label: 'Medium', hex: '#E3B876', blurb: 'Multi-step reasoning and analysis - routes to a Medium model.' },
+  complex: { label: 'Complex', hex: '#B487D0', blurb: 'Open-ended architecture and strategy - routes to a Complex, most-capable model.' },
 };
 const complexityOf = (cx: number): Complexity => (cx < 35 ? 'small' : cx < 75 ? 'medium' : 'complex');
 
 type Persona = 'user' | 'admin';
 
-// In the User persona the model choice is fixed (and grayed out) to a
-// representative spread - a frontier flagship, a large-OSS, and a small-OSS - so
-// an end user can't reconfigure routing. Only Admin can change models.
-const USER_DEFAULT_IDS = ['databricks-claude-opus-5', 'databricks-qwen3-next-80b-a3b-instruct', 'databricks-gpt-oss-20b'];
+// Representative per-query cost - used to pick the cheapest model in each category.
+const _perQ = (m: ModelDef) => 800 * m.price_in_per_1m + 400 * m.price_out_per_1m;
+// Cheapest model per size category, ordered Small -> Medium -> Complex. This is the
+// spread the router actually chooses from (it picks the cheapest that clears the bar),
+// and it drives the fallback chain + the live per-endpoint AI Gateway config panel.
+function cheapestPerCategory(models: ModelDef[]): ModelDef[] {
+  return (['small-oss', 'large-oss', 'frontier'] as Tier[])
+    .map((t) => [...models.filter((m) => m.tier === t)].sort((a, b) => _perQ(a) - _perQ(b))[0])
+    .filter((m): m is ModelDef => !!m);
+}
 
 interface Question { id: string; t: string; cx: number }
 interface Feature { id: string; label: string; feature: string }
@@ -45,7 +52,7 @@ interface BudgetEffect {
 interface FallbackEffect { enabled: boolean; armed: string[]; fired: boolean; from: string | null }
 interface Result {
   chosen: Chosen; routedTo?: Chosen; fallback?: FallbackEffect | null;
-  costUsd: number; latencyMs: number; judgeScore: number; complexity: number;
+  costUsd: number; latencyMs: number; judgeScore: number | null; complexity: number;
   bandLabel?: string | null; matchedRule?: string | null;
   inputTokens?: number; outputTokens?: number;
   requiredTier: Tier; baseRequiredTier?: Tier; reason: string; baseline: { short: string; costUsd: number };
@@ -57,7 +64,6 @@ interface Result {
   };
   blocked?: boolean;
   answer?: string; judgeReason?: string;
-  decision?: RoutingDecision;
   trace: { kind: string; text: string }[];
 }
 
@@ -117,18 +123,36 @@ export function Pipeline() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [custom, setCustom] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
   const [enabled, setEnabled] = useState<Set<string>>(new Set());
   const [inspect, setInspect] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
-  // Smart Routing ON-vs-OFF: same prompt routed vs a fixed frontier flagship.
-  const [ab, setAb] = useState<SmartRoutingAb | null>(null);
-  const [abBusy, setAbBusy] = useState(false);
-  const [abErr, setAbErr] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [persona, setPersona] = useState<Persona>('admin'); // admin sees governance + budget + policy editor; user sees a simple ask
   const [cxInfo, setCxInfo] = useState(false); // complexity-legend popover
+
+  // ---- Real finops-auto proxy state (POST /v1/chat/completions) -----------
+  // Auto-classifier is the master switch: ON = finops-auto routes across ALL deployed
+  // models and picks the cheapest that clears the bar (model picks grayed, no per-endpoint
+  // config panel); OFF = the admin picks the 3 category models + writes keyword criteria.
+  const [autoClassifier, setAutoClassifier] = useState(true);
+  const [selected, setSelected] = useState<string[]>([]); // 3 category picks (manual mode)
+  // Free-text keyword criteria per category (manual mode): a prompt matching a keyword
+  // routes to that category; anything unmatched falls back to the classifier's score.
+  const [criteria, setCriteria] = useState<Record<Tier, string>>({
+    'small-oss': 'code, sql, python, how do i, reset, format, classify, extract',
+    'large-oss': 'summarize, draft, translate, compare, analyze, explain',
+    frontier: 'strategy, architecture, valuation, acquisition, migrate, design, root cause',
+  });
+  const [cacheOn, setCacheOn] = useState(true); // semantic cache on the routed call
+  const [optOn, setOptOn] = useState(false); // output-shaping (optimize output)
+  const [optWords, setOptWords] = useState(150);
+  const [receipt, setReceipt] = useState<FinopsReceipt | null>(null); // raw receipt → chip row + cache/optimize panels
+  const [blockedErr, setBlockedErr] = useState<{ message: string; finops?: FinopsReceipt } | null>(null); // proxy throws on guardrail/budget/rate block
+  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+  const [cfgReady, setCfgReady] = useState(false); // persisted admin config loaded (gates auto-save)
+  const refreshCacheStats = useCallback(() => { getCacheStats().then(setCacheStats).catch(() => {}); }, []);
+  useEffect(() => { refreshCacheStats(); }, [refreshCacheStats]);
 
   // The customer's OWN routing policy: user-defined complexity bands. Seeded once
   // from the default config thresholds, then fully editable.
@@ -150,7 +174,7 @@ export function Pipeline() {
   const [routerModel, setRouterModel] = useState('');
 
   // Setting a fresh question (pill / example library / clear) also clears the result.
-  const setPrompt = (q: string) => { setCustom(q); setResult(null); setAb(null); setAbErr(null); };
+  const setPrompt = (q: string) => { setCustom(q); setResult(null); setReceipt(null); setBlockedErr(null); };
   const useLibraryQuestion = (q: string) => setPrompt(q);
 
   // Whether the budget applies is driven by the "Budgets" governance TICK (the
@@ -170,7 +194,7 @@ export function Pipeline() {
     if (cfg && !polSeeded) { setDowngradeAt(cfg.policy.budget.downgrade_at_pct); setOpenOnlyAt(cfg.policy.budget.open_only_at_pct); setPolSeeded(true); }
   }, [cfg, polSeeded]);
 
-  // V2: the LIVE per-endpoint AI Gateway config, read from each selected endpoint via
+  // V2: the LIVE per-endpoint AI Gateway config, read from each routable endpoint via
   // the SDK. WRITES run as the SIGNED-IN USER (Databricks Apps on-behalf-of-user), so
   // a human admin can alter these platform-managed system endpoints even though the
   // app's own SP cannot. Errors (e.g. you lack Manage) are surfaced inline.
@@ -178,11 +202,13 @@ export function Pipeline() {
   const [rlInput, setRlInput] = useState<Record<string, string>>({});
   const [gwErr, setGwErr] = useState<Record<string, string>>({});
   const [gwBusy, setGwBusy] = useState<string | null>(null);
+  // Load the live per-endpoint config for the admin's 3 category picks (manual mode).
+  // In auto-classifier mode there's no hand-picked set, so the panel is hidden.
   useEffect(() => {
-    if (!selected.length) return;
+    if (autoClassifier || selected.length === 0) return;
     fetch(`/api/governance/config?models=${encodeURIComponent(selected.join(','))}`)
       .then((r) => r.json()).then(setGwConfig).catch(() => {});
-  }, [selected]);
+  }, [selected, autoClassifier]);
   const applyGateway = async (model: string, patch: object) => {
     setGwBusy(model);
     setGwErr((e) => { const n = { ...e }; delete n[model]; return n; });
@@ -203,17 +229,6 @@ export function Pipeline() {
       setGwErr((e) => ({ ...e, [model]: msg }));
     }
   };
-
-  // App-level fallback: an ordered list of serving endpoints (primary first) the
-  // gateway retries through when a call fails/times out. The app IS the gateway, so
-  // it enforces this itself - no custom endpoint needed. Loaded from + saved to Lakebase.
-  const [fbOrder, setFbOrder] = useState<string[]>([]);
-  const [fbSaved, setFbSaved] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  useEffect(() => {
-    fetch('/api/governance/fallback').then((r) => r.json()).then((p) => {
-      if (Array.isArray(p?.order) && p.order.length) setFbOrder(p.order);
-    }).catch(() => {});
-  }, []);
 
   // App-layer governance (Idea 2): the gateway app enforces these itself on every
   // request. Guardrails scan the prompt (PII + keyword) and block or mask; rate limits
@@ -250,20 +265,14 @@ export function Pipeline() {
     ]);
   }, [cfg, bands.length]);
 
-  // Default model picks: opus-5 for frontier (the flagship), cheapest for the two
-  // OSS tiers - a visible routing spread.
-  useEffect(() => {
-    if (!cfg || selected.length) return;
-    // Defaults: frontier → opus-5; large-OSS → glm-5.3; small-OSS → cheapest in the
-    // tier (by representative per-query cost, 800 in / 400 out).
-    const perQ = (m: ModelDef) => 800 * m.price_in_per_1m + 400 * m.price_out_per_1m;
-    const pick = (t: Tier) => cfg.models.filter((m) => m.tier === t).sort((a, b) => perQ(a) - perQ(b))[0]?.id;
-    const pin = (id: string, t: Tier) => cfg.models.find((m) => m.id === id)?.id ?? pick(t);
-    setSelected([pin('databricks-claude-opus-5', 'frontier'), pin('databricks-glm-5-3', 'large-oss'), pick('small-oss')].filter(Boolean) as string[]);
-  }, [cfg, selected.length]);
-
   const models = cfg?.models ?? [];
   const byId = useMemo(() => new Map(models.map((m) => [m.id, m])), [models]);
+  // No hand-picked model set: the router considers EVERY deployed model and picks the
+  // cheapest one that clears the bar. `repModels` = the cheapest in each category (what
+  // it actually chooses from), used for the fallback chain + per-endpoint config panel.
+  const poolIds = useMemo(() => models.map((m) => m.id), [models]);
+  const repModels = useMemo(() => cheapestPerCategory(models), [models]);
+  const repIds = useMemo(() => repModels.map((m) => m.id), [repModels]);
   // Curated questions carry a hand-tuned complexity (drives the actual route when
   // that exact question is the prompt). The backend classifier scores anything else.
   const knownCx = useMemo(() => new Map(questions.map((q) => [q.t, q.cx])), [questions]);
@@ -277,28 +286,64 @@ export function Pipeline() {
     if (pick) setRouterModel(pick.id);
   }, [cfg, routerModel]);
 
-  // User persona locks the model set to the fixed defaults (Admin edits freely).
-  useEffect(() => {
-    if (persona !== 'user' || !models.length) return;
-    const ids = USER_DEFAULT_IDS.filter((id) => byId.has(id));
-    if (ids.length) setSelected(ids);
-  }, [persona, models.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Effective fallback chain: the saved order constrained to the selected models,
-  // with any newly-selected model appended. Primary is first, then each fallback.
+  // Fallback chain mirrors the models actually routed across: the admin's 3 picks in
+  // manual mode, or the cheapest-per-category set in auto mode. Ordered Small -> Medium
+  // -> Complex (ascending capability). No hand-ordering.
   const fbChain = useMemo(() => {
-    const inSel = fbOrder.filter((id) => selected.includes(id));
-    const missing = selected.filter((id) => !inSel.includes(id));
-    return [...inSel, ...missing];
-  }, [fbOrder, selected]);
-  const saveFallback = async () => {
-    setFbSaved('saving');
-    const r = await fetch('/api/governance/fallback', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: enabled.has('fallbacks'), order: fbChain }),
-    }).then((x) => x.json()).catch(() => null);
-    setFbSaved(r?.ok ? 'saved' : 'error');
-  };
+    const order: Tier[] = ['small-oss', 'large-oss', 'frontier'];
+    const source = autoClassifier ? repIds : selected;
+    return [...source].sort((a, b) => order.indexOf(byId.get(a)?.tier as Tier) - order.indexOf(byId.get(b)?.tier as Tier));
+  }, [autoClassifier, repIds, selected, byId]);
+
+  // Seed the 3 category picks (manual mode) once config loads: opus-5 / glm-5.3 / cheapest
+  // Small - a visible spread. The persisted admin config (below) overrides this if present.
+  useEffect(() => {
+    if (!cfg || selected.length) return;
+    const pin = (id: string, t: Tier) => cfg.models.find((m) => m.id === id)?.id
+      ?? [...cfg.models.filter((m) => m.tier === t)].sort((a, b) => _perQ(a) - _perQ(b))[0]?.id;
+    const picks = [pin('databricks-claude-opus-5', 'frontier'), pin('databricks-glm-5-3', 'large-oss'), pin('', 'small-oss')].filter(Boolean) as string[];
+    if (picks.length) setSelected(picks);
+  }, [cfg, selected.length]);
+
+  const setTierModel = (t: Tier, id: string) =>
+    setSelected((prev) => {
+      const others = prev.filter((x) => byId.get(x)?.tier !== t);
+      return id ? [...others, id] : others;
+    });
+
+  // ---- Persist the admin config so the USER persona inherits it (point 6) ----
+  // Load once on mount (both personas), then the admin auto-saves on change.
+  useEffect(() => {
+    getAppConfig().then((c: AppAdminConfig) => {
+      if (c && Object.keys(c).length) {
+        if (typeof c.autoClassifier === 'boolean') setAutoClassifier(c.autoClassifier);
+        if (Array.isArray(c.models) && c.models.length) setSelected(c.models);
+        if (c.criteria) setCriteria((prev) => ({ ...prev, ...c.criteria } as Record<Tier, string>));
+        if (Array.isArray(c.enabled)) setEnabled(new Set(c.enabled));
+        if (c.options) {
+          if (typeof c.options.cache === 'boolean') setCacheOn(c.options.cache);
+          if (typeof c.options.optimize === 'boolean') setOptOn(c.options.optimize);
+          if (typeof c.options.optimizeWords === 'number') setOptWords(c.options.optimizeWords);
+        }
+        if (c.guardrails) setGuardCfg(c.guardrails);
+        if (c.rateLimit) setRateCfg(c.rateLimit);
+        if (c.access) { setAccessGroup(c.access.group as AccessGroup); if (c.access.tiers) setAccessTiers(c.access.tiers as Record<AccessGroup, Tier[]>); }
+      }
+    }).finally(() => setCfgReady(true));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Admin auto-save (debounced) so edits flow to the user persona + survive restarts.
+  const adminConfig: AppAdminConfig = useMemo(() => ({
+    autoClassifier, models: selected, criteria, enabled: [...enabled],
+    options: { cache: cacheOn, optimize: optOn, optimizeWords: optWords },
+    guardrails: guardCfg, rateLimit: rateCfg,
+    access: { group: accessGroup, tiers: accessTiers },
+  }), [autoClassifier, selected, criteria, enabled, cacheOn, optOn, optWords, guardCfg, rateCfg, accessGroup, accessTiers]);
+  useEffect(() => {
+    if (!cfgReady || persona !== 'admin') return;
+    const id = setTimeout(() => { saveAppConfig(adminConfig).catch(() => {}); }, 600);
+    return () => clearTimeout(id);
+  }, [adminConfig, cfgReady, persona]);
 
   // Show just 3 impactful example questions - one at each end of the complexity
   // range and one in the middle - so the routing spread (small → large → frontier)
@@ -310,14 +355,10 @@ export function Pipeline() {
     return Array.from(new Set(picks));
   }, [questions]);
 
-  // One model per tier - the dropdowns pick which model represents each tier.
-  const setTierModel = (t: Tier, id: string) =>
-    setSelected((prev) => {
-      const others = prev.filter((x) => byId.get(x)?.tier !== t);
-      return id ? [...others, id] : others;
-    });
   const toggleFeature = (id: string) =>
     setEnabled((e) => { const n = new Set(e); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  // Auto-classifier handles governance automatically: close any open Configure panel.
+  useEffect(() => { if (autoClassifier) setInspect(null); }, [autoClassifier]);
 
   const onDragEnd = (e: DragEndEvent) => {
     if (e.over?.id !== 'gateway-question' || !String(e.active.id).startsWith('q:')) return;
@@ -327,85 +368,104 @@ export function Pipeline() {
 
   const route = async () => {
     const text = custom.trim();
-    if (!text || selected.length < 1 || busy) return;
+    if (!text || poolIds.length < 1 || busy) return;
     setBusy(true);
     setResult(null);
+    setReceipt(null);
+    setBlockedErr(null);
     try {
-      // Governance TICKS are the switches: a feature only affects the route when
-      // it's enabled. Budget applies only if the "Budgets" tick is on; the
-      // customer's routing policy (bands / criteria) applies only if the "Routing
-      // policy" tick is on - otherwise the gateway falls back to the platform's
-      // default complexity thresholds.
-      const budgetActive = persona === 'admin' && enabled.has('budget');
-      const policyActive = enabled.has('routing-policy');
-      const budget = budgetActive
-        ? { applied: true, consumedPct, capUsd: capUsd ?? undefined, downgradeAtPct: downgradeAt, openOnlyAtPct: openOnlyAt, downgradeAction, openOnlyAction }
-        : null;
-      const bandPayload = policyActive ? bands.map((b) => ({ label: b.label, min: b.min, max: b.max, tier: b.tier })) : [];
-      const policy = policyActive ? { mode: policyMode, rules: policyRules.map((r) => ({ keywords: r.keywords, tier: r.tier })) } : null;
-      // Complexity: a curated question's hand-tuned score wins; otherwise send null
-      // so the routing LLM classifies it (live) / the heuristic does (demo).
-      const cx = knownCx.get(text) ?? null;
-      const fbPayload = enabled.has('fallbacks') ? { enabled: true, order: fbChain } : null;
-      // App-layer governance the gateway enforces itself (Idea 2), sent only when ticked.
-      const guardPayload = enabled.has('guardrails')
-        ? { enabled: true, pii: guardCfg.pii, mode: guardCfg.mode, keywords: guardCfg.keywords.split(',').map((k) => k.trim()).filter(Boolean) }
-        : null;
-      const ratePayload = enabled.has('rate-limits') ? { enabled: true, perMin: rateCfg.perMin } : null;
-      const accessPayload = persona === 'admin' && enabled.has('access-control')
-        ? { enabled: true, group: accessGroup, allowedTiers: accessTiers[accessGroup] }
-        : null;
-      const body = { models: selected, features: [...enabled], prompt: text, budget, bands: bandPayload, policy, complexity: cx, routerModel, fallback: fbPayload, guardrails: guardPayload, rateLimit: ratePayload, access: accessPayload };
-      const r: Result = await fetch('/api/gateway/run', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      }).then((res) => res.json());
-      setResult(r);
-      if (r.costUsd != null && r.chosen) {
-        logRun({
-          source: 'gateway',
-          modelShort: r.chosen.short,
-          tier: r.chosen.tier,
-          costUsd: r.costUsd,
-          baselineUsd: r.baseline.costUsd,
-          inputTokens: r.inputTokens ?? 0,
-          outputTokens: r.outputTokens ?? 0,
-          latencyMs: r.latencyMs,
-          optimized: false,
-          promptSnippet: text,
-        });
+      // Governance TICKS are the switches: a feature only affects the route when enabled.
+      // In Auto-classifier mode every governance feature is on automatically (the chips
+      // render all-green + locked); in Manual mode the admin's ticks decide. This tab
+      // calls the REAL finops-auto proxy (POST /v1/chat/completions).
+      const featOn = (id: string) => autoClassifier || enabled.has(id);
+      const budgetActive = enabled.has('budget');
+      // Candidate pool: Auto-classifier ON = every deployed model (finops-auto picks the
+      // cheapest that clears the bar); OFF = the admin's 3 category picks. ABAC is a Manual
+      // simulation control, so it only narrows the pool when auto-classifier is off.
+      const basePool = autoClassifier ? poolIds : selected;
+      const allowedTiers = !autoClassifier && enabled.has('access-control') ? accessTiers[accessGroup] : null;
+      const candidateIds = allowedTiers
+        ? basePool.filter((id) => allowedTiers.includes(byId.get(id)?.tier as Tier))
+        : basePool;
+      if (candidateIds.length === 0) {
+        setBlockedErr({ message: allowedTiers
+          ? `Access control: ${accessGroup} may not use any of the configured model categories, so the request is blocked before routing.`
+          : 'No candidate models are configured, so there is nothing to route to.' });
+        setBusy(false);
+        return;
       }
+      // Complexity: a curated question's hand-tuned score wins; else the classifier scores
+      // it live. In Manual mode (auto-classifier OFF) the keyword criteria decide the
+      // category (a match overrides the score); anything unmatched falls back to the score.
+      const complexity = knownCx.get(text) ?? undefined;
+
+      const finopsOpts: Record<string, unknown> = {
+        models: candidateIds,
+        routerModel,
+        semanticCache: { enabled: cacheOn, threshold: 0.92 },
+        optimize: { enabled: optOn, targetWords: optWords },
+      };
+      if (complexity != null) finopsOpts.complexity = complexity;
+      if (!autoClassifier) {
+        // Free-text criteria: one keyword rule per category (blank rules are dropped).
+        const rules = (['small-oss', 'large-oss', 'frontier'] as Tier[])
+          .map((t) => ({ keywords: criteria[t], tier: t }))
+          .filter((r) => r.keywords.trim().length > 0);
+        if (rules.length) finopsOpts.policy = { mode: 'criteria', rules };
+      }
+      if (budgetActive) finopsOpts.budget = { enabled: true, capUsd: capUsd ?? undefined, downgradeAtPct: downgradeAt, openOnlyAtPct: openOnlyAt, downgradeAction, openOnlyAction, consumedPct };
+      // Fallback: retry down the chosen routing models (Small -> Medium -> Complex).
+      if (featOn('fallbacks')) finopsOpts.fallback = { enabled: true, order: fbChain.filter((id) => candidateIds.includes(id)) };
+      if (featOn('guardrails')) finopsOpts.guardrails = { enabled: true, pii: guardCfg.pii, mode: guardCfg.mode, keywords: guardCfg.keywords.split(',').map((k) => k.trim()).filter(Boolean) };
+      if (featOn('rate-limits')) finopsOpts.rateLimit = { enabled: true, perMin: rateCfg.perMin };
+
+      const { answer, finops: f } = await gatewayChat(text, 'finops-auto', finopsOpts);
+      setReceipt(f);
+      refreshCacheStats();
+
+      const result: Result = {
+        chosen: f.servedBy as Chosen,
+        routedTo: f.routedTo as Chosen,
+        fallback: f.fallback ? { enabled: f.fallback.enabled, armed: f.fallback.armed, fired: f.fallback.fired, from: f.fallback.from } : null,
+        costUsd: f.costUsd,
+        latencyMs: f.latencyMs,
+        judgeScore: null, // a single routed call is not judged - quality lives in the A/B panels
+        complexity: f.complexity,
+        bandLabel: f.bandLabel,
+        matchedRule: f.matchedRule,
+        inputTokens: f.inputTokens,
+        outputTokens: f.outputTokens,
+        requiredTier: f.requiredTier as Tier,
+        reason: routeReason(f),
+        baseline: { short: f.baselineModel, costUsd: f.baselineUsd },
+        savingsUsd: f.savingsUsd,
+        savingsPct: f.savingsPct,
+        appliedFeatures: [...enabled],
+        budget: f.budget ? { applied: true, consumedPct: f.budget.consumedPct, capUsd: f.budget.capUsd, frontierBarPct: null, downgraded: f.budget.ceiling !== 'frontier', note: f.budget.note } : null,
+        answer,
+        trace: routeTrace(f),
+      };
+      setResult(result);
+      logRun({
+        source: 'gateway',
+        modelShort: f.servedBy.short,
+        tier: f.servedBy.tier as Tier,
+        costUsd: f.costUsd,
+        baselineUsd: f.baselineUsd,
+        inputTokens: f.inputTokens,
+        outputTokens: f.outputTokens,
+        latencyMs: f.latencyMs,
+        optimized: (f.optimization?.savedOutputTokens ?? 0) > 0 || (f.compression?.savedTokens ?? 0) > 0,
+        promptSnippet: text,
+      });
       // Feed the Architecture tab: this routed model becomes the "live" request.
-      if (r.chosen) setLastRouting({ model: r.chosen.short, tier: r.chosen.tier, costUsd: r.costUsd, complexity: r.complexity, source: 'gateway' });
+      setLastRouting({ model: f.servedBy.short, tier: f.servedBy.tier as Tier, costUsd: f.costUsd, complexity: f.complexity, source: 'gateway' });
+    } catch (e) {
+      const err = e as Error & { finops?: FinopsReceipt };
+      setBlockedErr({ message: err.message || 'Gateway request failed', finops: err.finops });
     } finally {
       setBusy(false);
-    }
-  };
-
-  // The "always call the flagship" baseline for the OFF side: the priciest frontier.
-  const frontierBaselineId = useMemo(() => {
-    const fr = models.filter((m) => m.tier === 'frontier');
-    return fr.length ? fr.reduce((a, b) => (a.price_out_per_1m >= b.price_out_per_1m ? a : b)).id : undefined;
-  }, [models]);
-
-  // Smart Routing ON vs OFF on the same prompt: the router's pick vs a fixed
-  // frontier flagship, both answered + judged so cost AND quality deltas are real.
-  const runAb = async () => {
-    const text = custom.trim();
-    if (!text || selected.length < 1 || abBusy) return;
-    setAbBusy(true); setAb(null); setAbErr(null);
-    try {
-      const judge = byId.has('databricks-claude-opus-4-8') ? 'databricks-claude-opus-4-8' : undefined;
-      const r = await smartRoutingAb(text, {
-        models: selected,
-        frontierModel: frontierBaselineId,
-        routerModel,
-        judgeModel: judge,
-      });
-      setAb(r);
-    } catch (e) {
-      setAbErr(e instanceof Error ? e.message : 'Smart Routing comparison failed');
-    } finally {
-      setAbBusy(false);
     }
   };
 
@@ -428,10 +488,9 @@ export function Pipeline() {
               <h2 className="font-display text-[clamp(20px,2.4vw,28px)] font-bold tracking-[-.02em] text-white">Route to Unity Gateway</h2>
               <p className="mt-2 max-w-[80ch] text-[13px] text-white/65">
                 {persona === 'admin'
-                  ? "Type or drop in a question, pick the models you'd let it choose from, and tick the governance features - each has a Configure panel (rate limits, guardrails, budgets routing, complexity routing, inference tables). The gateway routes to the cheapest model that clears the bar; turn on a budget and that bar tightens as spend rises."
-                  : 'Ask a question and pick which models the gateway may choose from. It routes to the cheapest model that still clears the quality bar, automatically.'}
+                  ? "Type or drop in a question. Leave the auto-classifier on and finops-auto routes across every deployed model; turn it off to pick the model for each category and write your own keyword criteria. Tick the governance features - rate limits, guardrails, access control, inference tables, fallbacks - each with a Configure panel, and add semantic cache or output shaping as options. The gateway routes to the cheapest model that clears the bar."
+                  : 'Ask a question and hit Get response. It routes through the gateway with the settings your admin configured, returning the cheapest answer that still clears the quality bar.'}
               </p>
-              <SmartRoutingNote />
             </div>
 
             <div>
@@ -464,24 +523,43 @@ export function Pipeline() {
               <span className="font-display text-[16px] font-bold uppercase tracking-[.14em] text-[#8FC1F0]">Unity Gateway</span>
               <span className="num ml-auto text-[12px] font-semibold text-white/55">governed · one endpoint</span>
             </div>
-              {/* Question slot - the composer. Admins get a model picker at its foot
-                  (the Routing LLM) just like the model selector under a console prompt. */}
+              {/* Question slot - the composer (just the prompt; the classifier model is a
+                  sensible default, and complexity Auto/Manual lives in the governance features). */}
               <QuestionSlot
                 custom={custom}
-                onCustom={(v) => { setCustom(v); setResult(null); }}
+                onCustom={(v) => { setCustom(v); setResult(null); setReceipt(null); setBlockedErr(null); }}
                 onClear={() => setPrompt('')}
-                admin={persona === 'admin'}
-                routerModel={routerModel}
-                setRouterModel={setRouterModel}
-                models={models}
               />
 
-              {/* Models - one column per tier (side by side), each a labelled dropdown */}
-              <div>
+              {/* Admin: the auto-classifier master switch + (manual) model picks, criteria,
+                  and per-endpoint config. The user persona sees none of this - just the
+                  question + Get response, applying whatever the admin persisted. */}
+              {persona === 'admin' && (
+              <>
+              {/* Auto-classifier master toggle */}
+              <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className={EB}>Auto-classifier <span className="font-normal normal-case text-white/40">· finops-auto</span></span>
+                    <p className="mt-1 truncate whitespace-nowrap text-[11.5px] leading-[1.5] text-white/50">
+                      {autoClassifier
+                        ? 'ON: the router picks the cheapest of all deployed models that clears the bar.'
+                        : 'OFF: you pick the model for each category and define the keyword criteria that route to it.'}
+                    </p>
+                  </div>
+                  <button type="button" role="switch" aria-checked={autoClassifier} aria-label="Auto-classifier"
+                    onClick={() => setAutoClassifier((v) => !v)}
+                    className={`relative h-7 w-12 shrink-0 rounded-full transition ${autoClassifier ? 'bg-moss' : 'bg-white/20'}`}>
+                    <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all duration-200 ${autoClassifier ? 'left-6' : 'left-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Models to route across - one per category. Grayed out when auto-classifier is on. */}
+              <div className={autoClassifier ? 'pointer-events-none opacity-45' : ''}>
                 <div className="mb-2.5 flex items-center gap-2">
                   <span className={EB}>Models to route across</span>
-                  <span className="num text-[11.5px] text-white/50">{selected.length} selected · one per tier</span>
-                  {persona === 'user' && <span className="rounded-pill bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[.06em] text-white/45">🔒 set by admin</span>}
+                  <span className="num text-[11.5px] text-white/50">{autoClassifier ? 'auto — finops-auto picks the cheapest per category' : 'one per category'}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3 max-[640px]:grid-cols-1">
                   {TIER_ORDER.map((t) => {
@@ -494,17 +572,10 @@ export function Pipeline() {
                           <span className={`h-2.5 w-[3px] rounded-[2px] ${TIER_DOT[t]}`} />{TIER_LABEL[t]}
                         </span>
                         <div className="relative">
-                          <select
-                            value={current}
-                            onChange={(e) => setTierModel(t, e.target.value)}
-                            disabled={persona === 'user'}
-                            aria-label={`${TIER_LABEL[t]} model`}
-                            className={`num w-full appearance-none rounded-lg bg-black/30 px-3.5 py-2.5 pr-9 text-[13px] font-semibold text-white ring-1 ring-white/10 outline-none transition ${persona === 'user' ? 'cursor-not-allowed opacity-45' : 'cursor-pointer hover:bg-black/40'}`}
-                          >
+                          <select value={current} onChange={(e) => setTierModel(t, e.target.value)} disabled={autoClassifier} aria-label={`${TIER_LABEL[t]} model`}
+                            className={`num w-full appearance-none rounded-lg bg-black/30 px-3.5 py-2.5 pr-9 text-[13px] font-semibold text-white ring-1 ring-white/10 outline-none transition ${autoClassifier ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-black/40'}`}>
                             <option value="" className="text-ink">none</option>
-                            {tierModelsList.map((m) => (
-                              <option key={m.id} value={m.id} className="text-ink">{m.short}</option>
-                            ))}
+                            {tierModelsList.map((m) => <option key={m.id} value={m.id} className="text-ink">{m.short}</option>)}
                           </select>
                           <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-white/45">▾</span>
                         </div>
@@ -514,8 +585,27 @@ export function Pipeline() {
                 </div>
               </div>
 
-              {/* V2: live AI Gateway config read off each selected endpoint via the SDK */}
-              {Object.keys(gwConfig).length > 0 && (
+              {/* Manual only: free-text keyword criteria per category (V1 "define criteria yourself") */}
+              {!autoClassifier && (
+                <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10">
+                  <div className={`${EB} mb-2`}>Routing criteria · keywords → category</div>
+                  <div className="flex flex-col gap-2">
+                    {TIER_ORDER.map((t) => (
+                      <div key={t} className="flex items-center gap-2">
+                        <span className="flex w-[86px] shrink-0 items-center gap-1.5 text-[12px] font-semibold" style={{ color: TIER_META[t].hex }}>
+                          <span className="h-2 w-2 rounded-full" style={{ background: TIER_META[t].hex }} />{TIER_LABEL[t]}
+                        </span>
+                        <input value={criteria[t]} onChange={(e) => setCriteria((c) => ({ ...c, [t]: e.target.value }))} aria-label={`${TIER_LABEL[t]} keywords`} placeholder="keywords, comma-separated"
+                          className="min-w-0 flex-1 rounded bg-white/10 px-2.5 py-1.5 text-[12px] text-white ring-1 ring-white/10 outline-none placeholder:text-white/30" />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] leading-[1.5] text-white/45">A prompt containing one of a category's keywords routes to that category; anything unmatched falls back to the classifier's score. In production the small router LLM interprets these directly.</p>
+                </div>
+              )}
+
+              {/* Manual only: live per-endpoint AI Gateway config for the 3 picks, via the SDK */}
+              {!autoClassifier && Object.keys(gwConfig).length > 0 && (
                 <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10">
                   <div className={`${EB} mb-2`}>Live AI Gateway config <span className="font-normal normal-case text-white/40">· read from each endpoint via the SDK</span></div>
                   <div className="flex flex-col gap-1.5">
@@ -568,41 +658,64 @@ export function Pipeline() {
                 </div>
               )}
 
-              {/* Governance features - Admin only */}
-              {persona === 'admin' && (
+              {/* Governance features */}
               <div>
-                <div className={`${EB} mb-2`}>Governance features · tick to apply, <span className="text-[#8FC1F0]">Configure</span> to inspect &amp; edit</div>
+                <div className={`${EB} mb-2`}>Governance features · {autoClassifier ? <span className="text-[#93D3AB]">all applied automatically by finops-auto</span> : <>tick to apply, <span className="text-[#8FC1F0]">Configure</span> to inspect &amp; edit</>}</div>
                 <div className="flex flex-wrap gap-2">
                   {features.map((f) => (
-                    <FeatureChip key={f.id} f={f} on={enabled.has(f.id)} onToggle={() => toggleFeature(f.id)} onInspect={() => setInspect((cur) => (cur === f.id ? null : f.id))} inspecting={inspect === f.id} />
+                    <FeatureChip key={f.id} f={f} on={enabled.has(f.id)} locked={autoClassifier} onToggle={() => toggleFeature(f.id)} onInspect={() => setInspect((cur) => (cur === f.id ? null : f.id))} inspecting={inspect === f.id} />
                   ))}
                 </div>
               </div>
+
+              {/* Options: per-request levers applied on Route */}
+              <div>
+                <div className={`${EB} mb-2`}>Options · applied on Route</div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-white/75">
+                    <input type="checkbox" checked={cacheOn} onChange={(e) => setCacheOn(e.target.checked)} className="h-3.5 w-3.5 accent-lava" />
+                    Semantic cache
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-white/75">
+                    <input type="checkbox" checked={optOn} onChange={(e) => setOptOn(e.target.checked)} className="h-3.5 w-3.5 accent-lava" />
+                    Optimize output
+                  </label>
+                  {optOn && (
+                    <label className="flex items-center gap-2 text-[12.5px] text-white/75">≤ words
+                      <input type="number" min={20} max={800} value={optWords} onChange={(e) => setOptWords(Math.max(20, Number(e.target.value) || 150))}
+                        className="num w-[70px] rounded bg-white/[0.06] px-2 py-1 text-right text-[12px] text-white outline-none ring-1 ring-white/10" />
+                    </label>
+                  )}
+                  {cacheStats && (
+                    <span className="ml-auto inline-flex items-center gap-2 rounded-pill bg-moss/12 px-3 py-1 ring-1 ring-moss/25" title={cfg?.demoMode ? 'Demo mode: the semantic cache is disabled, so this stays at $0.' : 'Cumulative $ saved by serving near-duplicate prompts from the durable semantic cache.'}>
+                      <span className="font-body text-[10px] font-semibold uppercase tracking-[.1em] text-[#93D3AB]">saved by cache</span>
+                      <span className="num text-[13px] font-semibold text-[#93D3AB]">{formatMoney(cacheStats.savedUsd)}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+              </>
               )}
 
+              {/* Action row (both personas). The user persona just asks and gets a response
+                  routed with everything the admin persisted. */}
               <div className="flex flex-wrap gap-2.5">
                 <button
                   onClick={route}
-                  disabled={busy || !activeQuestionText.trim() || selected.length < 1}
+                  disabled={busy || !activeQuestionText.trim()}
                   className="rounded-pill bg-lava px-[22px] py-2.5 text-[13px] font-semibold text-white shadow-lift transition hover:bg-[#e22e1a] disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {busy ? 'Routing…' : 'Route through the gateway'}
+                  {busy ? (persona === 'user' ? 'Working…' : 'Routing…') : (persona === 'user' ? 'Get response' : 'Route through the gateway')}
                 </button>
-                <button
-                  onClick={runAb}
-                  disabled={abBusy || !activeQuestionText.trim() || selected.length < 1}
-                  title="Run the same prompt with Smart Routing ON (router picks) vs OFF (always the frontier flagship) and measure the cost + quality difference"
-                  className="rounded-pill bg-white/10 px-[22px] py-2.5 text-[13px] font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {abBusy ? 'Comparing on vs off…' : 'Smart Routing: on vs off'}
-                </button>
-                <button
-                  onClick={() => { setPrompt(''); setInspect(null); }}
-                  disabled={busy}
-                  className="rounded-pill bg-white/10 px-[22px] py-2.5 text-[13px] font-medium text-white/80 ring-1 ring-white/10 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  Reset
-                </button>
+                {persona === 'admin' && (
+                  <button
+                    onClick={() => { setPrompt(''); setInspect(null); }}
+                    disabled={busy}
+                    className="rounded-pill bg-white/10 px-[22px] py-2.5 text-[13px] font-medium text-white/80 ring-1 ring-white/10 transition hover:bg-white/15 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Reset
+                  </button>
+                )}
               </div>
 
             {/* Feature Configure panel - inside the gateway box (Admin only). Budgets
@@ -623,8 +736,7 @@ export function Pipeline() {
                 <ConfigCard title={inspectFeature.label}>
                   <FallbackForm
                     fbOn={enabled.has('fallbacks')} setFbOn={() => toggleFeature('fallbacks')}
-                    chain={fbChain} byId={byId} onReorder={setFbOrder}
-                    saved={fbSaved} onSave={saveFallback}
+                    chain={fbChain} byId={byId}
                   />
                 </ConfigCard>
               ) : inspectFeature.feature === 'guardrails' ? (
@@ -646,8 +758,9 @@ export function Pipeline() {
           </div>
         </section>
 
-        {/* Box 3 - blocked by budget policy (no model called) */}
-        {result && result.blocked && (
+        {/* Blocked before routing - guardrail, budget cap, rate limit, or access control.
+            The real proxy THROWS on a block, so this renders from the caught error. */}
+        {blockedErr && (
           <section className="relative animate-[fadeUp_.5s_ease_both] overflow-hidden rounded-[26px] bg-ink p-[26px] text-white shadow-lift-3d-hi max-[720px]:rounded-2xl max-[720px]:p-4" style={{ animationDelay: '.12s' }}>
             <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-lava opacity-[.14] blur-3xl" />
             <div className="relative flex flex-col gap-4">
@@ -655,16 +768,9 @@ export function Pipeline() {
               <div className="flex items-start gap-3 rounded-2xl bg-lava/10 p-5 ring-1 ring-lava/40">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lava/25 text-[18px]">🛑</span>
                 <div>
-                  <div className="font-display text-[15px] font-bold text-lava">Blocked by budget policy</div>
-                  <p className="mt-1.5 text-[12.5px] leading-[1.6] text-white/75">{result.reason}</p>
-                  <div className="num mt-3 flex flex-col gap-1.5 text-[11.5px] leading-[1.7]">
-                    {result.trace.map((e, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className={e.kind === 'feature' ? 'text-moss' : e.kind === 'route' ? 'text-lava' : 'text-white/45'}>{e.kind === 'feature' ? '✓' : '→'}</span>
-                        <span className="text-white/70">{e.text}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="font-display text-[15px] font-bold text-lava">Blocked before routing</div>
+                  <p className="mt-1.5 text-[12.5px] leading-[1.6] text-white/75">{blockedErr.message}</p>
+                  <p className="mt-2 text-[11.5px] leading-[1.6] text-white/50">No model was called. The gateway app enforced this itself (guardrail, budget cap, rate limit, or access control) before any inference ran.</p>
                 </div>
               </div>
             </div>
@@ -677,6 +783,7 @@ export function Pipeline() {
             <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-lava opacity-[.09] blur-3xl" />
             <div className="relative flex flex-col gap-[18px]">
               <div className={SECTION}>Result</div>
+              {receipt && <ReceiptChips f={receipt} demoMode={!!cfg?.demoMode} />}
               {/* Live routing steps - query → complexity → policy → model → response */}
               <div className="rounded-2xl bg-white/[0.04] p-4 pt-5 ring-1 ring-white/10">
                 <div className={`${EB} mb-4`}>Live routing flow</div>
@@ -692,10 +799,6 @@ export function Pipeline() {
                   ]}
                 />
               </div>
-
-              {/* The auditable Smart Routing decision - task-type family, language
-                  family, complexity label, and the plain-English rationale. */}
-              {result.decision && <RoutingDecisionPanel d={result.decision} />}
 
               {/* App-level fallback: the chain the gateway is armed to retry through,
                   and a banner when a fallback actually served this request. */}
@@ -771,7 +874,7 @@ export function Pipeline() {
                 )}
                 <div className="num mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-white/50">
                   <span>{result.latencyMs} ms</span>
-                  <span>judge {formatScore(result.judgeScore)}/10</span>
+                  {result.judgeScore != null && <span>judge {formatScore(result.judgeScore)}/10</span>}
                   <span>complexity {result.complexity}{result.bandLabel ? ` · ${result.bandLabel} band` : ''}</span>
                   {result.budget?.applied && (
                     <span className={`rounded-pill px-2 py-1 text-[10px] uppercase tracking-[.08em] ${result.budget.downgraded ? 'bg-lava/20 text-lava' : 'bg-white/10 text-white/70'}`}>
@@ -853,36 +956,12 @@ export function Pipeline() {
                 <div className="mb-2.5 flex flex-wrap items-center gap-2">
                   <h6 className="font-display text-[12px] font-semibold text-white">Response</h6>
                   <span className="num text-[11px] text-white/45">from {result.chosen.short}</span>
-                  <span className="num ml-auto rounded-pill bg-[#2272B4]/25 px-2.5 py-1 text-[11px] font-bold text-[#8FC1F0] ring-1 ring-[#2272B4]/40">Quality {formatScore(result.judgeScore)}/10</span>
+                  {result.judgeScore != null && <span className="num ml-auto rounded-pill bg-[#2272B4]/25 px-2.5 py-1 text-[11px] font-bold text-[#8FC1F0] ring-1 ring-[#2272B4]/40">Quality {formatScore(result.judgeScore)}/10</span>}
                 </div>
                 <div className="max-h-[300px] overflow-y-auto rounded-lg bg-black/25 px-3.5 py-3 text-[13px] leading-[1.65] text-white/85 ring-1 ring-white/10" style={{ whiteSpace: 'pre-wrap' }}>{result.answer}</div>
                 {result.judgeReason && <p className="mt-2 text-[11.5px] leading-[1.5] text-white/55"><span className="font-semibold text-white/70">Judge:</span> {result.judgeReason}</p>}
               </div>
             )}
-            </div>
-          </section>
-        )}
-
-        {/* Smart Routing ON vs OFF - the headline demo: same prompt, router pick vs
-            a fixed frontier flagship, with measured cost + quality deltas. */}
-        {(abBusy || ab || abErr) && (
-          <section className="relative animate-[fadeUp_.5s_ease_both] overflow-hidden rounded-[26px] bg-ink p-[26px] text-white shadow-lift-3d-hi max-[720px]:rounded-2xl max-[720px]:p-4">
-            <div className="pointer-events-none absolute -left-24 -top-24 h-80 w-80 rounded-full bg-lava opacity-[.09] blur-3xl" />
-            <div className="relative flex flex-col gap-[18px]">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={SECTION}>Smart Routing · on vs off</span>
-                {ab && <span className="num text-[11.5px] text-white/45">both answers judged by {ab.judge}</span>}
-              </div>
-              {abBusy && (
-                <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-6 ring-1 ring-white/10">
-                  <span className="h-3 w-3 animate-pulse rounded-full bg-lava" />
-                  <span className="text-[13px] text-white/70">Running the same prompt with Smart Routing on and off, then judging both answers… (two live model calls, ~20-40s)</span>
-                </div>
-              )}
-              {abErr && !abBusy && (
-                <div className="rounded-2xl bg-lava/10 p-5 text-[12.5px] text-white/80 ring-1 ring-lava/40">{abErr}</div>
-              )}
-              {ab && !abBusy && <SmartRoutingAbCard ab={ab} />}
             </div>
           </section>
         )}
@@ -900,90 +979,6 @@ export function Pipeline() {
 
 // ---- pieces -------------------------------------------------------------
 
-// Honest positioning: what Smart Routing is, the real savings claim, and that the
-// shipped Beta is coding-agents while this tab prototypes the general-prompt case.
-function SmartRoutingNote() {
-  return (
-    <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10">
-      <span className="mt-0.5 text-[13px]">🧭</span>
-      <p className="text-[11.5px] leading-[1.6] text-white/55">
-        <b className="text-white/80">Smart Routing.</b> Unity AI Gateway Smart Routing classifies each request by task type, language and complexity, then routes to the cheapest capable model - matching frontier quality at <b className="text-white/80">up to 30% lower cost on internal benchmarks and over 50% on external ones</b>. The shipped Beta covers coding agents (Claude Code / Codex); this tab prototypes the same decision for <b className="text-white/80">general prompts</b>, over your own models.
-      </p>
-    </div>
-  );
-}
-
-// The auditable routing decision: task-type family, language family, complexity
-// label + score, required tier, and the plain-English rationale.
-function RoutingDecisionPanel({ d }: { d: RoutingDecision }) {
-  const cxHex = d.complexityLabel.id === 'trivial' ? '#93D3AB' : d.complexityLabel.id === 'moderate' ? '#E3B876' : '#B487D0';
-  const Cell = ({ label, value, hex }: { label: string; value: string; hex?: string }) => (
-    <div className="rounded-lg bg-black/25 p-3 ring-1 ring-white/10">
-      <div className={EB}>{label}</div>
-      <div className="mt-1.5 flex items-center gap-1.5 text-[13.5px] font-semibold text-white">
-        {hex && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: hex }} />}
-        <span className="truncate" title={value}>{value}</span>
-      </div>
-    </div>
-  );
-  return (
-    <div className="rounded-2xl bg-white/[0.04] p-5 ring-1 ring-white/10">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h6 className="font-display text-[12px] font-semibold text-white">Routing decision</h6>
-        <span className="num text-[11px] text-white/45">classified by {d.classifier}</span>
-        <span className="num ml-auto rounded-pill bg-[#2272B4]/25 px-2.5 py-1 text-[11px] font-bold text-[#8FC1F0] ring-1 ring-[#2272B4]/40">visible &amp; auditable</span>
-      </div>
-      <div className="grid grid-cols-4 gap-3 max-[720px]:grid-cols-2">
-        <Cell label="Task type" value={d.taskType.label} />
-        <Cell label="Language" value={d.language.label} />
-        <Cell label="Complexity" value={`${d.complexityLabel.label} · ${d.complexityScore}`} hex={cxHex} />
-        <Cell label="Required tier" value={d.requiredTierLabel} />
-      </div>
-      <p className="mt-3 text-[12.5px] leading-[1.6] text-white/70"><span className="font-semibold text-white/85">Why:</span> {d.rationale}</p>
-    </div>
-  );
-}
-
-// Smart Routing ON vs OFF: measured cost + quality on the same prompt.
-function SmartRoutingAbCard({ ab }: { ab: SmartRoutingAb }) {
-  const { on, off, decision } = ab;
-  const qDelta = ab.qualityDelta;
-  const qNote = qDelta == null ? '' : qDelta >= -0.3 ? 'held' : `${qDelta > 0 ? '+' : ''}${qDelta} pts`;
-  const Side = ({ label, side, dim }: { label: string; side: SmartRoutingSide; dim?: boolean }) => (
-    <div className={`flex flex-col gap-3 rounded-2xl p-5 ring-1 ${dim ? 'bg-white/[0.03] ring-white/10' : 'bg-lava/[0.06] ring-2 ring-lava'}`}>
-      <div className="flex items-center justify-between">
-        <span className={`rounded-pill px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.08em] ${dim ? 'bg-white/10 text-white/60' : 'bg-lava/25 text-lava'}`}>{label}</span>
-        <span className="num rounded-pill bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[.06em] text-white/60">{TIER_LABEL[side.tier as Tier] ?? side.tier}</span>
-      </div>
-      <div className="num text-[15px] font-semibold text-white">{side.model}</div>
-      <div className="flex items-end gap-5">
-        <div><div className={EB}>Cost / query</div><div className={`num mt-1 text-[24px] font-medium leading-none tracking-[-.04em] ${dim ? 'text-white/85' : 'text-lava'}`}>{usd(side.costUsd)}</div></div>
-        <div><div className={EB}>Quality</div><div className="num mt-1 text-[15px] text-white/85">{side.quality != null ? `${formatScore(side.quality)}/10` : '—'}</div></div>
-        <div><div className={EB}>Latency</div><div className="num mt-1 text-[15px] text-white/85">{side.latencyMs}ms</div></div>
-      </div>
-      <details>
-        <summary className="cursor-pointer text-[11.5px] text-white/50 hover:text-white/80">Show response</summary>
-        <div className="mt-2 max-h-[220px] overflow-y-auto rounded-lg bg-black/25 px-3 py-2.5 text-[12.5px] leading-[1.6] text-white/80 ring-1 ring-white/10" style={{ whiteSpace: 'pre-wrap' }}>{side.answer}</div>
-      </details>
-    </div>
-  );
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-2 rounded-2xl bg-black/30 p-5 ring-1 ring-white/10">
-        <div><div className={EB}>Saved with Smart Routing</div><div className="num mt-1 text-[30px] font-medium leading-none tracking-[-.045em] text-moss">{ab.savedPct}%</div></div>
-        <div><div className={EB}>Per query</div><div className="num mt-1 text-[16px] text-white/85">{usd(ab.savedUsd)}</div></div>
-        {qNote && <div><div className={EB}>Quality vs frontier</div><div className={`num mt-1 text-[16px] ${qNote === 'held' ? 'text-moss' : 'text-white/85'}`}>{qNote}</div></div>}
-        <p className="w-full text-[11.5px] leading-[1.5] text-white/50">Same prompt, both answered live and scored by the same judge. OFF always calls the frontier flagship; ON lets the router pick the cheapest model that clears the bar.</p>
-      </div>
-      <RoutingDecisionPanel d={decision} />
-      <div className="grid grid-cols-2 gap-4 max-[760px]:grid-cols-1">
-        <Side label="Off · frontier flagship" side={off} dim />
-        <Side label="On · router pick" side={on} />
-      </div>
-    </div>
-  );
-}
-
 function QuestionPill({ q, onClick }: { q: Question; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: `q:${q.id}` });
   const c = complexityOf(q.cx);
@@ -999,9 +994,8 @@ function QuestionPill({ q, onClick }: { q: Question; onClick: () => void }) {
 
 // The composer: an editable textarea (drop a question in, type, paste, edit
 // freely). For Admins it carries a model picker at its foot - the Routing LLM
-// that classifies each question and routes it - styled like the model selector
-// under a prompt in the claude.ai / model console composer.
-function QuestionSlot({ custom, onCustom, onClear, admin, routerModel, setRouterModel, models }: { custom: string; onCustom: (v: string) => void; onClear: () => void; admin: boolean; routerModel: string; setRouterModel: (id: string) => void; models: ModelDef[] }) {
+// The composer: an editable textarea (drop a question in, type, paste, edit freely).
+function QuestionSlot({ custom, onCustom, onClear }: { custom: string; onCustom: (v: string) => void; onClear: () => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'gateway-question' });
   const has = custom.trim().length > 0;
   return (
@@ -1019,27 +1013,6 @@ function QuestionSlot({ custom, onCustom, onClear, admin, routerModel, setRouter
         placeholder="Drop a question here, type your own, or paste text…"
         className="block w-full resize-none bg-transparent text-[14.5px] leading-[1.5] text-white outline-none placeholder:text-white/35"
       />
-      {/* Composer foot-bar (Admin only): the Routing LLM picker, like the model
-          selector under a prompt in the console. It classifies each question's
-          complexity and routes it to the cheapest tier that clears the bar. */}
-      {admin && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/10 pt-2.5">
-          <span className="text-[11px] font-semibold text-white/45">Routing LLM</span>
-          <div className="relative">
-            <select
-              value={routerModel}
-              onChange={(e) => setRouterModel(e.target.value)}
-              onPointerDown={(e) => e.stopPropagation()}
-              aria-label="Routing LLM"
-              className="num cursor-pointer appearance-none rounded-pill bg-white/10 py-1 pl-3 pr-7 text-[12px] font-semibold text-white ring-1 ring-white/15 outline-none transition hover:bg-white/[0.16]"
-            >
-              {models.map((m) => <option key={m.id} value={m.id} className="text-ink">{m.short}</option>)}
-            </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/45">▾</span>
-          </div>
-          <span className="text-[11px] leading-[1.4] text-white/40">classifies complexity &amp; routes</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -1048,7 +1021,7 @@ function QuestionSlot({ custom, onCustom, onClear, admin, routerModel, setRouter
 function PersonaToggle({ persona, onChange }: { persona: Persona; onChange: (p: Persona) => void }) {
   return (
     <div role="radiogroup" aria-label="Persona" className="inline-flex items-center gap-1 rounded-pill bg-white/10 p-1 ring-1 ring-white/10">
-      {(['user', 'admin'] as Persona[]).map((p) => (
+      {(['admin', 'user'] as Persona[]).map((p) => (
         <button
           key={p}
           role="radio"
@@ -1255,7 +1228,7 @@ function BudgetForm({ budgetOn, setBudgetOn, capUsd, setCapUsd, consumedPct, set
               exact confusion point - make it explicit. */}
           {!effect && (
             <div className="rounded-lg bg-white/[0.05] px-3 py-2 text-[11.5px] leading-[1.5] text-white/60 ring-1 ring-amber/25">
-              <span className="font-semibold text-amber">No cap active</span> at {consumedPct}% consumed - routing follows complexity only (a complex prompt still goes to frontier). Raise <b className="text-white/80">Consumed</b> to ≥{minTrigger}% or lower a threshold below {consumedPct}% to engage a cap.
+              <span className="font-semibold text-amber">No cap active</span> at {consumedPct}% consumed - routing follows complexity only (a complex prompt still goes to the Complex category). Raise <b className="text-white/80">Consumed</b> to ≥{minTrigger}% or lower a threshold below {consumedPct}% to engage a cap.
             </div>
           )}
           {capUsd != null && (
@@ -1299,23 +1272,13 @@ function BudgetForm({ budgetOn, setBudgetOn, capUsd, setCapUsd, consumedPct, set
   );
 }
 
-// App-level fallback designer: order the selected models (primary first, then
-// fallbacks). The gateway app retries down this chain on error/timeout - real
-// failover with no custom endpoint. The order is saved to Lakebase.
-function FallbackForm({ fbOn, setFbOn, chain, byId, onReorder, saved, onSave }: {
+// App-level fallback: the gateway retries down an auto-derived chain (the cheapest of
+// each category, Small -> Medium -> Complex) on error/timeout. No hand-ordering - the
+// app IS the router, so it enforces this itself with no custom endpoint.
+function FallbackForm({ fbOn, setFbOn, chain, byId }: {
   fbOn: boolean; setFbOn: (b: boolean) => void;
   chain: string[]; byId: Map<string, ModelDef>;
-  onReorder: (order: string[]) => void;
-  saved: 'idle' | 'saving' | 'saved' | 'error'; onSave: () => void;
 }) {
-  const move = (i: number, d: -1 | 1) => {
-    const j = i + d;
-    if (j < 0 || j >= chain.length) return;
-    const next = [...chain];
-    [next[i], next[j]] = [next[j], next[i]];
-    onReorder(next);
-  };
-  const savedLabel = saved === 'saving' ? 'Saving…' : saved === 'saved' ? '✓ Saved to Lakebase' : saved === 'error' ? 'Save failed' : 'Save policy';
   return (
     <div className="flex flex-col gap-3">
       <label className="flex cursor-pointer items-center gap-2">
@@ -1325,42 +1288,31 @@ function FallbackForm({ fbOn, setFbOn, chain, byId, onReorder, saved, onSave }: 
       </label>
       {fbOn ? (
         <>
-          <span className={EB}>Failover order · primary first</span>
+          <span className={EB}>Auto failover chain · cheapest of each category</span>
           <div className="flex flex-col gap-2">
             {chain.length < 2 && (
               <p className="rounded-lg bg-white/[0.05] px-3 py-2 text-[11.5px] leading-[1.5] text-white/60 ring-1 ring-amber/25">
-                Select at least two models (above) to form a fallback chain - the gateway needs somewhere to fall back to.
+                Need at least two categories of deployed models to form a fallback chain.
               </p>
             )}
             {chain.map((id, i) => {
               const m = byId.get(id);
               return (
                 <div key={id} className="flex items-center gap-2 rounded-lg bg-black/20 p-2 ring-1 ring-white/10">
-                  <span className={`num w-5 shrink-0 text-center text-[11px] font-bold ${i === 0 ? 'text-lava' : 'text-white/45'}`}>{i === 0 ? '★' : i}</span>
+                  <span className={`num w-5 shrink-0 text-center text-[11px] font-bold ${i === 0 ? 'text-lava' : 'text-white/45'}`}>{i === 0 ? '①' : i + 1}</span>
                   <span className={`h-4 w-[3px] shrink-0 rounded ${TIER_DOT[m?.tier ?? 'small-oss']}`} />
                   <span className="num text-[12.5px] font-semibold text-white">{m?.short ?? id}</span>
-                  {i === 0 && <span className="rounded-pill bg-lava/20 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[.06em] text-lava">primary</span>}
-                  <span className="ml-auto flex items-center gap-1">
-                    <button onClick={() => move(i, -1)} disabled={i === 0} className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70 transition hover:bg-white/20 disabled:opacity-25" aria-label="Move up">↑</button>
-                    <button onClick={() => move(i, 1)} disabled={i === chain.length - 1} className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70 transition hover:bg-white/20 disabled:opacity-25" aria-label="Move down">↓</button>
-                  </span>
+                  {m && <span className="rounded-pill bg-white/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[.06em] text-white/55">{TIER_SHORT[m.tier]}</span>}
                 </div>
               );
             })}
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onSave} disabled={saved === 'saving' || chain.length < 2}
-              className={`rounded-pill px-3.5 py-1.5 text-[12px] font-semibold ring-1 transition disabled:opacity-40 ${saved === 'saved' ? 'bg-moss/20 text-[#93D3AB] ring-moss/30' : saved === 'error' ? 'bg-lava/20 text-lava ring-lava/30' : 'bg-lava text-white ring-transparent hover:bg-[#e22e1a]'}`}>
-              {savedLabel}
-            </button>
-            <span className="text-[11px] text-white/40">persists across restarts &amp; replicas</span>
-          </div>
           <p className="text-[11px] leading-[1.6] text-white/50">
-            <span className="font-semibold text-white/70">How it works:</span> the gateway app IS the router, so it enforces this itself - if the routed model's call fails, it retries the next model in this order and reports which one served. System pay-per-token endpoints can't carry native <span className="num">fallback_config</span>; this application-level failover works today with no custom endpoint.
+            <span className="font-semibold text-white/70">How it works:</span> the gateway app IS the router, so if the routed model's call fails it retries down this chain (cheapest per category, ascending) and reports which one served. System pay-per-token endpoints can't carry native <span className="num">fallback_config</span>; this application-level failover works today with no custom endpoint.
           </p>
         </>
       ) : (
-        <p className="text-[11.5px] leading-[1.6] text-white/45">Turn this on to make the gateway resilient: if the routed model errors or times out, it automatically retries the next model you selected. Order them below (primary first). The policy is saved to Lakebase and enforced on every route.</p>
+        <p className="text-[11.5px] leading-[1.6] text-white/45">Turn this on to make the gateway resilient: if the routed model errors or times out, it automatically retries the next model in the auto chain (cheapest of each category). Enforced on every route.</p>
       )}
     </div>
   );
@@ -1498,31 +1450,85 @@ function AccessControlForm({ on, setOn, group, setGroup, tiers, setTiers }: {
             </div>
           </div>
           <p className="text-[11px] leading-[1.6] text-white/50">
-            <span className="font-semibold text-white/70">Enforced by the gateway</span>: a request from <b className="text-white/75">{group}</b> can only route to the ticked tiers - a denied tier (e.g. frontier) is filtered out before routing, and if nothing is permitted the request is blocked. In production this is a <span className="num">EXECUTE</span> / ABAC grant on the model endpoints by group. Try a complex prompt as <b className="text-white/75">Contractor</b> (small OSS only) to see frontier denied.
+            <span className="font-semibold text-white/70">Enforced by the gateway</span>: a request from <b className="text-white/75">{group}</b> can only route to the ticked categories - a denied category (e.g. Complex) is filtered out before routing, and if nothing is permitted the request is blocked. In production this is a <span className="num">EXECUTE</span> / ABAC grant on the model endpoints by group. Try a complex prompt as <b className="text-white/75">Contractor</b> (Small only) to see Complex denied.
           </p>
         </>
       ) : (
-        <p className="text-[11.5px] leading-[1.6] text-white/45">Turn this on to restrict model access by requester group (e.g. contractors → OSS only, data scientists → all tiers). The gateway filters the candidate models to the group's allowed tiers before routing.</p>
+        <p className="text-[11.5px] leading-[1.6] text-white/45">Turn this on to restrict model access by requester group (e.g. contractors → Small only, data scientists → all categories). The gateway filters the candidate models to the group's allowed categories before routing.</p>
       )}
     </div>
   );
 }
 
-function FeatureChip({ f, on, onToggle, onInspect, inspecting }: { f: Feature; on: boolean; onToggle: () => void; onInspect: () => void; inspecting: boolean }) {
+function FeatureChip({ f, on, onToggle, onInspect, inspecting, locked = false }: { f: Feature; on: boolean; onToggle: () => void; onInspect: () => void; inspecting: boolean; locked?: boolean }) {
+  // Auto-classifier mode: every feature is applied automatically, so the chip is green +
+  // checked, not toggleable, and carries no Configure control.
+  const shown = locked || on;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-pill py-1.5 pl-2.5 pr-1.5 text-[12.5px] font-semibold transition ${on ? 'bg-moss/20 text-[#93D3AB]' : 'bg-white/10 text-white/55'} ${inspecting ? 'ring-2 ring-[#8FC1F0]/60' : ''}`}>
-      <button onClick={onToggle} className="flex items-center gap-1.5" aria-pressed={on}>
-        <span className={`grid h-4 w-4 place-items-center rounded-full text-[9px] ${on ? 'bg-moss text-white' : 'border border-white/25'}`}>{on ? '✓' : ''}</span>
+    <span className={`inline-flex items-center gap-1 rounded-pill py-1.5 pl-2.5 pr-1.5 text-[12.5px] font-semibold transition ${shown ? 'bg-moss/20 text-[#93D3AB]' : 'bg-white/10 text-white/55'} ${inspecting ? 'ring-2 ring-[#8FC1F0]/60' : ''}`}>
+      <button onClick={locked ? undefined : onToggle} disabled={locked} className="flex items-center gap-1.5" aria-pressed={shown} title={locked ? 'Applied automatically in auto-classifier mode' : undefined}>
+        <span className={`grid h-4 w-4 place-items-center rounded-full text-[9px] ${shown ? 'bg-moss text-white' : 'border border-white/25'}`}>{shown ? '✓' : ''}</span>
         {f.label}
       </button>
-      <button
-        onClick={onInspect}
-        aria-expanded={inspecting}
-        title="Configure this feature"
-        className={`ml-1 inline-flex items-center gap-1 rounded-pill px-2 py-1 text-[10px] font-bold uppercase tracking-[.05em] transition ${inspecting ? 'bg-[#8FC1F0] text-ink' : 'bg-white/15 text-white/80 hover:bg-white/25 hover:text-white'}`}
-      >
-        <span className="text-[10px]">⚙</span>{inspecting ? 'Editing ▴' : 'Configure ▾'}
-      </button>
+      {!locked && (
+        <button
+          onClick={onInspect}
+          aria-expanded={inspecting}
+          title="Configure this feature"
+          className={`ml-1 inline-flex items-center gap-1 rounded-pill px-2 py-1 text-[10px] font-bold uppercase tracking-[.05em] transition ${inspecting ? 'bg-[#8FC1F0] text-ink' : 'bg-white/15 text-white/80 hover:bg-white/25 hover:text-white'}`}
+        >
+          <span className="text-[10px]">⚙</span>{inspecting ? 'Editing ▴' : 'Configure ▾'}
+        </button>
+      )}
     </span>
   );
 }
+
+// ---- Receipt adapters + migrated Live-gateway pieces --------------------
+
+// A one-line plain-English rationale synthesized from the routing receipt (the real
+// proxy returns no `reason` string; we build one from the fields it does return).
+function routeReason(f: FinopsReceipt): string {
+  const via = f.matchedRule
+    ? `matched rule "${f.matchedRule}"`
+    : f.bandLabel
+      ? `scored complexity ${f.complexity} (${f.bandLabel})`
+      : `scored complexity ${f.complexity}`;
+  return `The router ${via} → needs ${f.requiredTierLabel}, and served it with ${f.servedBy.short} (${TIER_LABEL[f.servedBy.tier as Tier]}) at ${formatMoney(f.costUsd)}/query.`;
+}
+
+// Synthesize the "how it routed" trace list from receipt fields (the proxy returns no
+// step trace on a single call - these mirror what each governance feature actually did).
+function routeTrace(f: FinopsReceipt): { kind: string; text: string }[] {
+  const t: { kind: string; text: string }[] = [];
+  if (f.guardrail) t.push({ kind: 'feature', text: `Guardrail: ${f.guardrail.action} (${f.guardrail.categories})` });
+  if (f.cacheHit) t.push({ kind: 'feature', text: `Semantic cache hit${f.similarity != null ? ` · ${Math.round(f.similarity * 100)}% match` : ''} → served at $0` });
+  t.push({ kind: 'route', text: f.matchedRule ? `Matched criteria "${f.matchedRule}" → needs ${f.requiredTierLabel}` : `Complexity ${f.complexity}${f.bandLabel ? ` (${f.bandLabel})` : ''} → needs ${f.requiredTierLabel}` });
+  if (f.budget) t.push({ kind: 'feature', text: `Budget ${Math.round(f.budget.consumedPct)}% of $${f.budget.capUsd.toLocaleString()}${f.budget.ceiling !== 'frontier' ? ` · capped at ${TIER_SHORT[f.budget.ceiling as Tier] ?? f.budget.ceiling}` : ''}` });
+  if (f.compression && f.compression.savedTokens > 0) t.push({ kind: 'feature', text: `Prompt compressed −${f.compression.savedPct}% (${f.compression.savedTokens} tokens)` });
+  if (f.optimization?.enabled) t.push({ kind: 'feature', text: `Output shaped to ≤${f.optimization.targetWords} words` });
+  if (f.fallback?.fired) t.push({ kind: 'route', text: `Primary failed → served by ${f.servedBy.short}` });
+  t.push({ kind: 'route', text: `Routed to ${f.servedBy.short} (${TIER_LABEL[f.servedBy.tier as Tier]}) → ${formatMoney(f.costUsd)}` });
+  return t;
+}
+
+
+// The routing-receipt chip row: what the gateway did on this real call.
+function ReceiptChips({ f, demoMode }: { f: FinopsReceipt; demoMode: boolean }) {
+  const chip = 'inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[.06em] ring-1';
+  const moss = 'bg-moss/15 text-[#93D3AB] ring-moss/30';
+  const amber = 'bg-[#E3B876]/15 text-[#E3B876] ring-[#E3B876]/30';
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={`${chip} bg-lava/15 text-[#FF9E7E] ring-lava/30`}>router picked</span>
+      {f.cacheHit && <span className={`${chip} ${moss}`}>⚡ cache hit{f.similarity != null ? ` · ${Math.round(f.similarity * 100)}% match` : ''}</span>}
+      {f.guardrail && <span className={`${chip} ${amber}`}>guardrail: {f.guardrail.action}</span>}
+      {f.fallback?.fired && <span className={`${chip} ${amber}`}>fallback fired: {f.fallback.from} → {f.servedBy.short}</span>}
+      {f.compression && f.compression.savedTokens > 0 && <span className={`${chip} ${moss}`}>compressed −{f.compression.savedPct}%</span>}
+      {f.optimization?.enabled && <span className={`${chip} ${moss}`}>shaped ≤{f.optimization.targetWords}w{f.optimization.savedOutputTokens > 0 ? ` · −${formatTokens(f.optimization.savedOutputTokens)} tok` : ''}</span>}
+      {f.budget && <span className={`${chip} ${amber}`}>budget {Math.round(f.budget.consumedPct)}%{f.budget.ceiling !== 'frontier' ? ` · cap ${TIER_SHORT[f.budget.ceiling as Tier] ?? f.budget.ceiling}` : ''}</span>}
+      {demoMode && <span className={`${chip} bg-white/10 text-white/60 ring-white/10`}>demo mode</span>}
+    </div>
+  );
+}
+

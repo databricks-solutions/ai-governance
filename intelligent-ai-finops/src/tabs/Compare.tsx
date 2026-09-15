@@ -15,8 +15,8 @@ const usd = (n: number) => formatMoney(n);
 const big = (n: number) => formatHeadline(n);
 const tok = (n: number | null) => (n == null ? '-' : n.toLocaleString());
 
-// The complexity class each tier is meant for - a heading on each lane.
-const TIER_CX_LABEL: Record<Tier, string> = { 'small-oss': 'Simple', 'large-oss': 'Medium', frontier: 'Complex' };
+// The size category each lane represents - a heading on each lane.
+const TIER_CX_LABEL: Record<Tier, string> = { 'small-oss': 'Small', 'large-oss': 'Medium', frontier: 'Complex' };
 
 const LBL = 'font-body text-[9.5px] font-semibold uppercase tracking-[.14em] text-white/45';
 const SECTION = 'font-display text-[13px] font-bold uppercase tracking-[.15em] text-[#7FB6F2]';
@@ -68,8 +68,8 @@ const streamingRun = (): RunData => ({ answer: '', costUsd: 0, latencyMs: null, 
 const idleRun = (): RunData => ({ ...streamingRun(), streaming: false });
 
 function defaultLanes(models: ModelDef[]): string[] {
-  // Defaults: frontier → opus-5; large-OSS ("Medium") → glm-5.3; small-OSS →
-  // cheapest by representative per-query cost. Pins fall back to cheapest-by-cost.
+  // Defaults: Complex → opus-5; Medium → glm-5.3; Small → cheapest by
+  // representative per-query cost. Pins fall back to cheapest-by-cost.
   const perQ = (m: ModelDef) => 800 * m.price_in_per_1m + 400 * m.price_out_per_1m;
   const cheapestOf = (t: Tier) => [...models.filter((m) => m.tier === t)].sort((a, b) => perQ(a) - perQ(b))[0]?.id;
   const pin = (id: string, t: Tier) => models.find((m) => m.id === id)?.id ?? cheapestOf(t);
@@ -105,8 +105,8 @@ export function Compare() {
 
   const running = phase !== 'idle';
 
-  // Default the judge to kimi-k3 (a strong open-weight grader); fall back to the
-  // cheapest small-OSS, then the first model, if it isn't in this workspace.
+  // Default the judge to kimi-k3 (a strong grader); fall back to the cheapest
+  // Small model, then the first model, if it isn't in this workspace.
   useEffect(() => {
     if (cfg && !judgeModel) {
       const cheapestSmall = [...cfg.models.filter((m) => m.tier === 'small-oss')].sort((a, b) => a.price_out_per_1m - b.price_out_per_1m)[0];
@@ -192,7 +192,7 @@ export function Compare() {
         resolve(i, { answer: '(no response - the model timed out or is unavailable in this workspace)', costUsd: 0, latencyMs: null, judgeScore: 0, judgeReason: '', inputTokens: null, outputTokens: null, context: null, error: true }, es);
       };
       const timer = window.setTimeout(() => {
-        resolve(i, { answer: '(timed out - this model took too long; try a faster frontier model like sonnet or opus-4-8)', costUsd: 0, latencyMs: null, judgeScore: 0, judgeReason: '', inputTokens: null, outputTokens: null, context: null, error: true }, es);
+        resolve(i, { answer: '(timed out - this model took too long; try a faster model like claude-sonnet-5 or gpt-5)', costUsd: 0, latencyMs: null, judgeScore: 0, judgeReason: '', inputTokens: null, outputTokens: null, context: null, error: true }, es);
       }, LANE_TIMEOUT_MS);
       timersRef.current.push(timer);
     });
@@ -282,7 +282,7 @@ export function Compare() {
     setWinnerIdx(winnerFrom(lanes));
   }, [lanes, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ROI: the best-value winner vs the frontier model over 12 months.
+  // ROI: the best-value winner vs the most capable model over 12 months.
   const roi = useMemo(() => {
     if (winnerIdx == null) return null;
     const winRun = lanes[winnerIdx]?.run;
@@ -308,20 +308,30 @@ export function Compare() {
       frontierPer = top.r.costUsd;
       frontierShort = top.m?.short;
     }
-    const smalls = Array.from(modelById.values()).filter((m) => m.tier === 'small-oss').sort((a, b) => a.price_out_per_1m - b.price_out_per_1m);
-    const smallModel = smalls[0];
+    // The router shown is the "Routing / Judge LLM" the user picked (it classifies the
+    // prompt), falling back to the cheapest Small model if that pick isn't resolvable.
+    const cheapestSmall = Array.from(modelById.values()).filter((m) => m.tier === 'small-oss').sort((a, b) => a.price_out_per_1m - b.price_out_per_1m)[0];
+    const routerModel = modelById.get(judgeModel) ?? cheapestSmall;
     const inTok = winRun.inputTokens ?? 0;
-    const routerPer = smallModel ? (inTok / 1e6) * smallModel.price_in_per_1m + (8 / 1e6) * smallModel.price_out_per_1m : 0;
+    // Routing is a cheap classification step, so price the overhead on a small classifier
+    // regardless of which (possibly expensive) model is selected to judge - otherwise a
+    // pricey judge pick would inflate the all-in cost and mask the real savings.
+    const classifier = cheapestSmall ?? routerModel;
+    const routerPer = classifier ? (inTok / 1e6) * classifier.price_in_per_1m + (8 / 1e6) * classifier.price_out_per_1m : 0;
     const allInPer = bestPer + routerPer;
     const cheaperX = allInPer > 0 ? frontierPer / allInPer : null;
     // `volume` is now DAILY (sliders are daily), so `monthly` holds the per-DAY cost
     // that the ROI panel + chart render on a daily basis; savedYr stays annual (×365).
-    const monthly = { frontier: frontierPer * volume, routed: bestPer * volume };
+    // Routed cost is ALL-IN (winning model + the router that classified the prompt), so
+    // saved/day and saved/year already net the router - and both scale with the sliders
+    // because they are per-query figures × the daily volume.
+    const monthly = { frontier: frontierPer * volume, routed: allInPer * volume };
     return {
-      monthly, savedYr: (frontierPer - bestPer) * volume * 365, frontierShort, frontierEstimated,
+      monthly, savedYr: (frontierPer - allInPer) * volume * 365, frontierShort, frontierEstimated,
       cheaperX: cheaperX != null ? Math.round(cheaperX * 10) / 10 : null,
+      bestPer, routerPer, allInPer, routerShort: routerModel?.short,
     };
-  }, [lanes, volume, winnerIdx, modelById]);
+  }, [lanes, volume, winnerIdx, modelById, judgeModel]);
 
   const hasWinner = winnerIdx !== null;
   const winnerModel = winnerIdx !== null ? modelById.get(lanes[winnerIdx]?.modelId) : null;
@@ -451,7 +461,7 @@ export function Compare() {
           <div className={SECTION}>Routing economics</div>
           <div className="flex flex-col gap-[18px]">
             <VizPanel title="Visualizing intelligent routing flow"><RoutingSteps steps={flowSteps} running={running} /></VizPanel>
-            <VizPanel title="Best value vs frontier - projected savings">
+            <VizPanel title="Best value vs most capable - projected savings">
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-4 max-[520px]:grid-cols-1">
                   <VizSlider label="Daily active users" value={users} min={100} max={200000} step={100} onChange={setUsers} accent="accent-[#B487D0]" />
@@ -466,41 +476,53 @@ export function Compare() {
                       <VizStat label="Saved / year" value="$0" />
                     </div>
                     <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-[11.5px] leading-[1.5] text-white/55 ring-1 ring-white/10">
-                      The frontier model was the best value model that cleared the quality bar on this prompt.
+                      The most capable model was the best value that cleared the quality bar on this prompt.
                     </p>
                   </>
                 ) : (
                   <div className="grid grid-cols-5 gap-2 max-[720px]:grid-cols-3 max-[520px]:grid-cols-2">
                     <VizStat label="Total queries / day" value={volume ? volume.toLocaleString() : '-'} />
-                    <VizStat label={frontierRefShort ? `${frontierRefShort}${frontierEstimated ? ' (est.)' : ''} / day` : 'Frontier / day'} value={roi ? compact(roi.monthly.frontier) : '-'} />
-                    <VizStat label={winnerModel ? `${winnerModel.short} / day` : 'Best value / day'} value={roi ? compact(roi.monthly.routed) : '-'} />
+                    <VizStat label={frontierRefShort ? `${frontierRefShort}${frontierEstimated ? ' (est.)' : ''} / day` : 'Most capable / day'} value={roi ? compact(roi.monthly.frontier) : '-'} />
+                    <VizStat label={winnerModel ? `${winnerModel.short} + router / day` : 'Best value / day'} value={roi ? compact(roi.monthly.routed) : '-'} />
                     <VizStat label="Saved / day" value={roi ? compact(roi.monthly.frontier - roi.monthly.routed) : '-'} color="#4FD79E" />
                     <VizStat label="Saved / year" value={roi ? compact(roi.savedYr) : '-'} color="#4FD79E" />
                   </div>
                 )}
                 <div className="relative">
-                  <RoiChart roi={roi} periods={30} periodNoun="days" totalSuffix="mo" frontierLabel={frontierRefShort ? `${frontierEstimated ? 'FRONTIER (EST.)' : 'FRONTIER'} · ${frontierRefShort}` : 'FRONTIER MODEL'} routedLabel={winnerModel ? `BEST VALUE · ${winnerModel.short}` : 'BEST VALUE'} />
+                  <RoiChart roi={roi} periods={30} periodNoun="days" totalSuffix="mo" frontierLabel={frontierRefShort ? `${frontierEstimated ? 'MOST CAPABLE (EST.)' : 'MOST CAPABLE'} · ${frontierRefShort}` : 'MOST CAPABLE'} routedLabel={winnerModel ? `BEST VALUE · ${winnerModel.short} + router` : 'BEST VALUE'} />
                   {!roi && (
                     <div className="absolute inset-0 grid place-items-center px-6 text-center">
-                      <p className="max-w-[42ch] text-[12.5px] leading-[1.5] text-white/45">Run a comparison above: this plots the best-value winner against the frontier model over 30 days. Move the sliders to scale it to your traffic.</p>
+                      <p className="max-w-[42ch] text-[12.5px] leading-[1.5] text-white/45">Run a comparison above: this plots the best-value winner against the most capable model over 30 days. Move the sliders to scale it to your traffic.</p>
                     </div>
                   )}
                 </div>
                 {roi && frontierEstimated && (
                   <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-[11.5px] leading-[1.5] text-white/55 ring-1 ring-white/10">
-                    <span className="font-semibold text-[#FF9E8C]">{frontierRefShort}</span> returned no data this run, so its line is <b>estimated</b> from its rate card × the winner's tokens - the saving shown is what routing avoids versus that frontier price.
+                    <span className="font-semibold text-[#FF9E8C]">{frontierRefShort}</span> returned no data this run, so its line is <b>estimated</b> from its rate card × the winner's tokens - the saving shown is what routing avoids versus that model's price.
                   </p>
                 )}
-                {/* Total saving per year - the punchline box at the end of the panel. */}
+                {/* All-in economics in one 3D box: the router overhead, the all-in per-query
+                    + per-day cost, and the yearly saving (which already nets the router).
+                    Every number is bold and one size. */}
                 {roi && !frontierWon && (
-                  <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-2xl bg-[#4FD79E]/[0.08] px-5 py-4 ring-1 ring-[#4FD79E]/40">
-                    <div>
-                      <div className="font-body text-[10px] font-semibold uppercase tracking-[.14em] text-[#4FD79E]/80">Total saving / year</div>
-                      <div className="mt-1 font-body text-[13px] leading-[1.4] text-white/60">
-                        {winnerModel ? <span className="num text-white/80">{winnerModel.short}</span> : 'best value'} vs {frontierRefShort ? <span className="num text-white/80">{frontierRefShort}</span> : 'the frontier model'} at {volume ? volume.toLocaleString() : '-'} queries/day
-                      </div>
+                  <div className={`rounded-2xl bg-[#4FD79E]/[0.08] p-5 ring-1 ring-[#4FD79E]/40 ${CARD_3D}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[13px] text-white">
+                      <span>+ router{roi.routerShort ? ` (${roi.routerShort})` : ''} scores each prompt to pick the model</span>
+                      <span className="num font-bold">+{usd(roi.routerPer)} / query · +{compact(roi.routerPer * volume)} / day</span>
                     </div>
-                    <div className="num text-[34px] font-semibold leading-none tracking-[-.04em] text-[#4FD79E]">{compact(roi.savedYr)}</div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-white/10 pt-2 text-[13px] text-white">
+                      <span>All-in · {winnerModel ? winnerModel.short : 'best value'} + router</span>
+                      <span className="num font-bold">{usd(roi.allInPer)} / query · {compact(roi.monthly.routed)} / day</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-[#4FD79E]/30 pt-3">
+                      <div>
+                        <div className="font-body text-[10px] font-bold uppercase tracking-[.14em] text-[#4FD79E]/80">Total saving / year</div>
+                        <div className="mt-1 font-body text-[13px] leading-[1.5] text-white/60">
+                          <span className="num font-bold text-white">{winnerModel ? winnerModel.short : 'best value'}</span> vs <span className="num font-bold text-white">{frontierRefShort ?? 'the most capable model'}</span> at <span className="num font-bold text-white">{volume ? volume.toLocaleString() : '-'}</span> queries/day
+                        </div>
+                      </div>
+                      <div className="num text-[30px] font-bold leading-none tracking-[-.04em] text-[#4FD79E]">{compact(roi.savedYr)}</div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -576,11 +598,12 @@ function LaneCard({ lane, i, model: m, models, won, hasWinner, running, isCheape
           </select>
           <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-white/45">▾</span>
         </div>
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          {m && <TierBadge tier={m.tier} />}
-          {isCheapest && <TagPill color="#93D3AB" label="Cheapest" glyph="$" />}
-          {isFastest && <TagPill color="#6BB0E8" label="Fastest" glyph="⚡" />}
-        </div>
+        {(isCheapest || isFastest) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {isCheapest && <TagPill color="#93D3AB" label="Cheapest" glyph="$" />}
+            {isFastest && <TagPill color="#6BB0E8" label="Fastest" glyph="⚡" />}
+          </div>
+        )}
       </div>
 
       {isRunning && (
@@ -698,7 +721,7 @@ function ContextPanel({ ctx }: { ctx: LaneContext }) {
           <Row k="model tier" v={TIER_SHORT[decision.tier]} />
           <Row k="tier needed" v={TIER_SHORT[decision.requiredTier]} />
           <Row k="verdict" v={clears ? 'clears the bar' : 'below the bar'} badge={clears ? '#93D3AB' : '#FF9E8C'} />
-          <Row k="if routed to frontier" v={`${decision.counterfactual.model} · ${usd(decision.counterfactual.costUsd)}`} />
+          <Row k="if routed to Complex" v={`${decision.counterfactual.model} · ${usd(decision.counterfactual.costUsd)}`} />
         </div>
       </div>
     </div>
@@ -737,15 +760,6 @@ function Dots() {
   );
 }
 
-function TierBadge({ tier }: { tier: Tier }) {
-  const hex = TIER_META[tier].hex;
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.07em]" style={{ background: `${hex}26`, color: hex }}>
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: hex }} />{TIER_SHORT[tier]}
-    </span>
-  );
-}
-
 function TagPill({ color, label, glyph }: { color: string; label: string; glyph: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[.08em]" style={{ background: `${color}2e`, color, boxShadow: `inset 0 0 0 1.5px ${color}80` }}>
@@ -777,9 +791,9 @@ function VizSlider({ label, value, min, max, step, onChange, accent }: { label: 
 
 function VizStat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="rounded-xl bg-black/25 px-3 py-2.5 ring-1 ring-white/10">
-      <div className="font-body text-[9px] font-semibold uppercase tracking-[.1em] text-white/45">{label}</div>
-      <div className="num mt-1 text-[15px] font-medium leading-none tracking-[-.03em]" style={color ? { color } : { color: '#fff' }}>{value}</div>
+    <div className={`rounded-xl bg-black/25 px-3 py-2.5 ring-1 ring-white/10 ${TILE_3D}`}>
+      <div className="font-body text-[10.5px] font-bold uppercase tracking-[.09em] text-white/55">{label}</div>
+      <div className="num mt-1 text-[16px] font-bold leading-none tracking-[-.03em]" style={color ? { color } : { color: '#fff' }}>{value}</div>
     </div>
   );
 }
@@ -788,8 +802,8 @@ interface Outcome { model: string; perQuery: string; savedYear: string }
 interface Page { eyebrow: string; big: string; sub: string }
 
 const INTRO_ADV: Page[] = [
-  { eyebrow: 'Compare all models', big: 'Your prompt, three models, one bar to clear.', sub: 'Pick a model for each lane - frontier or open weights - then run them side by side. The cheapest answer that stays within a judge point of the best one wins.' },
-  { eyebrow: 'Why it works', big: 'Most queries never needed a frontier model.', sub: '≈ 90% clear the quality bar on a smaller, cheaper one - route them there and pocket the difference.' },
+  { eyebrow: 'Compare all models', big: 'Your prompt, three models, one bar to clear.', sub: 'Pick a model for each lane - Small, Medium, or Complex - then run them side by side. The cheapest answer that stays within a judge point of the best one wins.' },
+  { eyebrow: 'Why it works', big: 'Most queries never needed your most capable model.', sub: '≈ 90% clear the quality bar on a smaller, cheaper one - route them there and pocket the difference.' },
   { eyebrow: 'Why it works', big: 'Route by complexity - not by habit.', sub: 'The prompt decides the model, one request at a time - automatically.' },
   { eyebrow: 'Why it works', big: 'Same governance. A fraction of the cost.', sub: 'Unity Gateway + Model Serving - already on Databricks.' },
 ];
@@ -866,7 +880,7 @@ function JudgeInfo({ onClose }: { onClose: () => void }) {
         </div>
         <ul className="flex list-disc flex-col gap-1.5 pl-4">
           <li>One model both <b>routes</b> (classifies complexity to pick the cheapest sufficient tier) and <b>judges</b> (grades each answer 1-10).</li>
-          <li>Defaults to <b>kimi-k3</b> - a strong open-weight grader. Pick a smaller model to keep the grading overhead cheaper, or a frontier one for stricter grading.</li>
+          <li>Defaults to <b>kimi-k3</b> - a strong grader. Pick a smaller model to keep the grading overhead cheaper, or a more capable one for stricter grading.</li>
           <li>The score drives the winner: the cheapest answer <b>within a judge point of the best</b> is chosen as <b>best value</b> - so price, not just quality, decides.</li>
         </ul>
         <p className="mt-2 text-[11px] text-ink-3">Runs as a real, deterministic (temperature 0) call in live mode; each grade is logged to MLflow.</p>

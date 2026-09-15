@@ -52,7 +52,8 @@ FEATURES = [
 
 _RANK = {"small-oss": 0, "large-oss": 1, "frontier": 2}
 _VALID_TIERS = set(_RANK)
-_TIER_LABEL = {"small-oss": "small OSS", "large-oss": "large OSS", "frontier": "frontier"}
+# User-facing size-category labels (surface in the routing receipt's requiredTierLabel).
+_TIER_LABEL = {"small-oss": "Small", "large-oss": "Medium", "frontier": "Complex"}
 
 
 def required_tier(complexity: int) -> str:

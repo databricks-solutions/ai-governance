@@ -261,10 +261,20 @@ def serve(messages: list[dict], requested_model: str | None = None, options: dic
     bud = pol.get("budget") or {}
     if is_auto and bud.get("enabled") and bud.get("capUsd"):
         from . import costcache
-        mtd = costcache.spend_last_30d()
-        if mtd is not None:
-            cap = float(bud["capUsd"])
-            consumed_pct = min(100.0, mtd / cap * 100) if cap > 0 else 0.0
+        cap = float(bud["capUsd"])
+        # A what-if `consumedPct` override drives the budget as if spend were at that
+        # level - it keeps the interactive "slide spend up, watch routing tighten" demo
+        # working even when real month-to-date spend is ~0. Without it, enforce against
+        # REAL last-30-day spend from the cached system-tables overview.
+        cx_override = bud.get("consumedPct")
+        simulated = isinstance(cx_override, (int, float)) and not isinstance(cx_override, bool)
+        if simulated:
+            consumed_pct = max(0.0, min(100.0, float(cx_override)))
+            mtd = cap * consumed_pct / 100.0
+        else:
+            mtd = costcache.spend_last_30d()
+            consumed_pct = (min(100.0, mtd / cap * 100) if cap > 0 else 0.0) if mtd is not None else None
+        if consumed_pct is not None:
             action, note = gateway._budget_ceiling(
                 consumed_pct, bud.get("downgradeAtPct"), bud.get("openOnlyAtPct"),
                 bud.get("downgradeAction"), bud.get("openOnlyAction"))
@@ -272,7 +282,7 @@ def serve(messages: list[dict], requested_model: str | None = None, options: dic
                 raise ProxyError(429, f"Budget cap reached: ${mtd:,.0f} of ${cap:,.0f} 30-day cap "
                                       f"({consumed_pct:.0f}%). Request refused - no model called.",
                                  "budget_block",
-                                 {"budget": {"mtdUsd": mtd, "capUsd": cap,
+                                 {"budget": {"mtdUsd": round(mtd, 2), "capUsd": cap,
                                              "consumedPct": round(consumed_pct, 1), "action": "block", "note": note}})
             if action in _RANK:
                 ceiling_rank = _RANK[action]

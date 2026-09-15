@@ -3,7 +3,6 @@ import { useSession, type TabId } from './store/session';
 import { useConfig } from './api/useConfig';
 import { Compare } from './tabs/Compare';
 import { Pipeline } from './tabs/Pipeline';
-import { GatewayApi } from './tabs/GatewayApi';
 import { Cost } from './tabs/Cost';
 import { WhyDatabricks } from './tabs/WhyDatabricks';
 import { Architecture } from './tabs/Architecture';
@@ -13,10 +12,9 @@ import { Styleguide } from './tabs/Styleguide';
 const TABS: { id: TabId; index: string; label: string }[] = [
   { id: 'compare', index: '1', label: 'Compare models' },
   { id: 'pipeline', index: '2', label: 'Context routing' },
-  { id: 'gatewayapi', index: '3', label: 'Live gateway' },
-  { id: 'cost', index: '4', label: 'Cost & savings' },
-  { id: 'why', index: '5', label: 'Why Databricks' },
-  { id: 'arch', index: '6', label: 'How it works' },
+  { id: 'cost', index: '3', label: 'Cost & savings' },
+  { id: 'why', index: '4', label: 'Why Databricks' },
+  { id: 'arch', index: '5', label: 'How it works' },
 ];
 
 export function App() {
@@ -91,7 +89,6 @@ export function App() {
         <div className="mx-auto max-w-[1180px]">
           <div className={activeTab === 'compare' ? '' : 'hidden'}><Compare /></div>
           <div className={activeTab === 'pipeline' ? '' : 'hidden'}><Pipeline /></div>
-          <div className={activeTab === 'gatewayapi' ? '' : 'hidden'}><GatewayApi /></div>
           <div className={activeTab === 'cost' ? '' : 'hidden'}><Cost /></div>
           <div className={activeTab === 'why' ? '' : 'hidden'}><WhyDatabricks /></div>
           <div className={activeTab === 'arch' ? '' : 'hidden'}><Architecture /></div>

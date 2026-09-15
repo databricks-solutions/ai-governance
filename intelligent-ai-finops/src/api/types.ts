@@ -1,18 +1,21 @@
 // Data contracts - mirror BUILD-SPEC §4 exactly. The frontend NEVER computes
 // cost (§7); every route returns a full RoutingReceipt from the backend.
 
+// The three keys are opaque SIZE slots (kept for back-compat with the backend +
+// persisted policy): frontier = Complex, large-oss = Medium, small-oss = Small.
+// Models are categorized by capability/cost, not by vendor or open-vs-proprietary.
 export type Tier = 'frontier' | 'large-oss' | 'small-oss';
 
-// Human labels for the three model categories.
+// Human labels for the three size categories.
 export const TIER_LABEL: Record<Tier, string> = {
-  frontier: 'Frontier',
-  'large-oss': 'Large open-weight OSS',
-  'small-oss': 'Small open source',
+  frontier: 'Complex',
+  'large-oss': 'Medium',
+  'small-oss': 'Small',
 };
 export const TIER_SHORT: Record<Tier, string> = {
-  frontier: 'Frontier',
-  'large-oss': 'Large OSS',
-  'small-oss': 'Small OSS',
+  frontier: 'Complex',
+  'large-oss': 'Medium',
+  'small-oss': 'Small',
 };
 // Category order used for grouping (most → least capable).
 export const TIER_ORDER: Tier[] = ['frontier', 'large-oss', 'small-oss'];

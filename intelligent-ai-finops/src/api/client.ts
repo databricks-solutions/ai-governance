@@ -59,119 +59,6 @@ export interface FinopsReceipt {
   optimization?: { enabled: boolean; mode: string; targetWords: number; outputTokens: number; baselineOutputTokens: number; savedOutputTokens: number; savedUsdEst: number } | null;
 }
 
-export interface OptimizeAbResult {
-  judge: string;
-  unshaped: { outputTokens: number; costUsd: number; servedBy: string; quality: number | null; answer: string };
-  shaped: { outputTokens: number; costUsd: number; servedBy: string; quality: number | null; answer: string; targetWords: number };
-  savedOutputTokens: number;
-  savedUsd: number;
-  savedPct: number;
-}
-
-// Prove output-shaping nets positive: runs the same prompt shaped vs unshaped and
-// returns the MEASURED output-token/cost delta + a quality score for each, scored by
-// the chosen `judgeModel` (empty = backend default, the cheapest frontier).
-export async function optimizeAb(prompt: string, model: string, targetWords: number, judgeModel?: string): Promise<OptimizeAbResult> {
-  const res = await fetch('/api/gateway/optimize/ab', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, model, targetWords, ...(judgeModel ? { judgeModel } : {}) }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || `A/B failed: ${res.status}`);
-  return data;
-}
-
-// ---- Smart Routing decision + ON-vs-OFF (Context-routing tab) ------------
-// The auditable routing decision the app surfaces, mirroring Unity AI Gateway
-// Smart Routing: task-type family, language family, complexity label, rationale.
-export interface RoutingDecision {
-  taskType: { id: string; label: string };
-  language: { id: string; label: string };
-  complexityScore: number;
-  complexityLabel: { id: string; label: string };
-  requiredTier: string;
-  requiredTierLabel: string;
-  chosenTier: string;
-  rationale: string;
-  classifier: string;
-}
-
-export interface SmartRoutingSide {
-  model: string; tier: string; costUsd: number; latencyMs: number;
-  quality: number | null; inputTokens: number; outputTokens: number; answer: string;
-}
-
-export interface SmartRoutingAb {
-  decision: RoutingDecision;
-  judge: string;
-  on: SmartRoutingSide;
-  off: SmartRoutingSide;
-  savedUsd: number;
-  savedPct: number;
-  qualityDelta: number | null;
-}
-
-// Run the SAME prompt with Smart Routing ON (router picks cheapest-sufficient) vs
-// OFF (a fixed frontier flagship). Both answers judged by the same model, so cost
-// AND quality deltas are measured. Two live model calls + two judge calls, so it's
-// deliberately slow - show a busy state.
-export async function smartRoutingAb(
-  prompt: string,
-  opts: { models?: string[]; frontierModel?: string; routerModel?: string; judgeModel?: string } = {},
-): Promise<SmartRoutingAb> {
-  const res = await fetch('/api/smartrouting/ab', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, ...opts }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || `Smart Routing A/B failed: ${res.status}`);
-  return data;
-}
-
-// ---- Bring-your-own evaluation set (validate routing holds quality) -------
-export interface EvalRow {
-  prompt: string; error?: string;
-  routed?: { model: string; tier: string; costUsd: number; quality: number | null; complexity: number };
-  frontier?: { model: string; costUsd: number; quality: number | null };
-  savedUsd?: number; savedPct?: number;
-}
-export interface EvalAggregate {
-  count: number; avgRoutedQuality: number | null; avgFrontierQuality: number | null;
-  qualityRetentionPct: number | null; routedCostUsd: number; frontierCostUsd: number;
-  savedUsd: number; savedPct: number; judge: string; frontierBaseline: string;
-}
-export interface EvalResult {
-  aggregate?: EvalAggregate; rows?: EvalRow[]; errors?: EvalRow[];
-  mlflow?: { logged: boolean; experiment?: string; runId?: string; reason?: string };
-  error?: string;
-}
-
-// Run a set of prompts through the router vs a frontier baseline, judged, aggregated.
-export async function runEvalSet(prompts: string[], opts: { models?: string[]; frontierModel?: string; judgeModel?: string } = {}): Promise<EvalResult> {
-  const res = await fetch('/api/eval/run', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompts, ...opts }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error || `Eval failed: ${res.status}`);
-  return data;
-}
-
-export interface ReadinessCheck { id: string; label: string; ok: boolean; optional?: boolean; detail: string; fix: string }
-export interface Discovery { liveCount: number; registryCount: number; present: string[]; missing: string[]; extra: string[]; extraCount: number }
-export interface Readiness {
-  ready: boolean; checks: ReadinessCheck[]; discovery: Discovery;
-  warehouseId: string | null; embedEndpoint: string; dataSource: string;
-}
-
-export async function getReadiness(): Promise<Readiness> {
-  const res = await fetch('/api/setup/readiness');
-  if (!res.ok) throw new Error(`GET /api/setup/readiness failed: ${res.status}`);
-  return res.json();
-}
-
 export interface GatewayChatResult {
   answer: string;
   finops: FinopsReceipt;
@@ -295,4 +182,40 @@ export async function getConfig(): Promise<AppConfig> {
     judgeEnabled: !!raw.judgeEnabled,
     priceFootnote: raw.priceFootnote ?? 'Prices from the DBU rate card - see config',
   };
+}
+
+// ---- Admin gateway config (Context-routing tab), persisted to Lakebase -----
+// The full admin-configured state so the USER persona (question-only) inherits
+// exactly what the admin set. Opaque-ish blob; the Pipeline tab owns the shape.
+export interface AppAdminConfig {
+  autoClassifier?: boolean;
+  models?: string[];                                   // 3 category picks (manual mode)
+  criteria?: Record<string, string>;                   // tier key -> comma-separated keywords
+  enabled?: string[];                                  // governance feature ids ticked on
+  options?: { cache?: boolean; optimize?: boolean; optimizeWords?: number; smartAb?: boolean; outputAb?: boolean };
+  guardrails?: { pii: boolean; mode: 'block' | 'mask'; keywords: string };
+  rateLimit?: { perMin: number };
+  budget?: { on: boolean; capUsd: number | null; consumedPct: number; downgradeAt: number; openOnlyAt: number; downgradeAction: string; openOnlyAction: string };
+  access?: { group: string; tiers: Record<string, string[]> };
+}
+
+export async function getAppConfig(): Promise<AppAdminConfig> {
+  try {
+    const res = await fetch('/api/gateway/appconfig');
+    if (!res.ok) return {};
+    return res.json();
+  } catch {
+    return {};
+  }
+}
+
+export async function saveAppConfig(cfg: AppAdminConfig): Promise<{ ok: boolean; saved: boolean }> {
+  try {
+    const res = await fetch('/api/gateway/appconfig', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg),
+    });
+    return res.json();
+  } catch {
+    return { ok: false, saved: false };
+  }
 }
