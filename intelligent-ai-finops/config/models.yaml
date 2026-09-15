@@ -21,7 +21,7 @@ models:
   - { id: databricks-claude-opus-4-7,  short: claude-opus-4-7,  tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
   - { id: databricks-claude-opus-4-8,  short: claude-opus-4-8,  tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
   - { id: databricks-claude-opus-5,    short: claude-opus-5,    tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 357.143 }
-  - { id: databricks-claude-sonnet-4,  short: claude-sonnet-4,  tier: frontier, dbu_in_per_1m: 42.857,  dbu_out_per_1m: 214.286 }
+  # claude-sonnet-4 removed: DEPRECATED on FMAPI (400 "endpoint is deprecated").
   - { id: databricks-claude-sonnet-4-5, short: claude-sonnet-4-5, tier: frontier, dbu_in_per_1m: 42.857, dbu_out_per_1m: 214.286 }
   - { id: databricks-claude-sonnet-4-6, short: claude-sonnet-4-6, tier: frontier, dbu_in_per_1m: 42.857, dbu_out_per_1m: 214.286 }
   - { id: databricks-claude-sonnet-5,  short: claude-sonnet-5,  tier: frontier, dbu_in_per_1m: 28.571,  dbu_out_per_1m: 142.857 }
@@ -29,8 +29,9 @@ models:
   - { id: databricks-gpt-5-2,          short: gpt-5-2,          tier: frontier, dbu_in_per_1m: 25.000,  dbu_out_per_1m: 200.000 }
   - { id: databricks-gpt-5-4,          short: gpt-5-4,          tier: frontier, dbu_in_per_1m: 35.714,  dbu_out_per_1m: 214.286 }
   - { id: databricks-gpt-5-6-sol,      short: gpt-5-6-sol,      tier: frontier, dbu_in_per_1m: 71.429,  dbu_out_per_1m: 428.571 }
-  - { id: databricks-gemini-2-5-pro,   short: gemini-2-5-pro,   tier: frontier, dbu_in_per_1m: 22.321,  dbu_out_per_1m: 178.571 }
-  - { id: databricks-gemini-3-1-pro,   short: gemini-3-1-pro,   tier: frontier, dbu_in_per_1m: 35.714,  dbu_out_per_1m: 214.286 }
+  # gemini-2-5-pro removed: the endpoint is DEPRECATED on FMAPI (400 "endpoint is
+  # deprecated") so it can never answer. gemini-3-1-pro removed: not deployed on this
+  # workspace (404). Re-add with a live endpoint id + its DBU rate card if they return.
 
   # ---- Large open-weight OSS -------------------------------------------
   - { id: databricks-llama-4-maverick,           short: llama-4-maverick, tier: large-oss, dbu_in_per_1m: 7.143, dbu_out_per_1m: 21.429 }

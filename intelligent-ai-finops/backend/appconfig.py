@@ -47,6 +47,12 @@ def load_config() -> dict:
         "dbuToUsd": dbu_to_usd,
         "demoMode": _env_bool("FINOPS_DEMO_MODE", True),
         "judgeEnabled": _env_bool("FINOPS_JUDGE_ENABLED", True),
+        # V2: where the Cost tab's data comes from. "system_tables" reads real
+        # spend/usage from Unity Catalog system tables via the warehouse; "demo"
+        # (default) synthesises it. warehouseId is the SQL warehouse the App SP
+        # queries with.
+        "dataSource": os.environ.get("FINOPS_DATA_SOURCE", "demo"),
+        "warehouseId": os.environ.get("FINOPS_WAREHOUSE_ID", ""),
         "priceFootnote": (
             f"Prices = official Databricks FMAPI DBU rate card × ${dbu_to_usd:g}/DBU "
             f"(Model Serving list rate). Source: databricks.com/product/pricing."

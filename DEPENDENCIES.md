@@ -79,6 +79,7 @@ Source of truth: `intelligent-ai-finops/requirements.txt` (exact `==` pins).
 | pyyaml | 6.0.3 | MIT | Parse `config/*.yaml` (model registry + routing policy) | https://github.com/yaml/pyyaml |
 | requests | 2.34.2 | Apache-2.0 | HTTP calls to the FMAPI `/invocations` endpoint | https://github.com/psf/requests |
 | mlflow-skinny | 3.15.2 | Apache-2.0 | Best-effort LLM-as-judge run logging | https://github.com/mlflow/mlflow |
+| pg8000 | 1.31.5 | BSD-3-Clause | Pure-Python Postgres driver for the durable Lakebase cache (cost cache + pgvector semantic cache). Chosen over psycopg (LGPL) to keep this repo copyleft-free. Transitive deps `scramp` (MIT-0) and `asn1crypto` (MIT). | https://github.com/tlocke/pg8000 |
 
 ## intelligent-ai-finops — frontend (runtime)
 

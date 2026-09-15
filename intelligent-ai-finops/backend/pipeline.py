@@ -25,16 +25,16 @@ from .appconfig import load_config
 # complexity range so the routing spread is visible. `t` is used verbatim as the
 # prompt when a pill is picked, so it must read like a genuine ask, not a label.
 QUESTIONS = [
-    {"id": "q1", "t": "How do I reset a locked user account? Walk me through the steps.", "cx": 8},
-    {"id": "q2", "t": "Can you summarize our PTO and parental-leave policy for a new hire in a short paragraph?", "cx": 18},
-    {"id": "q3", "t": "Draft a short customer-facing note that summarizes this outage ticket and what we're doing about it.", "cx": 34},
-    {"id": "q4", "t": "Compare our three product lines by gross margin and tell me which one is the outlier and why.", "cx": 52},
-    {"id": "q5", "t": "Write a recursive SQL CTE that rolls our org hierarchy up to total headcount per manager, and explain how it works.", "cx": 63},
-    {"id": "q6", "t": "We have three conflicting incident timelines from different teams - can you reconcile them into one and justify each inference?", "cx": 74},
-    {"id": "q7", "t": "How would you migrate a 2TB Postgres monolith to a sharded database with zero downtime and no data loss? Walk through the plan and the failure modes.", "cx": 95},
-    {"id": "q8", "t": "We're weighing a $400M acquisition financed with cash, debt, and stock - can you build the full valuation (DCF, comps, accretion/dilution, downside cases) and give me a go/no-go recommendation?", "cx": 96},
-    {"id": "q9", "t": "Help me design a five-year capital-allocation strategy across three macro scenarios (soft landing, recession, stagflation) - where should free cash flow go, and what triggers a shift?", "cx": 92},
-    {"id": "q10", "t": "We're moving from seat-based to usage-based pricing - how should we repackage it, model the revenue impact, and migrate existing customers safely?", "cx": 88},
+    {"id": "q1", "t": "Draft a short, friendly reply to a customer asking how to reset their password.", "cx": 8},
+    {"id": "q2", "t": "Classify and set a priority for this inbound ticket: \"I was charged twice this month and need it fixed today.\"", "cx": 16},
+    {"id": "q3", "t": "Summarize this 6-message support thread into two sentences and the resolution: login fails after the update, agent confirms a known SSO bug, fix ships tomorrow, workaround given.", "cx": 26},
+    {"id": "q4", "t": "Draft a short customer-facing note that summarizes this outage and what we're doing about it.", "cx": 36},
+    {"id": "q5", "t": "Compare our three product lines by gross margin and tell me which one is the outlier and why.", "cx": 52},
+    {"id": "q6", "t": "Write a recursive SQL CTE that rolls our org hierarchy up to total headcount per manager, and explain how it works.", "cx": 64},
+    {"id": "q7", "t": "We have three conflicting incident timelines from different teams - reconcile them into one and justify each inference.", "cx": 75},
+    {"id": "q8", "t": "We're moving from seat-based to usage-based pricing - how should we repackage it, model the revenue impact, and migrate existing customers safely?", "cx": 88},
+    {"id": "q9", "t": "Design a five-year capital-allocation strategy across three macro scenarios (soft landing, recession, stagflation) - where should free cash flow go, and what triggers a shift?", "cx": 93},
+    {"id": "q10", "t": "We're weighing a $400M acquisition financed with cash, debt, and stock - build the full valuation (DCF, comps, accretion/dilution, downside cases) and give a go/no-go recommendation.", "cx": 96},
 ]
 
 # Stage catalogue. `feature` names the Unity AI Gateway (or platform) capability a

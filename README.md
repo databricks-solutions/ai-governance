@@ -154,29 +154,34 @@ one or more ported deep-dive notebooks. They are plain notebooks — clone this 
 ## 💸 Intelligent AI FinOps — smart model routing (standalone app)
 
 A separate, self-contained Databricks App ([`intelligent-ai-finops/`](intelligent-ai-finops)) that
-makes the **Cost** pillar tangible: a routing layer that sends each query to the **cheapest model
-that still clears a quality bar**, then shows the cost and the savings — on the same **Unity AI
-Gateway + Model Serving** surface. Four views: **Compare models** side by side (live streaming +
-LLM-as-judge), **Context routing** (route by complexity + budget across the models you allow),
-**Cost & savings** (spend by model/tier, the share of traffic kept off the frontier, observability,
-and a forward projection), and **How it works** (the end-to-end request flow). No warehouse,
-catalog, or Lakebase dependency — the FastAPI backend *is* the app container and all config is two
-bundled YAML files.
+makes the **Cost** pillar tangible: the app *is* the gateway. It exposes an OpenAI-compatible
+`POST /v1/chat/completions` proxy (`finops-auto`) that classifies each prompt, routes it to the
+**cheapest model that still clears a quality bar**, and enforces app-level guardrails, rate limits,
+a semantic cache, fallback, and a live budget, all on the same **Unity AI Gateway + Model Serving**
+surface. Six views: **Compare models** side by side (live streaming + LLM-as-judge), **Smart
+routing** (route by complexity + budget across the models you allow), **Cost & savings** (real spend
+from `system.ai_gateway.usage` / `system.serving`, the routed-vs-frontier counterfactual, coding-agent
+spend, chargeback, and a projection), **Gateway API** (the live proxy with its routing receipt and
+semantic-cache stats), **Why Databricks**, and **How it works** (the end-to-end request flow).
 
-It **ships in live mode** (real Model Serving calls, real tokens/latency, a real LLM-as-judge). Set
-`FINOPS_DEMO_MODE=true` in `app.yaml` for a **zero-setup, fully offline demo** (synthesised numbers,
-no endpoints required) — useful on venue wifi or a bare workspace.
+It **ships in live mode** (real Model Serving calls, real tokens/latency, real system-table cost).
+Set `FINOPS_DEMO_MODE=true` for a **zero-setup, fully offline demo** (synthesised numbers, no
+endpoints required) — useful on venue wifi or a bare workspace. Live mode reads cost through a
+serverless SQL warehouse and can optionally persist its cost + semantic cache in an Autoscaling
+Lakebase (pgvector); both degrade gracefully to in-process defaults when not configured.
 
 ```bash
 cd intelligent-ai-finops
 npm install && npm run build                                       # build the frontend (dist/)
-databricks bundle deploy -t dev --profile <profile>               # create the app + upload
-databricks bundle run intelligent_ai_finops -t dev --profile <profile>   # start it
+databricks bundle deploy -t prod --profile <profile>              # create the app + upload
+databricks bundle run intelligent_ai_finops_v2 -t prod --profile <profile>   # start it
 ```
 
-Nothing workspace-specific is hardcoded — the target comes from `--profile`. For live mode, the
-endpoints in `config/models.yaml` must exist in the workspace and the app's service principal must
-have **CAN QUERY** on them (otherwise deploy with `FINOPS_DEMO_MODE=true`). Full details in
+Nothing workspace-specific is hardcoded — fill the `prod` target's variables in `databricks.yml`
+and the target comes from `--profile`. For live mode, the endpoints in `config/models.yaml` must
+exist in the workspace and the app's service principal must have the grants in
+[`intelligent-ai-finops/V2_SETUP.md`](intelligent-ai-finops/V2_SETUP.md) (otherwise deploy with
+`FINOPS_DEMO_MODE=true`). Full details in
 [`intelligent-ai-finops/README.md`](intelligent-ai-finops/README.md).
 
 ## Repository layout

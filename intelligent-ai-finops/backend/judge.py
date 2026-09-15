@@ -40,36 +40,55 @@ def score_and_reason(prompt: str, answer: str, model_id: str | None = None) -> t
             judge = None
     if judge is None:
         judge = models.cheapest_of_tier(JUDGE_MODEL_TIER)
-    # The judge only needs to emit two lines of JSON (a score + one sentence), so
-    # its budget is capped tight. This matters for latency: the judge is a SECOND
-    # live call on every lane (3 per Compare run), and on a reasoning judge the
-    # token budget is the dominant cost - 600 is plenty for the JSON and keeps the
-    # judge from thinking for tens of seconds per lane.
-    # temperature=0.0 makes the judge deterministic - the same answer scores the
-    # same way run-to-run, which is what makes the scoring feel consistent.
-    result = models.live_query(judge, _RUBRIC.format(prompt=prompt, answer=answer), max_tokens=600, temperature=0.0)
+    # Budget: the judge only needs a score + one short sentence, but some models
+    # (e.g. kimi-k3) write a VERBOSE reason and, plain, spend the budget on hidden
+    # thinking. `_reasoning_suppression` (in models.live_query) now keeps kimi/GLM/
+    # DeepSeek terse, and 1200 tokens leaves headroom so the JSON closes on a long
+    # answer instead of truncating mid-"reason". temperature=0.0 keeps it deterministic.
+    result = models.live_query(judge, _RUBRIC.format(prompt=prompt, answer=answer), max_tokens=1200, temperature=0.0)
     text = result["answer"] or ""
-    value: float | None = None
-    reason = ""
-    try:
-        i, j = text.find("{"), text.rfind("}")
-        parsed = json.loads(text[i : j + 1])
-        value = float(parsed.get("score"))
-        reason = str(parsed.get("reason", "") or "").strip()
-    except (ValueError, KeyError, TypeError):
-        # Salvage a bare 1-10 number if the model didn't return clean JSON.
-        m = re.search(r"\b(10(?:\.0)?|[1-9](?:\.\d)?)\b", text)
-        if m:
-            value = float(m.group(1))
+    value, reason = _extract_score_reason(text)
     if value is None:
         # Couldn't determine a score at all - use a neutral midpoint (NOT 1.0, which
-        # would wrongly crown or kill a lane in the winner rule) and surface the
-        # parse failure in the reason.
+        # would wrongly crown or kill a lane in the winner rule) and surface it.
         value = 5.0
         reason = reason or "Judge response could not be parsed; neutral score applied."
     value = max(1.0, min(10.0, value))
     _log_to_mlflow(judge.id, prompt, answer, value, result["cost_usd"])
     return round(value, 1), reason
+
+
+def _extract_score_reason(text: str) -> tuple[float | None, str]:
+    """Pull (score, reason) from the judge's output, ROBUST to messy/truncated JSON.
+
+    Reasoning/verbose models (kimi-k3) often overrun the token budget mid-answer, so
+    the JSON never closes. The score is emitted first, so we recover it directly from
+    the `"score":` key even when the closing brace (and the reason) are cut off -
+    which is exactly the case that used to fall through to a bogus neutral 5.0 on
+    every lane. Layered: (1) clean JSON, (2) score-key regex on unclosed JSON,
+    (3) an explicit "Score: N" / "N/10" phrasing. A bare number anywhere is NOT
+    accepted (it wrongly matched digits like "112%" inside the reason)."""
+    t = (text or "").strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    # 1) Clean JSON object.
+    try:
+        i, j = t.find("{"), t.rfind("}")
+        if i != -1 and j > i:
+            p = json.loads(t[i : j + 1])
+            if p.get("score") is not None:
+                return float(p["score"]), str(p.get("reason", "") or "").strip()
+    except (ValueError, KeyError, TypeError):
+        pass
+    # 2) Truncation-proof: read the score straight off the "score" key, and the reason
+    # up to the next quote (may be cut short - that's fine, we still have the score).
+    ms = re.search(r'"score"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)', t)
+    if ms:
+        mr = re.search(r'"reason"\s*:\s*"([^"]*)', t)
+        return float(ms.group(1)), (mr.group(1).strip() if mr else "")
+    # 3) Free-text phrasing like "Score: 8" or "8/10".
+    mp = re.search(r'(?:score\D{0,8}|rating\D{0,8})([0-9]{1,2}(?:\.[0-9])?)|\b([0-9]{1,2}(?:\.[0-9])?)\s*/\s*10', t, re.I)
+    if mp:
+        return float(mp.group(1) or mp.group(2)), ""
+    return None, ""
 
 
 def score(prompt: str, answer: str, model_id: str | None = None) -> float:

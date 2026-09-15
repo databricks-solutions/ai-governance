@@ -4,7 +4,7 @@ import { buildSampleRuns } from '../data/sampleSession';
 
 // Cross-tab session state. In-memory only - no browser storage APIs.
 
-export type TabId = 'compare' | 'pipeline' | 'cost' | 'why' | 'arch' | 'styleguide';
+export type TabId = 'compare' | 'pipeline' | 'gatewayapi' | 'cost' | 'why' | 'arch' | 'styleguide';
 
 // The last routing decision - from Compare's winner or the Gateway box - so the
 // Architecture tab can render it live. Null before any run → generic diagram.
