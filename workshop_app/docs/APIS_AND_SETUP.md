@@ -272,7 +272,7 @@ This matters for the on-behalf-of claim. The workshop can legitimately say:
 
 It must **not** claim that a green check in this app proves OBO. The app is a governed
 observer; OBO is proven by a participant driving their own coding agent through the Gateway
-and seeing their own identity in the logs. The Coding Agents accelerator is where that
+and seeing their own identity in the logs. The Coding accelerator is where that
 happens.
 
 ---
@@ -280,7 +280,7 @@ happens.
 ## 6. Coding-agent onboarding (`ucode`)
 
 `ucode` is the Databricks CLI that installs, authenticates, and configures a coding agent
-against the Gateway — the default path for the Coding Agents accelerator.
+against the Gateway — the default path for the Coding accelerator.
 
 ```bash
 ucode cursor          # or: ucode codex / claude

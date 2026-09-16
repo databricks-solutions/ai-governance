@@ -48,14 +48,17 @@ an MCP policy function, etc.).
 Beyond the core workshop, six optional **~3-hour accelerators** each get their own page (same
 concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
-- **MCP Servers** — on-behalf-of auth to a managed/external MCP.
-- **Agent Registry** — register, version, and own a representative agent.
-- **Coding Agents** — govern dev-agent traffic with per-developer attribution
-  and code-secret detection.
-- **External Providers** — route Bedrock/OpenAI/Anthropic through the Gateway;
-  migrate one shadow workload.
-- **Policies & Guardrails** — safety filter on input/output, custom PII-leakage
-  judge, red-team dataset.
+Each accelerator is **additive** to the core — it only covers what the core does not. IDs are
+stable (`acc_*`), so the internal app's scope import still resolves them.
+
+- **MCPs** — managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, telemetry.
+- **Agents** — register, version, own, trace, evaluate, and manage an agent's lifecycle.
+- **Coding** — route dev-agent traffic through the Gateway, add **smart routing** and
+  **Omnigent** above the harness, prove it lands there, and attribute per developer.
+- **Providers** — everything specific to an outside provider (Bedrock/OpenAI/Anthropic):
+  add it, secure its credentials, bind it, migrate + attribute it, verify its cost, ban/fail it over.
+- **Policies** — mask vs block, block delivery, path coverage, effectiveness benchmarking,
+  prompt-injection, groundedness, custom per-use-case policies.
 - **Skills** — build, govern, and deploy Agent Skills in Genie Code with registry control.
 
 Run the one that matches the customer's priority (the accelerator overview and links live on
@@ -80,11 +83,13 @@ databricks bundle run ai_governance_workshop_app -t dev -p <profile>
 **Prereqs:** Databricks CLI authenticated to the workspace, a running SQL warehouse, an
 existing Unity Catalog catalog, and Node (the bundle builds the frontend for you on deploy).
 
-`warehouse_id` and `catalog` are **required** (no defaults), so a missing one fails immediately
-rather than deploying an app that fails every step in front of the customer. Optional overrides:
-`--var="workshop_group=<group>"` (who gets `CAN_USE` on the app; default `users`),
-`--var="schema=<name>"`, `--var="progress_volume=<name>"`. Both commands are idempotent —
-re-run them any time.
+`warehouse_id` is **required** (no default), so a missing one fails immediately rather than
+deploying an app that fails every step in front of the customer. `catalog` and `schema` carry
+defaults (`uaigw_fe` / `workshop`) that point at our internal hosted instance — **on a customer
+workspace always pass `--var="catalog=<your-catalog>"`**, since `uaigw_fe` will not exist there.
+Optional overrides: `--var="workshop_group=<group>"` (who gets `CAN_USE` on the app; default
+`users`), `--var="schema=<name>"`, `--var="progress_volume=<name>"`. Both commands are idempotent
+— re-run them any time.
 
 **How it's fully declarative.** The app receives its `catalog`/`schema`/`warehouse_id` as env
 straight from the bundle variables (`apps.*.config.env` in `databricks.yml`), so there's no
@@ -165,7 +170,7 @@ See `docs/APIS_AND_SETUP.md` for the full dependency list.
 ```bash
 # Backend — local dev has no bundle, so pass the values the bundle would inject as env
 DATABRICKS_PROFILE=<profile> DATABRICKS_WAREHOUSE_ID=<id> \
-  WORKSHOP_CATALOG=<catalog> WORKSHOP_SCHEMA=ai_governance_workshop \
+  WORKSHOP_CATALOG=<catalog> WORKSHOP_SCHEMA=workshop \
   uv run uvicorn app:app --reload --port 8000
 # Frontend (proxies /api to :8000)
 cd frontend && npm ci && npm run dev

@@ -21,10 +21,12 @@ intro:
     Three pillars:
 
     - **Choice** — place any model, tool, or agent behind one control plane, addressed by a
-      Unity Catalog name instead of a workspace endpoint name — and see which of your endpoints
-      are still on the legacy (v1) path versus the governed (v3) path.
-    - **Cost** — project what routing between models saves, set budgets and rate limits, and
-      attribute each request to a team.
+      Unity Catalog name instead of a workspace endpoint name; run proprietary and open-weight
+      frontier models through the same governed path; and see which of your endpoints are still
+      on the legacy (v1) path versus the governed (v3) path.
+    - **Cost** — project what routing between models saves, set budgets and rate limits,
+      attribute each request to a team, and link tasks to spend to see which model is most
+      efficient for each kind of work.
     - **Control** — rate limits, guardrails, and MCP service policies that deny specific calls,
       with the telemetry that records them.
 
@@ -186,6 +188,37 @@ pillars:
           label: Show which models this identity can access (effective access)
           test: default_access
 
+      - id: use_open_weight_model
+        title: "Choice: Use proprietary and open-weight frontier models"
+        outcome: "We can run the latest open-weight frontier models (GLM, GPT-OSS, DeepSeek, Llama) alongside proprietary ones (Claude, GPT) as v3 Unity Catalog model services on one governed control plane — same grants, policies, and attribution — so model choice is never a single-vendor bet."
+        concept: |
+          Choice is not a single-vendor bet. Through the Gateway, **proprietary frontier models**
+          (Claude, GPT) and **open-weight frontier models** (GLM, GPT-OSS, DeepSeek, Llama) are
+          addressed the same way — as a **v3 Unity Catalog model service**
+          (`catalog.schema.service`, e.g. `system.ai.glm-5-3-flash`) on the governed
+          `/ai-gateway` path — and carry the same UC grants, the same guardrails and rate limits,
+          and the same request-tag attribution. So a team picks the best model for each task, and
+          swapping proprietary for open-weight (or the reverse) is a config change, not a
+          re-platforming.
+
+          Two things this proves for a governance program:
+
+          - **No lock-in.** The v3 model-service contract, the grants, and the telemetry are
+            identical regardless of who trained the model. You are governing *access to models*,
+            not betting the platform on one lab.
+          - **Data residency and cost latitude.** An open-weight model served on your own
+            Databricks compute keeps the payload inside your account — an option you keep open
+            precisely because it rides the same governed v3 path as everything else.
+
+          This Try-It calls the configured open-weight model service
+          (`gateway.open_weight_model_service` in `config/workshop.yaml`, default
+          `system.ai.glm-5-3-flash`) over the v3 Gateway path and shows it answered, tokened, and
+          attributed exactly like a proprietary model. Point it at whichever open-weight model
+          service your organization uses.
+        action:
+          label: Call an open-weight model service (v3) through the governed Gateway
+          test: use_open_weight_model
+
       - id: choice_smart_routing
         title: "Choice: Automate the right choice"
         outcome: "We can use custom or smart routing to automate model choice — each request goes to the right model without the caller picking it (smart-routing example coming soon)."
@@ -346,6 +379,33 @@ pillars:
         action:
           label: Query usage by project tag
           test: usage_by_project
+
+      - id: cost_task_usage
+        title: "Cost: Cost per task — which model is most efficient"
+        outcome: "We can link AI-completed tasks to spend by model — tagging each unit of work with a `task` tag and reading tokens per task per model — to see which model does each kind of work most efficiently."
+        concept: |
+          `cost_usage` answers *who* spent (attribution by team/tag). This answers a different
+          question a FinOps or platform owner keeps asking: **which model is most efficient for
+          the work we actually do?**
+
+          The mechanism is the same telemetry, sliced one level finer. Every model call the Cost
+          routing steps send now carries a **`task` request tag** on top of the project tags, and
+          each sample prompt (one *task*) is run against every model. So
+          `system.ai_gateway.usage` can be grouped by **task × model**, and the lowest
+          average-tokens row for a task is the cheapest model that did that unit of work.
+
+          Read this next to **Cost → Project routing savings**, which shows each model's *answer*
+          to the same prompts: put the two together and you have cost *and* quality per task —
+          exactly the evidence to decide which model (or which routing tier) a given workload
+          should default to. Token counts are exact; convert to dollars with your negotiated rate.
+
+          The tag is caller-supplied, so — like all request tags — it is an attribution signal,
+          not a budget boundary. The query is in `queries/usage_by_task.sql`. As with
+          `cost_usage`, the table lags real time by minutes: an empty result right after the
+          routing steps means *not ingested yet*, not *tagging is broken*.
+        action:
+          label: Show cost/tokens per task, by model
+          test: cost_task_usage
 
       - id: cost_team_governance
         title: "Cost: Team-level budgets & visibility"

@@ -55,25 +55,33 @@ GATEWAY_CHAT_PATH = "/ai-gateway/mlflow/v1/chat/completions"
 # Fallback panel, used when config/workshop.yaml has no `cost.routing` block. Prices are
 # public list rates per million tokens; `unit` says how to convert. Endpoints are the
 # pay-per-token FMAPI names available on most workspaces.
+# Endpoints are v3 UC model services (catalog.schema.service), addressed by name on the governed
+# Gateway path. Override per key with `cost.routing.endpoints` in config/workshop.yaml.
 _DEFAULT_MODELS = {
     "frontier": {
-        "endpoint": "databricks-claude-sonnet-4-5",
+        "endpoint": "system.ai.claude-sonnet-4-5",
         "label": "Claude Sonnet 4.5",
         "tier": "frontier",
+        "open_weight": False,
+        "provider": "Anthropic (proprietary)",
         "price": {"unit": "usd", "in": 3.0, "out": 15.0},
         "oneliner": "Frontier model — highest quality, highest cost. Reserve it for genuinely hard work.",
     },
     "mid": {
-        "endpoint": "databricks-meta-llama-3-3-70b-instruct",
+        "endpoint": "system.ai.meta-llama-3-3-70b-instruct",
         "label": "Llama 3.3 70B",
         "tier": "strong-oss",
+        "open_weight": True,
+        "provider": "Meta (open weight)",
         "price": {"unit": "dbu", "in": 14.286, "out": 42.857},
         "oneliner": "Strong open-weight model — near-frontier on many tasks at a fraction of the cost.",
     },
     "cheap": {
-        "endpoint": "databricks-meta-llama-3-1-8b-instruct",
+        "endpoint": "system.ai.meta-llama-3-1-8b-instruct",
         "label": "Llama 3.1 8B",
         "tier": "small-oss",
+        "open_weight": True,
+        "provider": "Meta (open weight)",
         "price": {"unit": "dbu", "in": 2.143, "out": 6.429},
         "oneliner": "Small open-weight model — cheapest and fastest; fine for simple, well-defined tasks.",
     },
@@ -148,6 +156,16 @@ def sample_prompts() -> list[str]:
     return [str(single)] if single else list(_DEFAULT_PROMPTS)
 
 
+def task_tag(prompt_index: int) -> str:
+    """Stable `task` tag for one sample prompt, sent on every model call for that prompt.
+
+    Each sample prompt is one unit of work ("task"). Because every prompt is run against every
+    model, tagging by task makes system.ai_gateway.usage answer "which model was most efficient
+    for THIS task" — the basis for the cost_task_usage step.
+    """
+    return f"routing_task_{prompt_index + 1}"
+
+
 def models() -> dict:
     """The model panel, with per-key endpoint overrides from config/workshop.yaml."""
     overrides = _routing_cfg().get("endpoints", {}) or {}
@@ -206,52 +224,99 @@ def request_tags() -> dict:
     return tags
 
 
-def query(model_key: str, prompt: str, max_tokens: int | None = None) -> dict:
-    """Call one model and return the answer plus measured tokens, latency, and cost.
+def _merge_tags(extra_tags: dict | None) -> dict:
+    tags = request_tags()
+    if extra_tags:
+        tags = {**tags, **{str(k): str(v) for k, v in extra_tags.items() if v is not None}}
+    return tags
 
-    Calls the Gateway path (`/ai-gateway/mlflow/v1/chat/completions`) with an FQN or endpoint
-    name in `model`, rather than the SDK's `serving_endpoints.query()`, because query() targets
-    the legacy invocations path and cannot set the request-tag header.
+
+def is_model_service(model: str) -> bool:
+    """True if `model` is a UC model-service FQN (catalog.schema.service) — the v3 contract.
+
+    A dotted name names a Unity Catalog model service and rides the governed v3 path; a bare
+    `databricks-...` (or any undotted) name is a legacy workspace endpoint on the v1 path. Both
+    go through the same `/ai-gateway/mlflow/v1/chat/completions` URL — v1 vs v3 is decided by what
+    you put in `model`, not by the URL.
+    """
+    return "." in (model or "") and not (model or "").startswith("databricks-")
+
+
+def _invoke(model: str, prompt: str, max_tokens: int, tags: dict) -> dict:
+    """Low-level Gateway chat call. Raises on failure; callers add cost/labels and catch.
+
+    Uses the Gateway path with a model name/FQN in `model`, not the SDK's
+    `serving_endpoints.query()`, because query() targets the legacy invocations path and cannot
+    set the request-tag header.
+    """
+    w = get_workspace_client()
+    resp = w.api_client.do(
+        "POST", GATEWAY_CHAT_PATH,
+        headers={"Content-Type": "application/json", "Accept": "application/json",
+                 REQUEST_TAGS_HEADER: json.dumps(tags)},
+        body={"model": model,
+              "messages": [{"role": "user", "content": prompt}],
+              "max_tokens": max_tokens},
+    )
+    usage = (resp or {}).get("usage") or {}
+    choices = (resp or {}).get("choices") or []
+    content = (choices[0].get("message") or {}).get("content") if choices else None
+    return {"answer": _extract_text(content),
+            "input_tokens": usage.get("prompt_tokens") or 0,
+            "output_tokens": usage.get("completion_tokens") or 0}
+
+
+def query(model_key: str, prompt: str, max_tokens: int | None = None,
+          extra_tags: dict | None = None) -> dict:
+    """Call one panel model and return the answer plus measured tokens, latency, and cost.
+
+    `extra_tags` are merged into the request tags on top of the project tags — the routing steps
+    use it to stamp a per-prompt `task` tag, so system.ai_gateway.usage can be sliced by task and
+    by the model that handled it (the `cost_task_usage` step).
 
     Never raises: an endpoint that is missing or throttled becomes an `error` field so a
     live workshop shows a clear message on one card instead of failing the whole step.
     """
     m = models()[model_key]
     max_tokens = max_tokens or DEFAULT_MAX_TOKENS
-    w = get_workspace_client()
-    tags = request_tags()
+    tags = _merge_tags(extra_tags)
     start = time.monotonic()
     base = {"model_key": model_key, "label": m["label"], "tier": m["tier"],
             "endpoint": m["endpoint"], "request_tags": tags,
-            "gateway_path": GATEWAY_CHAT_PATH}
+            "gateway_path": GATEWAY_CHAT_PATH,
+            "path_version": "v3" if is_model_service(m["endpoint"]) else "v1"}
     try:
-        resp = w.api_client.do(
-            "POST", GATEWAY_CHAT_PATH,
-            headers={"Content-Type": "application/json", "Accept": "application/json",
-                     REQUEST_TAGS_HEADER: json.dumps(tags)},
-            body={"model": m["endpoint"],
-                  "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": max_tokens},
-        )
-        duration = time.monotonic() - start
-        usage = (resp or {}).get("usage") or {}
-        in_tok = usage.get("prompt_tokens") or 0
-        out_tok = usage.get("completion_tokens") or 0
-        choices = (resp or {}).get("choices") or []
-        content = (choices[0].get("message") or {}).get("content") if choices else None
-        return {
-            **base,
-            "answer": _extract_text(content),
-            "input_tokens": in_tok,
-            "output_tokens": out_tok,
-            "duration_s": round(duration, 2),
-            "cost_usd": cost_usd(model_key, in_tok, out_tok),
-            "error": None,
-        }
+        r = _invoke(m["endpoint"], prompt, max_tokens, tags)
+        return {**base, **r, "duration_s": round(time.monotonic() - start, 2),
+                "cost_usd": cost_usd(model_key, r["input_tokens"], r["output_tokens"]),
+                "error": None}
     except Exception as e:  # noqa: BLE001 — surface endpoint errors per-card, don't fail the step
         return {**base, "answer": None, "input_tokens": 0, "output_tokens": 0,
                 "duration_s": round(time.monotonic() - start, 2), "cost_usd": 0.0,
                 "error": str(e)[:300]}
+
+
+def invoke_model(model: str, prompt: str, max_tokens: int | None = None,
+                 extra_tags: dict | None = None, label: str | None = None) -> dict:
+    """Call an arbitrary model by name/FQN over the governed Gateway path.
+
+    For steps that target a specific model service (a UC FQN `catalog.schema.service`, v3) rather
+    than a routing-panel tier — e.g. the open-weight-model step. `path_version` reports v3 vs v1
+    from the model name. Never raises; on failure the result carries an `error` field. Cost is
+    not computed here (the panel price list only covers the routing tiers).
+    """
+    max_tokens = max_tokens or DEFAULT_MAX_TOKENS
+    tags = _merge_tags(extra_tags)
+    start = time.monotonic()
+    base = {"model": model, "label": label or model, "request_tags": tags,
+            "gateway_path": GATEWAY_CHAT_PATH,
+            "path_version": "v3" if is_model_service(model) else "v1"}
+    try:
+        r = _invoke(model, prompt, max_tokens, tags)
+        return {**base, **r, "duration_s": round(time.monotonic() - start, 2), "error": None}
+    except Exception as e:  # noqa: BLE001 — surface per-card, don't fail the step
+        return {**base, "answer": None, "input_tokens": 0, "output_tokens": 0,
+                "duration_s": round(time.monotonic() - start, 2), "error": str(e)[:300]}
 
 
 def compare(prompt: str) -> dict:
@@ -262,7 +327,8 @@ def compare(prompt: str) -> dict:
     whether the cheap model was actually good enough.
     """
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(PANEL_ORDER)) as ex:
-        results = list(ex.map(lambda k: query(k, prompt), PANEL_ORDER))
+        results = list(ex.map(
+            lambda k: query(k, prompt, extra_tags={"task": "compare_adhoc"}), PANEL_ORDER))
     priced = [r for r in results if not r["error"]]
     spread = None
     if len(priced) > 1:
@@ -296,7 +362,13 @@ def evaluate() -> dict:
 
     def _run(t):
         kind, pi, k, prompt = t
-        return (kind, pi, k, query(k, prompt) if kind == "model" else classify(prompt))
+        # Stamp each per-prompt model call with a `task` tag so system.ai_gateway.usage can be
+        # sliced by task x model in the cost_task_usage step. The classifier call is routing
+        # overhead, not the task's own work, so it stays untagged to keep the task's token count
+        # equal to the answer work.
+        return (kind, pi, k,
+                query(k, prompt, extra_tags={"task": task_tag(pi)}) if kind == "model"
+                else classify(prompt))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(tasks) or 1)) as ex:
         done = list(ex.map(_run, tasks))
@@ -437,7 +509,7 @@ def route(prompt: str) -> dict:
     """
     c = classify(prompt)
     chosen_key = COMPLEXITY_TO_MODEL.get(c["complexity"], "frontier")
-    answer = query(chosen_key, prompt)
+    answer = query(chosen_key, prompt, extra_tags={"task": "routed_adhoc"})
 
     routed_cost = c["classifier_cost_usd"] + answer["cost_usd"]
     frontier_cost = cost_usd("frontier", answer["input_tokens"], answer["output_tokens"])
@@ -472,6 +544,8 @@ def panel() -> dict:
             "key": key, "label": m["label"], "tier": m["tier"], "endpoint": m["endpoint"],
             "oneliner": m["oneliner"], "price_unit": m["price"]["unit"],
             "usd_in_per_mtok": round(in_usd, 4), "usd_out_per_mtok": round(out_usd, 4),
+            "open_weight": bool(m.get("open_weight")), "provider": m.get("provider"),
+            "path_version": "v3" if is_model_service(m["endpoint"]) else "v1",
         })
     return {
         "models": out,

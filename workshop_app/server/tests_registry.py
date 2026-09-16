@@ -110,6 +110,9 @@ API_DOCS: dict[str, dict[str, str]] = {
     "agent_sp_attribution": {
         "api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway config on agent-like endpoints)"},
     "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
+    "use_open_weight_model": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions with model=<catalog.schema.service> (a v3 open-weight model service)",
+        "note": "Same governed v3 path, grants, and request-tag attribution as a proprietary model."},
     "endpoint_inventory_v1_v3": {"api": "SQL: system.ai_gateway.usage (service_name NULL = v1)"},
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
@@ -140,6 +143,9 @@ API_DOCS: dict[str, dict[str, str]] = {
         "note": "Heuristic scan of tool name/description for prompt-injection ('tool poisoning')."},
     # SQL-only tests: name the table rather than a REST path, which is the useful detail.
     "usage_by_project": {"api": "SQL: system.ai_gateway.usage"},
+    "cost_task_usage": {
+        "api": "SQL: system.ai_gateway.usage (request_tags['task'])",
+        "note": "Slices usage by task x model to compare which model was most efficient per task."},
     "coding_agent_usage": {"api": "SQL: system.ai_gateway.usage (user_agent)"},
     "coding_agent_route_check": {
         "api": "SQL: system.ai_gateway.usage (service_name vs endpoint_name)",
@@ -2117,10 +2123,127 @@ def t_guardrail_block_shape() -> TestResult:
                  "see the block shape.", shape="not_blocked", **detail)
 
 
+def t_use_open_weight_model() -> TestResult:
+    """Prove an open-weight model runs as a v3 UC model service on the same control plane.
+
+    Choice is not a single-vendor bet. Proprietary frontier models (Claude, GPT) and open-weight
+    ones (GLM, GPT-OSS, DeepSeek, Llama) are addressed identically through the Gateway — a Unity
+    Catalog model-service name (`catalog.schema.service`) on the v3 path, same grants, same
+    request-tag attribution. This calls the configured open-weight model service over that v3 path
+    and shows it answered, tagged like any proprietary model. The model service is set by
+    `gateway.open_weight_model_service` in config/workshop.yaml (default system.ai.glm-5-3-flash).
+    """
+    svc = (get_config().get("gateway", {}) or {}).get("open_weight_model_service") \
+        or "system.ai.glm-5-3-flash"
+    prompt = "In one sentence, what is a model serving endpoint?"
+    # GLM (and other reasoning models) spend tokens on hidden reasoning before the answer, so give
+    # the budget room — too small a max_tokens returns usage but empty content.
+    r = routing.invoke_model(svc, prompt, max_tokens=512,
+                             extra_tags={"task": "open_weight_probe"}, label=svc)
+    if r["error"]:
+        return _fail(
+            f"The open-weight model service `{svc}` did not answer over the governed v3 gateway "
+            "path — check it exists (GET /api/2.1/unity-catalog/model-services) and this identity "
+            "has EXECUTE on it.", error=r["error"], model_service=svc, path_version=r["path_version"])
+    if not (r["answer"] or "").strip():
+        return _todo(
+            f"`{svc}` responded but returned no text ({r['output_tokens']} completion tokens, "
+            "likely all spent on reasoning). Raise max_tokens for this model.",
+            model_service=svc, output_tokens=r["output_tokens"], path_version=r["path_version"])
+    return _ok(
+        f"Open-weight model service `{svc}` answered over the governed "
+        f"{r['path_version']} Gateway path in {r['duration_s']}s "
+        f"({r['input_tokens']}+{r['output_tokens']} tokens) — addressed as a Unity Catalog model "
+        "service, the same contract, grants, and request-tag attribution a proprietary model uses.",
+        model_service=svc, path_version=r["path_version"], answer=r["answer"],
+        input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
+        duration_s=r["duration_s"], request_tags=r["request_tags"],
+        gateway_path=routing.GATEWAY_CHAT_PATH,
+        interpretation=(
+            "An open-weight model (GLM) is governed identically to Claude or GPT: same v3 UC "
+            "model-service contract, same gateway path, same attribution. Model choice — "
+            "proprietary or open weight — is a config change, never a re-platforming or a "
+            "single-vendor lock-in."))
+
+
+def t_cost_task_usage() -> TestResult:
+    """Link AI-completed tasks to token spend, by model — the most efficient model per task.
+
+    Where cost_usage attributes spend to a team/tag ("who spent"), this slices the same
+    system.ai_gateway.usage telemetry by the `task` request tag the routing steps stamp on every
+    model call. Because each task runs against every model, the result shows which model did the
+    work at the lowest token cost ("which model is most efficient for our work"). Same ingestion
+    lag as usage_by_project: an empty result right after the routing steps means "not ingested
+    yet", not "broken".
+    """
+    proj = get_config().get("project", {}).get("name", "")
+    p = _sql_str(proj)
+    sql = load_query("usage_by_task", project=p)  # queries/usage_by_task.sql
+    watermark_sql = ("SELECT max(event_time) AS latest_event, "
+                     "current_timestamp() AS now_ts FROM system.ai_gateway.usage")
+    try:
+        rows = fetchall(sql)
+        if rows:
+            tasks = {r.get("task") for r in rows}
+            models_seen = {r.get("model") for r in rows}
+            # "Most efficient model" is only a meaningful comparison for a task that ran against
+            # MORE THAN ONE model — e.g. the routing tasks, which send every prompt to every tier.
+            # Single-model tasks (an ad-hoc route, the open-weight probe) would trivially "win"
+            # with their one model, so exclude them rather than present a non-comparison as a
+            # verdict. Per qualifying task, the lowest average-tokens row is the cheapest model.
+            models_per_task: dict[str, set] = {}
+            best: dict[str, dict] = {}
+            for r in rows:
+                t, avg = r.get("task"), r.get("avg_tokens_per_request")
+                models_per_task.setdefault(t, set()).add(r.get("model"))
+                if avg is None:
+                    continue
+                if t not in best or float(avg) < float(best[t]["avg_tokens_per_request"]):
+                    best[t] = {"model": r.get("model"), "avg_tokens_per_request": avg}
+            most_efficient = [{"task": t, **v} for t, v in best.items()
+                              if len(models_per_task.get(t, ())) > 1]
+            compared = len(most_efficient)
+            return _ok(
+                f"{len(tasks)} task(s) across {len(models_seen)} model(s) attributed by the "
+                f"`task` request tag; {compared} task(s) ran against multiple models, so their "
+                "most token-efficient model is highlighted.",
+                rows=rows, tasks=sorted(str(t) for t in tasks),
+                most_efficient_per_task=most_efficient,
+                interpretation=(
+                    "For a task that ran against multiple models (the routing tasks send every "
+                    "prompt to every tier), the lowest average-tokens row is the cheapest model "
+                    "that did that work — read it alongside the answers from Cost → Project "
+                    "routing savings to weigh cost against quality. Single-model tasks are "
+                    "attributed but omitted from the comparison. Token counts are exact; convert "
+                    "to dollars with your negotiated rate."),
+                sql=sql)
+        # No rows is a real (and common) outcome, not a pass. Report the table watermark so
+        # "not ingested yet" is distinguishable from "no task tags were sent".
+        freshness = {}
+        try:
+            wm = fetchall(watermark_sql)
+            if wm:
+                freshness = {"latest_event_in_table": str(wm[0].get("latest_event")),
+                             "queried_at": str(wm[0].get("now_ts"))}
+        except Exception as e:  # noqa: BLE001 — freshness is a diagnostic, not the test
+            freshness = {"error": str(e)[:200]}
+        return _todo(
+            "No task-tagged usage in the last 7 days. Run the Cost routing steps (they stamp a "
+            "`task` tag on every model call), then re-run — allow for ingestion lag.",
+            rows=[], table_freshness=freshness,
+            lag_note=("system.ai_gateway.usage is not real-time (a 13-21 minute lag was observed "
+                      "on a reference workspace). If the gap covers when the routing steps ran, "
+                      "the rows simply have not landed yet."),
+            sql=sql)
+    except Exception as e:
+        return _fail("Task-usage query failed.", error=str(e)[:600], sql=sql)
+
+
 REGISTRY: dict[str, Callable[[], TestResult]] = {
     "connection": t_connection,
     "workspace_context": t_workspace_context,
     "list_endpoints": t_list_endpoints,
+    "use_open_weight_model": t_use_open_weight_model,
     "endpoint_inventory_v1_v3": t_endpoint_inventory_v1_v3,
     "model_services": t_model_services,
     "default_access": t_default_access,
@@ -2138,6 +2261,7 @@ REGISTRY: dict[str, Callable[[], TestResult]] = {
     "test_mcp_policy": t_test_mcp_policy,
     "apply_tags": t_apply_tags,
     "usage_by_project": t_usage_by_project,
+    "cost_task_usage": t_cost_task_usage,
     "audit_scan": t_audit_scan,
     "list_registered_assets": t_list_registered_assets,
     "budget_status": t_budget_status,

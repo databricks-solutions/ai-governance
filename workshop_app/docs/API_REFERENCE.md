@@ -26,7 +26,7 @@ returned, not what a doc implied.
 | List MCP services | `GET /api/2.1/unity-catalog/mcp-services` | `mcp_inventory`, `mcp_policy_target` | ✅ returned 6 `MCP_SERVICE` securables |
 | MCP service permissions | `GET /api/2.1/unity-catalog/permissions/mcp_service/{name}` | `mcp_grants` | ✅ showed `EXECUTE` → `account users` |
 | List model services | `GET /api/2.1/unity-catalog/model-services` | `model_services` | ✅ returned 24 `MODEL_SERVICE` securables |
-| List model provider services | `GET /api/2.1/unity-catalog/model-provider-services` | — (documented for the External Providers accelerator) | ✅ responded; 0 registered |
+| List model provider services | `GET /api/2.1/unity-catalog/model-provider-services` | — (documented for the Providers accelerator) | ✅ responded; 0 registered |
 | Catalog / schema permissions | `GET /api/2.1/unity-catalog/permissions/{catalog\|schema}/{name}` | `default_access` | ✅ `system.ai` → `EXECUTE` to `account users` |
 
 The securable type in the permissions path is `mcp_service` (and `model_service`) — lowercase,

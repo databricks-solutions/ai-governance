@@ -18,20 +18,26 @@ workspace:
 # `--var="catalog=<your-catalog>"` so the bundle and the app agree.
 catalog:
   name: ""                        # e.g. main — must match the bundle's `catalog` variable
-  schema: ai_governance_workshop
+  schema: workshop                # matches the bundle's `schema` default (databricks.yml)
 
 # Foundation Model endpoints the workshop references (Choice pillar).
 gateway:
-  # A shared, out-of-the-box foundation-model endpoint (tags only, no per-project limits).
-  ootb_endpoint: databricks-claude-sonnet-4-5
-  # Alternate model used by the routing-agent cost demo (Cost pillar).
-  cheap_endpoint: databricks-meta-llama-3-3-70b-instruct
+  # A shared, out-of-the-box foundation model — a v3 UC model service (catalog.schema.service).
+  ootb_endpoint: system.ai.claude-sonnet-4-5
+  # Alternate (open-weight) model used by the routing-agent cost demo (Cost pillar).
+  cheap_endpoint: system.ai.meta-llama-3-3-70b-instruct
+  # Open-weight model called by the "Use proprietary and open-weight frontier models" step
+  # (Choice). A v3 Unity Catalog model service (catalog.schema.service) invoked over the governed
+  # gateway path — proving an open-weight model is addressed exactly like a proprietary one.
+  open_weight_model_service: system.ai.glm-5-3-flash
 
 # The governed endpoint the workshop creates and layers controls onto (Control pillar).
+# primary_model/fallback_model are shown as hints for the guided (UI) endpoint creation — the
+# app never invokes them here. They name v3 UC model services (catalog.schema.service).
 governed_endpoint:
   name: ai-governance-workshop-governed
-  primary_model: databricks-claude-sonnet-4-5
-  fallback_model: databricks-meta-llama-3-3-70b-instruct
+  primary_model: system.ai.claude-sonnet-4-5
+  fallback_model: system.ai.meta-llama-3-3-70b-instruct
   inference_table_prefix: workshop_governed
   rate_limit_per_user_per_min: 50
   guardrails:
@@ -85,11 +91,12 @@ cost:
     # Your negotiated $/DBU. The default is LIST PRICE — until you change it, dollar
     # figures are illustrative (token counts are always real).
     dbu_to_usd: 0.070
-    # Retarget the three tiers to endpoints that exist on this workspace.
+    # The three routing tiers, as v3 UC model services (catalog.schema.service). Retarget to
+    # whichever model services exist on this workspace.
     endpoints:
-      frontier: databricks-claude-sonnet-4-5
-      mid: databricks-meta-llama-3-3-70b-instruct
-      cheap: databricks-meta-llama-3-1-8b-instruct
+      frontier: system.ai.claude-sonnet-4-5
+      mid: system.ai.meta-llama-3-3-70b-instruct
+      cheap: system.ai.meta-llama-3-1-8b-instruct
     # Monthly request volume the comparison scales per-request cost by, so it reports a
     # monthly dollar figure. Set it to the workload's real volume.
     requests_per_month: 10000
