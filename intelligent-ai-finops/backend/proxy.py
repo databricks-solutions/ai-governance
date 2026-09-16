@@ -236,7 +236,7 @@ def serve(messages: list[dict], requested_model: str | None = None, options: dic
         _sem.note_miss()
 
     # ---- Classify complexity + resolve the required tier -----------------
-    # Manual override (Live Gateway "Manual" routing mode): the caller supplies a
+    # Manual override (Context routing "Manual" mode): the caller supplies a
     # 0-100 complexity, so skip the classifier and route on that number. Any other
     # value falls through to automatic classification (the default finops-auto path).
     cx_override = (options or {}).get("complexity")

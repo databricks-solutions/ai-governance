@@ -283,7 +283,7 @@ def models_discover():
 
 @app.get("/api/gateway/cache/stats")
 def gateway_cache_stats():
-    """Semantic-cache stats for the Gateway API tab: hits, misses, hit-rate, $ saved."""
+    """Semantic-cache stats for the Smart routing tab: hits, misses, hit-rate, $ saved."""
     from . import semcache
     return JSONResponse(semcache.stats())
 

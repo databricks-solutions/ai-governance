@@ -13,3 +13,6 @@ tsconfig.tsbuildinfo
 # Maintainer bundle overrides (real workspace values); keep the .example tracked
 databricks.*.local.yml
 !databricks.*.local.yml.example
+
+# tsconfig.json is caught by the root *conf*.json rule; keep it tracked
+!tsconfig.json
