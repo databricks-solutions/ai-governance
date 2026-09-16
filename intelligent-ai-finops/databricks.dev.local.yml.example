@@ -1,0 +1,32 @@
+# EXAMPLE. Copy to databricks.dev.local.yml (gitignored) and fill in YOUR values to
+# override the `dev` target. Merged into databricks.yml via `include: databricks.*.local.yml`.
+# This keeps workspace-specific values out of the repo; customers can instead just fill the
+# `prod` target's variables in databricks.yml. Replace every <placeholder> below.
+targets:
+  dev:
+    variables:
+      warehouse_id: "<your-sql-warehouse-id>"
+      # Autoscaling Lakebase project you own (optional durable cache + pgvector semantic cache).
+      lakebase_endpoint: "projects/<your-project>/branches/production/endpoints/primary"
+      lakebase_host: "<your-endpoint>.database.<region>.cloud.databricks.com"
+      lakebase_db: "databricks_postgres"
+      tools_catalog: "<your-catalog>"
+      tools_schema: "<your-schema>"
+    # Native app-resource attachments: auto-grant the app SP access at deploy (no manual
+    # grant SQL). Only valid because these resources EXIST in your workspace; a blank/missing
+    # resource fails deploy, which is why they live in this gitignored override, not the
+    # committed base app. Lakebase is NOT attached: autoscaling federates the SP via
+    # `databricks postgres create-role ... SERVICE_PRINCIPAL` (see V2_SETUP.md), and the app
+    # connects with the LAKEBASE_ENDPOINT/HOST env.
+    resources:
+      apps:
+        intelligent_ai_finops_v2:
+          resources:
+            - name: warehouse
+              sql_warehouse:
+                id: ${var.warehouse_id}
+                permission: CAN_USE
+            - name: embedding
+              serving_endpoint:
+                name: ${var.embed_endpoint}
+                permission: CAN_QUERY

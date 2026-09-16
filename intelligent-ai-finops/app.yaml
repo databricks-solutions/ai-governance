@@ -1,17 +1,49 @@
 # Databricks Apps entrypoint. FastAPI serves the built React frontend (./dist)
 # as static files and exposes /api. Build the frontend (`npm run build`) before
 # deploying so ./dist exists.
+#
+# NOTE: When deployed via the Asset Bundle (databricks.yml), the app's env is set
+# by that bundle's variable-driven `config.env` block, which OVERRIDES the values
+# here. These are the generic defaults for a manual/standalone deploy; nothing
+# workspace-specific is hardcoded. See V2_SETUP.md for what each one does.
 command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 env:
-  # Live: Compare calls real Model Serving (FMAPI) with the selected model +
-  # prompt — real answer, tokens, latency, and a real LLM-as-judge score.
-  # Set "true" for a fully offline demo (synthesised numbers, placeholder answer).
+  # Live: Compare calls real Model Serving (FMAPI). Set "true" for a fully offline
+  # demo (synthesised numbers + placeholder answers, zero workspace setup).
   - name: FINOPS_DEMO_MODE
     value: "false"
   - name: FINOPS_JUDGE_ENABLED
     value: "true"
-  # $ per DBU used to convert the FMAPI DBU rate card to dollars. 0.07 is the
-  # published AWS/GCP Model Serving list rate; set to your negotiated $/DBU.
+  # $ per DBU used to convert the FMAPI DBU rate card to dollars. 0.07 = published
+  # Model Serving list rate; set to your negotiated $/DBU.
   - name: FINOPS_DBU_TO_USD
     value: "0.07"
+  # Cost tab source: "system_tables" reads real spend/usage from Unity Catalog
+  # system tables via the warehouse below; "demo" synthesises it.
+  - name: FINOPS_DATA_SOURCE
+    value: "system_tables"
+  # ---- Workspace-specific: blank = degrade gracefully; set for your workspace ----
+  # Serverless SQL warehouse the app service principal queries (Cost / coding-agents
+  # / reliability / tools tabs). Blank → those tabs fall back to demo. See V2_SETUP.md.
+  - name: FINOPS_WAREHOUSE_ID
+    value: ""
+  # Embedding endpoint for the semantic cache (any workspace has this by default).
+  - name: FINOPS_EMBED_ENDPOINT
+    value: "databricks-gte-large-en"
+  # Autoscaling Lakebase (Postgres + pgvector) durable cache for the cost overview
+  # AND the semantic cache. Blank → in-process cache (still snappy, but not durable
+  # across restarts/replicas). LAKEBASE_ENDPOINT is the autoscaling endpoint path
+  # (projects/<p>/branches/<b>/endpoints/<e>); setup + SP role in V2_SETUP.md.
+  - name: LAKEBASE_ENDPOINT
+    value: ""
+  - name: LAKEBASE_HOST
+    value: ""
+  - name: LAKEBASE_DB
+    value: "databricks_postgres"
+  # Agent tools the router prunes over = real Unity Catalog functions in this
+  # catalog.schema (discovered live). Blank → a built-in sample set.
+  - name: FINOPS_TOOLS_CATALOG
+    value: ""
+  - name: FINOPS_TOOLS_SCHEMA
+    value: ""

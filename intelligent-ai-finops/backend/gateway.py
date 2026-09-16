@@ -12,22 +12,48 @@ predictable in front of a customer.
 from __future__ import annotations
 
 import re
+import time
 
-from . import compare, judge, models, routing
+from . import compare, compress, judge, models, routing, smartrouting
+from . import guardrails as _guard
+
+# In-process per-user sliding-window rate limiter (app-enforced, Idea 2). One process
+# per app replica - fine for the demo; a shared store (Lakebase) would make it global.
+_RL: dict[str, list[float]] = {}
+
+
+def _rate_check(user: str, per_min: int) -> tuple[bool, int]:
+    """Record a request for `user` and report (allowed, count_in_last_minute). Refuses
+    (allowed=False) once the last-60s count would exceed per_min."""
+    now = time.time()
+    win = [t for t in _RL.get(user, []) if t >= now - 60]
+    if len(win) >= per_min:
+        _RL[user] = win
+        return False, len(win)
+    win.append(now)
+    _RL[user] = win
+    return True, len(win)
 
 # Governance features shown as ticks in the box. `feature` maps to the config
 # panel; `label` is display text; `category` colours the tick.
+# V2: only the governance features that are READABLE + WRITABLE via the serving
+# endpoint's AI Gateway config (SDK/REST `ai_gateway`). Budgets and complexity
+# routing were dropped - they're app-side logic, not gateway config.
+# NOTE: "Usage tracking" was removed as a governance feature - it's always on for
+# system pay-per-token endpoints and has nothing to configure. Its real live state
+# is still shown (read-only) in the "Live AI Gateway config" readout.
 FEATURES = [
     {"id": "rate-limits", "label": "Rate limits", "feature": "rate-limits"},
     {"id": "guardrails", "label": "AI guardrails", "feature": "guardrails"},
-    {"id": "budget", "label": "Budgets routing", "feature": "budgets"},
-    {"id": "routing-policy", "label": "Complexity routing", "feature": "routing-policy"},
+    {"id": "access-control", "label": "Access control", "feature": "access-control"},
     {"id": "inference-tables", "label": "Inference tables", "feature": "inference-tables"},
+    {"id": "fallbacks", "label": "Fallbacks", "feature": "fallbacks"},
 ]
 
 _RANK = {"small-oss": 0, "large-oss": 1, "frontier": 2}
 _VALID_TIERS = set(_RANK)
-_TIER_LABEL = {"small-oss": "small OSS", "large-oss": "large OSS", "frontier": "frontier"}
+# User-facing size-category labels (surface in the routing receipt's requiredTierLabel).
+_TIER_LABEL = {"small-oss": "Small", "large-oss": "Medium", "frontier": "Complex"}
 
 
 def required_tier(complexity: int) -> str:
@@ -182,10 +208,34 @@ def _budget_ceiling(consumed_pct: float, downgrade_at: float | None = None,
     return "frontier", ""
 
 
+def classify_complexity(prompt: str, model_id: str) -> int:
+    """Live routing: ask the ROUTING LLM to score the prompt's complexity 0-100 and
+    route on that. Small models answer this in one cheap call; on any failure fall
+    back to the heuristic classifier so routing never blocks."""
+    rubric = (
+        "You are a routing classifier. Rate how COMPLEX this question is on a 0-100 "
+        "integer scale: 0-34 = trivial lookup / short task, 35-74 = multi-step reasoning "
+        "or analysis, 75-100 = open-ended expert reasoning / architecture / strategy. "
+        "Judge difficulty, not length. Respond with ONLY the integer.\n\n"
+        f"Question:\n{prompt}"
+    )
+    try:
+        r = models.live_query(models.by_id(model_id), rubric, max_tokens=8, temperature=0.0)
+        m = re.search(r"\d{1,3}", r.get("answer") or "")
+        if m:
+            return max(0, min(100, int(m.group())))
+    except Exception:  # noqa: BLE001 - fall back to the heuristic classifier
+        pass
+    return routing.classify(prompt or "")
+
+
 def run(selected_ids: list[str], features: list[str], complexity: int | None = None,
         prompt: str | None = None, budget: dict | None = None,
         bands: list[dict] | None = None, policy: dict | None = None,
-        demo: bool = True) -> dict:
+        router_model: str | None = None, fallback: dict | None = None,
+        guardrails: dict | None = None, rate_limit: dict | None = None,
+        access: dict | None = None,
+        user: str | None = None, demo: bool = True) -> dict:
     """Route the question over the customer's selected models.
 
     The customer's OWN routing policy (see resolve_policy) is either user-defined
@@ -206,7 +256,67 @@ def run(selected_ids: list[str], features: list[str], complexity: int | None = N
     if not sel:
         return {"error": "Pick at least one model for the gateway."}
 
-    cx = complexity if complexity is not None else routing.classify(prompt or "")
+    # ---- App-layer governance (Idea 2): the gateway app enforces these ITSELF, on
+    # every request, before any model call - real for any endpoint, no endpoint config.
+    mask_note: str | None = None
+    # 1) Rate limit (per user, per minute) - in-process sliding window.
+    if rate_limit and rate_limit.get("enabled") and "rate-limits" in features:
+        per_min = max(1, int(rate_limit.get("perMin") or 60))
+        who = user or "you"
+        allowed, count = _rate_check(who, per_min)
+        if not allowed:
+            return {"blocked": True,
+                    "reason": (f"Rate limit reached: {per_min} requests/minute for '{who}'. The gateway "
+                               f"refused this request before any model was called (app-enforced)."),
+                    "trace": [{"kind": "feature", "text": "Rate limits applied at the gateway (app-enforced)"},
+                              {"kind": "route", "text": f"{count} requests in the last minute ≥ limit {per_min} → refused"}]}
+    # 2) Guardrails (PII + keyword) - block the request, or mask the matches and proceed.
+    if guardrails and guardrails.get("enabled") and "guardrails" in features:
+        pii = guardrails.get("pii", True)
+        kws = guardrails.get("keywords") or []
+        findings = _guard.scan(prompt or "", pii=pii, keywords=kws)
+        if findings:
+            cats = ", ".join(sorted({f["category"] for f in findings}))
+            if guardrails.get("mode", "block") == "block":
+                return {"blocked": True,
+                        "reason": (f"Blocked by AI guardrails: detected {cats}. The gateway refused the "
+                                   f"request before any model was called (app-enforced guardrail)."),
+                        "trace": [{"kind": "feature", "text": "AI guardrails applied at the gateway (app-enforced)"},
+                                  {"kind": "route", "text": f"Detected {len(findings)} sensitive item(s): {cats} → blocked"}]}
+            masked, _ = _guard.mask(prompt or "", pii=pii, keywords=kws)
+            prompt = masked  # the sanitized prompt is what gets classified + sent
+            mask_note = f"AI guardrails masked {len(findings)} item(s) ({cats}) before routing"
+    # 3) Access control (ABAC): restrict this requester's GROUP to allowed tiers,
+    # before routing. Mirrors a UC ABAC policy (EXECUTE on model endpoints by group,
+    # e.g. "frontier/Anthropic models -> data scientists only"); the app enforces the
+    # same per the signed-in user's group. A denied tier is filtered out of the
+    # candidate set so routing picks within allowed tiers; if nothing is allowed, block.
+    access_note: str | None = None
+    if access and access.get("enabled") and "access-control" in features:
+        allowed = {t for t in (access.get("allowedTiers") or []) if t in _VALID_TIERS}
+        group = access.get("group") or "this group"
+        if allowed:
+            tiers_txt = ", ".join(_TIER_LABEL[t] for t in sorted(allowed, key=lambda t: _RANK[t]))
+            permitted = [m for m in sel if m.tier in allowed]
+            if not permitted:
+                return {"blocked": True,
+                        "reason": (f"Access policy: {group} may only use {tiers_txt}, but none of the "
+                                   f"selected models are in an allowed tier. No model was called."),
+                        "trace": [{"kind": "feature", "text": "Access control applied at the gateway (ABAC)"},
+                                  {"kind": "route", "text": f"{group} restricted to {tiers_txt} → no permitted model → blocked"}]}
+            denied = [m for m in sel if m.tier not in allowed]
+            sel = permitted
+            if denied:
+                access_note = f"Access policy: {group} restricted to {tiers_txt} ({len(denied)} model(s) denied)"
+
+    # Complexity: a manual/curated pin wins; else the routing LLM classifies it
+    # (live mode), else the heuristic classifier (demo/offline).
+    if complexity is not None:
+        cx = complexity
+    elif not demo and router_model:
+        cx = classify_complexity(prompt or "", router_model)
+    else:
+        cx = routing.classify(prompt or "")
     # Token counts scale with the prompt (input) and complexity (output) - same
     # basis as the Compare tab, so per-query costs line up across the two tabs
     # (instead of a fixed illustrative request size).
@@ -217,7 +327,7 @@ def run(selected_ids: list[str], features: list[str], complexity: int | None = N
 
     # The add-on cost of the small LLM that classifies (routes) the prompt - shown
     # so the story is "even after paying the router, routing cheaper still wins".
-    routing_overhead, router_short = models.router_overhead_usd(prompt)
+    routing_overhead, router_short = models.router_overhead_usd(prompt, model_id=router_model)
 
     base_req, band_label, matched_kw = resolve_policy(cx, prompt, bands, policy)
     base_rank = _RANK[base_req]
@@ -315,6 +425,32 @@ def run(selected_ids: list[str], features: list[str], complexity: int | None = N
         )
     req = chosen.tier
 
+    # V2 true router: compress the prompt (and select/trim the tool schemas) BEFORE
+    # the model call, so the request that actually leaves is smaller. Both are
+    # measured so the saving is provable; the compressed prompt is what we send.
+    prompt_comp = compress.compress_prompt(prompt or "")
+    from . import tools as tools_mod
+    tool_catalog, tool_source = tools_mod.catalog()  # REAL UC functions when configured, else sample
+    tool_comp = compress.compress_tools(prompt or "", tool_catalog)
+    tool_comp["source"] = tool_source
+    send_prompt = prompt_comp["compressed"] or (prompt or "")
+
+    # App-level fallback (real, no custom endpoint): if the Fallbacks tick is on, the
+    # gateway retries the next model in the admin's order when the routed model's call
+    # fails/times out. The app IS the gateway, so it enforces this itself - system
+    # pay-per-token endpoints can't carry native fallback_config, this can. `sel`-scoped.
+    sel_by_id = {m.id: m for m in sel}
+    fb_on = "fallbacks" in features and bool(fallback and fallback.get("enabled", True))
+    fb_ids = [i for i in (fallback or {}).get("order", []) if i in sel_by_id] if fb_on else []
+    if fb_on and not fb_ids:  # default order: the selected models as given
+        fb_ids = [m.id for m in sel]
+    # Serve order: the routed model first, then the fallback chain (deduped).
+    serve_chain = [chosen] + [sel_by_id[i] for i in fb_ids if i != chosen.id]
+    fb_armed = [m.short for m in serve_chain] if fb_on and len(serve_chain) > 1 else []
+    fb_fired = False
+    fb_from: str | None = None
+    served = chosen
+
     # Produce the actual answer + a quality score for the Result panel. Live mode
     # calls the chosen model (real answer/tokens/latency + a real LLM-as-judge);
     # demo mode synthesises so it runs offline. Token counts feed the cost below.
@@ -324,19 +460,34 @@ def run(selected_ids: list[str], features: list[str], complexity: int | None = N
         judge_reason = compare._demo_judge_reason(judge_score)
         latency = models.demo_latency_ms(chosen)
     else:
-        try:
-            live = models.live_query(chosen, prompt or "",
-                                     max_tokens=compare._ANSWER_MAX_TOKENS, system=compare._ANSWER_SYSTEM,
-                                     temperature=0.0)
-            answer = live["answer"] or "(no answer returned)"
-            in_tok, out_tok, latency = live["input_tokens"], live["output_tokens"], live["latency_ms"]
-            judge_score, judge_reason = judge.score_and_reason(prompt or "", answer)
-        except Exception as e:  # noqa: BLE001 - degrade to a visible error, never hang
-            answer = f"[error calling {chosen.short}: {str(e)[:160]}]"
+        chain = serve_chain if fb_on else [chosen]
+        last_err = None
+        served_ok = False
+        for idx, cand in enumerate(chain):
+            try:
+                live = models.live_query(cand, send_prompt,
+                                         max_tokens=compare._ANSWER_MAX_TOKENS, system=compare._ANSWER_SYSTEM,
+                                         temperature=0.0)
+                answer = live["answer"] or "(no answer returned)"
+                in_tok, out_tok, latency = live["input_tokens"], live["output_tokens"], live["latency_ms"]
+                judge_score, judge_reason = judge.score_and_reason(prompt or "", answer)
+                served = cand
+                if idx > 0:  # the routed model failed; a fallback served
+                    fb_fired = True
+                    fb_from = chosen.short
+                served_ok = True
+                break
+            except Exception as e:  # noqa: BLE001 - try the next model in the chain
+                last_err = e
+                continue
+        if not served_ok:
+            answer = f"[error calling {chosen.short}: {str(last_err)[:160]}]"
             judge_score, judge_reason, latency = 0.0, "", 0
 
+    # Cost/quality/logging reflect the model that ACTUALLY answered (`served`), while
+    # `chosen` stays the routed model so the routing trace reads true.
     baseline = max(sel, key=lambda m: m.cost_usd(in_tok, out_tok))
-    cost = chosen.cost_usd(in_tok, out_tok)
+    cost = served.cost_usd(in_tok, out_tok)
     base_cost = baseline.cost_usd(in_tok, out_tok)
     savings = base_cost - cost
     savings_pct = round(savings / base_cost * 100, 1) if base_cost > 0 else 0.0
@@ -347,20 +498,42 @@ def run(selected_ids: list[str], features: list[str], complexity: int | None = N
     for fid in features:
         if fid in feat_labels:
             trace.append({"kind": "feature", "text": f"{feat_labels[fid]} applied at the gateway"})
+    if mask_note:
+        trace.append({"kind": "feature", "text": mask_note})
+    if access_note:
+        trace.append({"kind": "feature", "text": access_note})
     if matched_kw:
-        trace.append({"kind": "route", "text": f"Router (small LLM) matched criteria '{matched_kw}' → needs {_TIER_LABEL[base_req]}"})
+        trace.append({"kind": "route", "text": f"Router ({router_short}) matched criteria '{matched_kw}' → needs {_TIER_LABEL[base_req]}"})
     else:
         band_txt = f" ({band_label} band)" if band_label else ""
-        trace.append({"kind": "route", "text": f"Router (small LLM) scored complexity {cx}{band_txt} → needs {_TIER_LABEL[base_req]}"})
+        trace.append({"kind": "route", "text": f"Router ({router_short}) scored complexity {cx}{band_txt} → needs {_TIER_LABEL[base_req]}"})
     if budget_applied and budget_note:
         trace.append({"kind": "route", "text": budget_note})
     elif budget_applied:
         trace.append({"kind": "route", "text": f"Budget {consumed_pct:.0f}% consumed - below your cap thresholds, no downgrade (all tiers available)"})
     trace.append({"kind": "route", "text": f"Routed to {chosen.short} ({_TIER_LABEL[chosen.tier]})"})
-    trace.append({"kind": "serve", "text": f"Served via Model Serving · {latency} ms"})
+    if fb_armed:
+        trace.append({"kind": "feature", "text": f"Fallback armed: {' → '.join(fb_armed)} (retries on error/timeout)"})
+    if fb_fired:
+        trace.append({"kind": "route", "text": f"Fallback fired: {fb_from} failed → served by {served.short}"})
+    trace.append({"kind": "serve", "text": f"Served by {served.short} via Model Serving · {latency} ms"})
+
+    # The auditable Smart Routing decision (task-type family, language family,
+    # complexity label, plain-English rationale) - describes the ROUTED target.
+    decision = smartrouting.decision(
+        prompt or "", cx, base_req, _TIER_LABEL[base_req],
+        chosen.short, chosen.tier, router_short, matched_kw)
 
     return {
-        "chosen": {"id": chosen.id, "short": chosen.short, "tier": chosen.tier},
+        "chosen": {"id": served.id, "short": served.short, "tier": served.tier},
+        "routedTo": {"id": chosen.id, "short": chosen.short, "tier": chosen.tier},
+        "decision": decision,
+        "fallback": {
+            "enabled": fb_on,
+            "armed": fb_armed,          # ordered shorts the chain would try
+            "fired": fb_fired,          # a fallback actually served this request
+            "from": fb_from,            # the routed model that failed (when fired)
+        } if fb_on else None,
         "costUsd": cost,
         "latencyMs": latency,
         "judgeScore": judge_score,
@@ -383,6 +556,7 @@ def run(selected_ids: list[str], features: list[str], complexity: int | None = N
         "routerModel": router_short,
         "allInCostUsd": cost + routing_overhead,
         "cheaperThanBaselineX": round(base_cost / (cost + routing_overhead), 1) if (cost + routing_overhead) > 0 else None,
+        "compression": {"prompt": prompt_comp, "tools": tool_comp},
         "appliedFeatures": [f for f in features if f in feat_labels],
         "budget": {
             "applied": budget_applied,

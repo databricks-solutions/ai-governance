@@ -1,5 +1,5 @@
-node_modules/
-dist/
+node_modules
+dist
 .venv/
 __pycache__/
 *.pyc
@@ -9,3 +9,7 @@ __pycache__/
 .env
 .databricks/
 tsconfig.tsbuildinfo
+
+# Maintainer bundle overrides (real workspace values); keep the .example tracked
+databricks.*.local.yml
+!databricks.*.local.yml.example

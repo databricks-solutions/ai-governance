@@ -44,7 +44,7 @@ const TILES: Tile[] = [
   { icon: 'shield', title: 'Governance & security built in', body: <>Every call goes through the Unity Gateway: Unity Catalog access control, per-user and per-group rate limits, and dollar budgets - one place to manage and audit all AI spend.</> },
   { icon: 'lock', title: 'One credential, not a drawer of vendor keys', body: <>Every model is reached through the same governed interface, so you manage a single access path under Unity Catalog instead of provisioning, rotating, and securing a separate API key per external vendor.</> },
   { icon: 'dollar', title: 'Real cost attribution, per team & model', body: <>Token usage, latency and cost are logged to governed system tables (<code className="num text-[11px] text-white/90">system.ai_gateway.usage</code>, <code className="num text-[11px] text-white/90">system.serving.*</code>), so savings are measurable and spend is attributable per team - not estimated from vendor invoices.</> },
-  { icon: 'unlock', title: 'No lock-in', body: <>Open-source models mean no dependency on a single vendor's pricing or availability. Route the easy majority of traffic to open models you control, and reserve frontier models for the requests that truly need them.</> },
+  { icon: 'unlock', title: 'No lock-in', body: <>Open-source models mean no dependency on a single vendor's pricing or availability. Route the easy majority of traffic to open models you control, and reserve your most capable models for the requests that truly need them.</> },
   { icon: 'loop', title: 'A continuous improvement loop', body: <>Because every routing decision and outcome is logged in one place, you can measure quality vs. cost over time and tune the policy on <b>your</b> own data - proving and improving savings continuously.</> },
   { icon: 'budget', title: 'Spend controls that actually enforce', body: <>Unity Gateway budgets are evaluated in <b>near-real-time</b> and scoped to a team - so you can throttle, downgrade, or cap spend the moment a budget is crossed, not 6–24 hours later.</> },
 ];
@@ -71,8 +71,8 @@ export function WhyDatabricks() {
             Your models, your routing rules, your data - on one governed platform
           </h2>
           <p className="mt-3 max-w-[86ch] text-[14px] leading-[1.6] text-white/65">
-            Routing every query to a frontier model is the expensive default. Databricks lets you
-            right-size each request across frontier and open-source models behind a single endpoint - 
+            Routing every query to your most capable model is the expensive default. Databricks lets you
+            right-size each request across models of every size behind a single endpoint -
             and, crucially, lets <b className="font-semibold text-white">you</b> decide how routing works instead of accepting a vendor's
             black-box logic.
           </p>

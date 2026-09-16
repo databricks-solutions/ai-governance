@@ -7,3 +7,4 @@ pydantic==2.13.4            # MIT — request/response models
 pyyaml==6.0.3               # MIT — reads config/*.yaml
 requests==2.34.2            # Apache-2.0 — HTTP calls to the FMAPI /invocations endpoint
 mlflow-skinny==3.15.2       # Apache-2.0 — best-effort LLM-as-judge run logging
+pg8000==1.31.5              # BSD-3-Clause — pure-Python Postgres driver for the Lakebase durable cache (permissive; no copyleft)

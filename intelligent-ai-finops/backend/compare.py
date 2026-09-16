@@ -142,7 +142,21 @@ def stream_lane(model_id: str, prompt: str, demo: bool = True,
     scores the answer with `judge_model` (a real LLM-as-judge). Demo mode streams
     a placeholder answer and synthesises the numbers so it runs offline.
     """
-    m = models.by_id(model_id)
+    # Guard the registry lookup: an unknown modelId would otherwise raise inside the
+    # SSE generator (after the 200 header is sent), breaking the stream with an
+    # unhandled exception. Yield a clean, errored `done` event instead so the lane
+    # fails gracefully and the client shows a plain reason - no stack trace.
+    try:
+        m = models.by_id(model_id)
+    except KeyError:
+        yield _sse({
+            "type": "done",
+            "answer": f"Unknown model '{model_id}' - it isn't in the registry for this workspace.",
+            "costUsd": 0, "latencyMs": 0, "judgeScore": 0, "judgeReason": "",
+            "inputTokens": 0, "outputTokens": 0, "totalTokens": 0,
+            "context": None, "error": True,
+        })
+        return
     latency = models.demo_latency_ms(m)
     judge = models.demo_judge(m)
     judge_reason = ""
@@ -180,6 +194,8 @@ def stream_lane(model_id: str, prompt: str, demo: bool = True,
         def _work():
             try:
                 box["live"] = models.live_query(m, prompt, max_tokens=_ANSWER_MAX_TOKENS, system=_ANSWER_SYSTEM, temperature=0.0)
+            except models.GuardrailBlocked as e:  # endpoint guardrail rejected the input - clean human reason
+                box["guardrail"] = str(e)
             except Exception as e:  # noqa: BLE001 - surface as a lane error, don't hang
                 box["err"] = str(e)
 
@@ -191,7 +207,13 @@ def stream_lane(model_id: str, prompt: str, demo: bool = True,
                 yield ": keepalive\n\n"  # SSE comment - ignored by the client, keeps the proxy warm
 
         errored = False
-        if "err" in box:
+        if "guardrail" in box:
+            # Blocked by the endpoint's safety/PII guardrail (often a false positive on a
+            # benign prompt). Show the plain reason - not a stack - and mark the lane failed
+            # so it's excluded from best value, but the comparison still crowns the rest.
+            answer = box["guardrail"]
+            final_cost, latency, errored = 0.0, 0, True
+        elif "err" in box:
             answer = f"[error calling {m.short}: {box['err'][:160]}]"
             final_cost, latency, errored = 0.0, 0, True
         else:

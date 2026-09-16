@@ -73,13 +73,21 @@ def demo_token_counts(prompt: str | None, complexity: int) -> tuple[int, int]:
     return in_tok, out_tok
 
 
-def router_overhead_usd(prompt: str | None, include_optimizer: bool = False) -> tuple[float, str]:
+def router_overhead_usd(prompt: str | None, include_optimizer: bool = False,
+                        model_id: str | None = None) -> tuple[float, str]:
     """The add-on cost of the SMALL LLM that does the routing (and, optionally,
     the prompt optimization) - so the demo can show that even after paying for
     the router/optimizer, routing to a cheaper model still costs far less than
-    always calling the frontier. Priced on the cheapest small-OSS model's rate
-    card. Returns (cost_usd, router_short)."""
-    r = cheapest_of_tier("small-oss")
+    always calling the frontier. Priced on the chosen routing model (defaults to
+    the cheapest small-OSS). Returns (cost_usd, router_short)."""
+    r = None
+    if model_id:
+        try:
+            r = by_id(model_id)
+        except KeyError:
+            r = None
+    if r is None:
+        r = cheapest_of_tier("small-oss")
     in_tok = SYS_OVERHEAD_TOK + est_tokens(prompt or "")
     # Classifier reads the prompt and emits a tiny score (~a few tokens).
     cost = r.cost_usd(in_tok, 8)
@@ -140,6 +148,14 @@ def demo_judge(m: Model) -> float:
     return round(random.uniform(lo, hi), 1)
 
 
+class GuardrailBlocked(Exception):
+    """Raised when a serving endpoint's AI Gateway INPUT guardrail (safety/PII)
+    rejects the prompt before the model runs (HTTP 400, finishReason=
+    input_guardrail_triggered). Not retryable and not our bug - surfaced to the UI
+    as a clear per-lane reason (often a false positive) instead of a generic error,
+    so one guarded endpoint never turns into an endless retry loop."""
+
+
 # ---- live invocation ----------------------------------------------------
 # Reasoning models spend most of their latency (and token budget) on hidden
 # thinking tokens, so max_tokens directly drives BOTH how slow a call is AND
@@ -188,13 +204,17 @@ def _reasoning_suppression(model_id: str) -> dict:
     Verified live on Databricks FMAPI (2026-09):
       - Claude (opus/sonnet/fable): `thinking={"type":"disabled"}` - only 'disabled'
         is accepted (bounded budgets and 'enabled' are rejected for opus-5).
-      - OpenAI family (gpt-*): `reasoning_effort="low"` (thinking is Anthropic-only).
+      - OpenAI family (gpt-*) AND Kimi/GLM/DeepSeek flagships: `reasoning_effort="low"`.
+        Kimi-K3 verified live: plain calls spend ~2x the tokens on verbose thinking
+        and can overrun a tight budget (breaking the JSON judge); `reasoning_effort=low`
+        keeps it terse and clean. `thinking` is Anthropic-only.
     Everything else (gemini/llama/qwen/gemma) gets nothing. If a param turns out
-    unsupported the caller retries without it (see live_query)."""
+    unsupported the caller retries without it (see live_query), so listing an extra
+    family here is safe - a model that rejects the knob just gets a clean retry."""
     mid = model_id.lower()
     if "claude" in mid:
         return {"thinking": {"type": "disabled"}}
-    if "gpt" in mid:
+    if any(k in mid for k in ("gpt", "kimi", "glm", "deepseek")):
         return {"reasoning_effort": "low"}
     return {}
 
@@ -223,6 +243,29 @@ def live_query(m: Model, prompt: str, max_tokens: int = _MAX_TOKENS, system: str
     we ask the model to continue from where it left off and stitch the parts
     together, up to a few rounds. With a generous budget this almost never fires,
     but it guarantees the final parts (recommendation, risks) are never lost."""
+    convo = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+    return _run_chat(m, convo, max_tokens, temperature)
+
+
+def live_chat(m: Model, messages: list[dict], max_tokens: int = _MAX_TOKENS,
+              temperature: float | None = None, continue_on_length: bool = True) -> dict:
+    """Proxy path: serve a full OpenAI-style `messages` array (multi-turn, with an
+    optional system message) rather than a single prompt string. Reuses the exact
+    same reasoning-suppression + 400-retry + length-continuation machinery as
+    live_query (see _run_chat), so a call routed through the /v1/chat/completions
+    proxy behaves identically to a Compare lane. Returns answer + token usage +
+    latency + cost. `continue_on_length=False` disables the continuation rounds so a
+    deliberate output cap (output-shaping) actually bites instead of being 3x'd."""
+    return _run_chat(m, list(messages), max_tokens, temperature, continue_on_length)
+
+
+def _run_chat(m: Model, convo: list[dict], max_tokens: int, temperature: float | None,
+              continue_on_length: bool = True) -> dict:
+    """Shared serving core for live_query (prompt) and live_chat (messages): POST to
+    the endpoint's /invocations with per-family reasoning suppression, retry once
+    without an optional knob a family rejects (400), and continue a length-truncated
+    answer across a few rounds. Single source of truth for how a real model call is
+    made, so both the Compare path and the proxy path stay consistent."""
     import time
 
     import requests
@@ -234,23 +277,67 @@ def live_query(m: Model, prompt: str, max_tokens: int = _MAX_TOKENS, system: str
     url = f"{host}/serving-endpoints/{m.id}/invocations"
     reasoning = _reasoning_suppression(m.id)
 
+    # Transient statuses worth a retry (endpoint briefly overloaded / cold / gateway hiccup).
+    _TRANSIENT = {429, 500, 502, 503, 504}
+
+    def _post(body: dict):
+        """POST with a generous timeout + transient retry so a slow (long multi-part
+        answer) or briefly-overloaded endpoint doesn't fail the whole call. 240s covers
+        a verbose completion; 2 retries with backoff ride out a 429/5xx or a connection
+        blip. Non-transient statuses (incl. 400) return immediately for the caller's
+        knob-drop / guardrail handling."""
+        last_exc = None
+        for attempt in range(3):  # 1 try + 2 retries
+            try:
+                r = requests.post(url, headers=auth, json=body, timeout=240)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                last_exc = e
+                if attempt < 2:
+                    time.sleep(2 * (attempt + 1))
+                    continue
+                raise
+            if r.status_code in _TRANSIENT and attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            return r
+        raise last_exc  # pragma: no cover - loop either returns or raises above
+
     def _one(msgs: list[dict]) -> dict:
         body = {"messages": msgs, "max_tokens": max_tokens}
         if temperature is not None:
             body["temperature"] = temperature
         body.update(reasoning)
-        resp = requests.post(url, headers=auth, json=body, timeout=120)
-        if resp.status_code == 400 and any(k in resp.text for k in ("thinking", "reasoning_effort", "temperature")):
-            # This family doesn't accept one of the optional knobs - retry without them.
-            for k in ("thinking", "reasoning_effort", "temperature"):
+        resp = _post(body)
+        # Many reasoning models (e.g. claude-opus-5) reject a non-default `temperature`
+        # with a 400 whose message does NOT reliably name the parameter (it can come back
+        # conflated with a guardrail/other message). So on ANY 400, drop temperature and
+        # retry - it's an optional tuning knob, always safe to omit - keeping the faster
+        # `thinking:disabled`/`reasoning_effort` suppression in place.
+        if resp.status_code == 400 and "temperature" in body:
+            body.pop("temperature", None)
+            resp = _post(body)
+        # If it STILL 400s because the family rejects the reasoning knob, drop that too.
+        if resp.status_code == 400 and any(k in resp.text for k in ("thinking", "reasoning_effort")):
+            for k in ("thinking", "reasoning_effort"):
                 body.pop(k, None)
-            resp = requests.post(url, headers=auth, json=body, timeout=120)
+            resp = _post(body)
+        # A 400 from the endpoint's INPUT GUARDRAIL (safety/PII) is not retryable and not
+        # our bug: the platform flagged the prompt before the model ran (often a false
+        # positive on a benign business prompt). Surface a clear, human reason so the lane
+        # explains itself and the comparison moves on gracefully - never an endless retry.
+        low = resp.text.lower()
+        if resp.status_code == 400 and ("input_guardrail" in low or "guardrail" in low):
+            raise GuardrailBlocked(
+                f"{m.short}: the prompt was blocked by this endpoint's safety/PII guardrail before "
+                f"the model ran (input flagged - often a false positive). Pick another model, or "
+                f"remove the guardrail on this endpoint."
+            )
         resp.raise_for_status()
         return resp.json()
 
     _CONTINUE = ("Continue exactly where you left off. Do not repeat anything already "
                  "written; finish the remaining parts and end cleanly.")
-    convo = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+    convo = list(convo)
     parts: list[str] = []
     in_tok = out_tok = latency = 0
     max_rounds = 3
@@ -267,8 +354,9 @@ def live_query(m: Model, prompt: str, max_tokens: int = _MAX_TOKENS, system: str
         out_tok += usage.get("completion_tokens") or 0
         if part:
             parts.append(part)
-        # Stop when the model finished naturally, returned nothing, or hit the cap.
-        if finish != "length" or not part or r == max_rounds - 1:
+        # Stop when the model finished naturally, returned nothing, hit the cap, or
+        # when continuation is disabled (a deliberate output cap must not be 3x'd).
+        if finish != "length" or not part or r == max_rounds - 1 or not continue_on_length:
             break
         convo = convo + [{"role": "assistant", "content": part},
                          {"role": "user", "content": _CONTINUE}]

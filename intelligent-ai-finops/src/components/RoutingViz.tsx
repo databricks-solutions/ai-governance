@@ -76,40 +76,44 @@ export function RoutingSteps({ steps, running = false }: { steps: RStep[]; runni
 // A linear axis sized to the frontier line squashes the best-value line onto $0
 // (routed cost is ~30-100× smaller). A log axis makes BOTH lines visible; the
 // (near-constant) vertical gap between them IS the "N× cheaper" multiple.
-export function RoiChart({ roi, frontierLabel = 'FRONTIER ONLY', routedLabel = 'INTELLIGENT ROUTING', frontierColor = 'var(--lava)', routedColor = '#6BB0E8' }: { roi: Roi | null; frontierLabel?: string; routedLabel?: string; frontierColor?: string; routedColor?: string }) {
+export function RoiChart({ roi, frontierLabel = 'FRONTIER ONLY', routedLabel = 'INTELLIGENT ROUTING', frontierColor = 'var(--lava)', routedColor = '#6BB0E8', periods = 12, periodNoun = 'months', totalSuffix = 'yr' }: { roi: Roi | null; frontierLabel?: string; routedLabel?: string; frontierColor?: string; routedColor?: string; periods?: number; periodNoun?: string; totalSuffix?: string }) {
   const W = 380, H = 140, PADL = 48, PADR = 16, PADT = 12, PADB = 30;
   // Unique gradient ids per colour pair so two charts with different palettes on
   // the same page (Compare = red/blue, Cost = blue/green) don't share a fill.
   const uid = `${frontierColor}-${routedColor}`.replace(/[^a-zA-Z0-9]/g, '');
   const frGradId = `frGrad-${uid}`, rtGradId = `rtGrad-${uid}`;
   if (!roi) return <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" />;
-  // Cumulative cost at the END of month i. Month 0 (=$0) is undefined on a log
-  // axis, so we plot months 1..12.
+  // roi.monthly holds the PER-PERIOD cost (a month for the Cost tab, a day for the
+  // Compare tab). Cumulative cost at the END of period i. Period 0 (=$0) is undefined
+  // on a log axis, so we plot 1..periods.
+  const N = Math.max(2, periods);
   const frAt = (i: number) => roi.monthly.frontier * i;
   const rtAt = (i: number) => roi.monthly.routed * i;
-  const fr12 = frAt(12), rt12 = rtAt(12);
-  const mo = Array.from({ length: 12 }, (_, i) => i + 1); // 1..12
-  // Log domain: nice powers of ten bounding routed-month-1 (smallest) and
-  // frontier-month-12 (largest).
+  const frN = frAt(N), rtN = rtAt(N);
+  const pts = Array.from({ length: N }, (_, i) => i + 1); // 1..N
+  // Log domain: nice powers of ten bounding routed-period-1 (smallest) and
+  // frontier-period-N (largest).
   const lo = Math.max(rtAt(1), 1e-9);
-  const hi = Math.max(fr12, lo * 10);
+  const hi = Math.max(frN, lo * 10);
   const lBot = Math.floor(Math.log10(lo));
   const lTop = Math.ceil(Math.log10(hi));
   const yLo = Math.pow(10, lBot);
-  const x = (i: number) => PADL + ((i - 1) / 11) * (W - PADL - PADR);
+  const x = (i: number) => PADL + ((i - 1) / (N - 1)) * (W - PADL - PADR);
   const y = (v: number) => H - PADB - ((Math.log10(Math.max(v, yLo)) - lBot) / (lTop - lBot)) * (H - PADT - PADB);
-  const line = (f: (i: number) => number) => mo.map((i, k) => `${k === 0 ? 'M' : 'L'}${x(i)},${y(f(i))}`).join(' ');
-  const areaTo = (f: (i: number) => number) => `${line(f)} L${x(12)},${y(yLo)} L${x(1)},${y(yLo)} Z`;
+  const line = (f: (i: number) => number) => pts.map((i, k) => `${k === 0 ? 'M' : 'L'}${x(i)},${y(f(i))}`).join(' ');
+  const areaTo = (f: (i: number) => number) => `${line(f)} L${x(N)},${y(yLo)} L${x(1)},${y(yLo)} Z`;
   const ticks: number[] = [];
   for (let p = lBot; p <= lTop; p++) ticks.push(Math.pow(10, p));
-  // The savings multiple = frontier / best-value (constant across the year); the
-  // gap between the two lines visualises exactly this.
-  const cheaperX = rt12 > 0 ? fr12 / rt12 : null;
+  // The savings multiple = frontier / best-value (constant across time); the gap
+  // between the two lines visualises exactly this.
+  const cheaperX = rtN > 0 ? frN / rtN : null;
   const cheaperLabel = cheaperX == null ? null : cheaperX >= 10 ? Math.round(cheaperX) : Math.round(cheaperX * 10) / 10;
-  const gapMidY = (y(frAt(11)) + y(rtAt(11))) / 2;
+  // Evenly spaced x-axis ticks (5) across 1..N.
+  const xTicks = Array.from(new Set(Array.from({ length: 5 }, (_, k) => Math.round(1 + (k * (N - 1)) / 4))));
+  const total = `/${totalSuffix}`;
   // When the frontier model IS the best value (nothing cheaper cleared the bar),
   // the two lines coincide - draw a SINGLE line instead of two overlapping ones.
-  const single = Math.abs(fr12 - rt12) < Math.max(fr12, 1) * 0.005;
+  const single = Math.abs(frN - rtN) < Math.max(frN, 1) * 0.005;
   return (
     <div>
       {/* Legend above the plot: one row when the frontier is the best value, two otherwise. */}
@@ -118,24 +122,24 @@ export function RoiChart({ roi, frontierLabel = 'FRONTIER ONLY', routedLabel = '
           <div className="flex items-center gap-2">
             <span className="h-[3px] w-4 shrink-0 rounded-full" style={{ background: frontierColor }} />
             <span className="text-[10px] font-bold uppercase tracking-[.06em]" style={{ color: frontierColor }}>{frontierLabel} = best value</span>
-            <span className="num shrink-0 text-[13px] font-bold" style={{ color: frontierColor }}>{compact(fr12)}/yr</span>
+            <span className="num shrink-0 text-[13px] font-bold" style={{ color: frontierColor }}>{compact(frN)}{total}</span>
           </div>
         ) : (
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-2">
               <span className="h-[3px] w-4 shrink-0 rounded-full" style={{ background: frontierColor }} />
               <span className="text-[10px] font-bold uppercase tracking-[.06em]" style={{ color: frontierColor }}>{frontierLabel}</span>
-              <span className="num shrink-0 text-[13px] font-bold" style={{ color: frontierColor }}>{compact(fr12)}/yr</span>
+              <span className="num shrink-0 text-[13px] font-bold" style={{ color: frontierColor }}>{compact(frN)}{total}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="h-[3px] w-4 shrink-0 rounded-full" style={{ background: routedColor }} />
               <span className="text-[10px] font-bold uppercase tracking-[.06em]" style={{ color: routedColor }}>{routedLabel}</span>
-              <span className="num shrink-0 text-[13px] font-bold" style={{ color: routedColor }}>{compact(rt12)}/yr</span>
+              <span className="num shrink-0 text-[13px] font-bold" style={{ color: routedColor }}>{compact(rtN)}{total}</span>
             </div>
           </div>
         )}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="ROI projection over 12 months, log scale">
+      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`ROI projection over ${N} ${periodNoun}, log scale`}>
         <defs>
           <linearGradient id={frGradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={frontierColor} stopOpacity="0.26" />
@@ -156,25 +160,34 @@ export function RoiChart({ roi, frontierLabel = 'FRONTIER ONLY', routedLabel = '
         {/* fills + lines. When single (frontier == best value) draw ONE lava line. */}
         <path d={areaTo(frAt)} fill={`url(#${frGradId})`} />
         {!single && <path d={areaTo(rtAt)} fill={`url(#${rtGradId})`} />}
-        <path key={`f${Math.round(fr12)}`} d={line(frAt)} fill="none" stroke={frontierColor} strokeWidth={2.2} className="[stroke-dasharray:600] [stroke-dashoffset:600] motion-safe:animate-[draw_1s_ease_forwards]" />
-        {!single && <path key={`r${Math.round(rt12)}`} d={line(rtAt)} fill="none" stroke={routedColor} strokeWidth={2.2} className="[stroke-dasharray:600] [stroke-dashoffset:600] motion-safe:animate-[draw_1s_ease_.15s_forwards]" />}
-        <circle cx={x(12)} cy={y(fr12)} r={3} fill={frontierColor} />
-        {!single && <circle cx={x(12)} cy={y(rt12)} r={3} fill={routedColor} />}
-        {/* The gap = the savings multiple. Only when the two lines are distinct. */}
-        {!single && cheaperLabel != null && cheaperLabel >= 1.2 && (
-          <g>
-            <line x1={x(11)} y1={y(frAt(11)) + 3} x2={x(11)} y2={y(rtAt(11)) - 3} stroke="rgba(255,255,255,0.35)" strokeWidth={1} strokeDasharray="2 2" />
-            <g transform={`translate(${x(11)}, ${gapMidY})`}>
-              <rect x={-34} y={-8} width={68} height={16} rx={8} fill="#141414" opacity={0.9} stroke="rgba(255,255,255,0.25)" strokeWidth={0.75} />
-              <text x={0} y={3.4} textAnchor="middle" fontSize={8.5} fontWeight={700} fill="#93D3AB" className="num">{cheaperLabel}× cheaper</text>
+        <path key={`f${Math.round(frN)}`} d={line(frAt)} fill="none" stroke={frontierColor} strokeWidth={2.2} className="[stroke-dasharray:600] [stroke-dashoffset:600] motion-safe:animate-[draw_1s_ease_forwards]" />
+        {!single && <path key={`r${Math.round(rtN)}`} d={line(rtAt)} fill="none" stroke={routedColor} strokeWidth={2.2} className="[stroke-dasharray:600] [stroke-dashoffset:600] motion-safe:animate-[draw_1s_ease_.15s_forwards]" />}
+        <circle cx={x(N)} cy={y(frN)} r={3} fill={frontierColor} />
+        {!single && <circle cx={x(N)} cy={y(rtN)} r={3} fill={routedColor} />}
+        {/* "N× cheaper" placed INSIDE the plot, centred in the gap between the two
+            lines. Centred (not right-aligned) so the chip can never clip the plot edge
+            the way the old pill did, with a small background chip and a compact 9.5px
+            font (smaller than the previous large label) so it stays legible over the fill. */}
+        {!single && cheaperLabel != null && cheaperLabel >= 1.2 && (() => {
+          const li = (N + 1) / 2;              // centre period
+          const lx = x(li);                    // = plot centre x, always well inside
+          const lyF = y(frAt(li)), lyR = y(rtAt(li));
+          const ly = (lyF + lyR) / 2;          // midway between frontier + routed lines
+          const txt = `${cheaperLabel}× cheaper`;
+          const bw = txt.length * 5.4 + 12;    // chip width sized to the text (no truncation)
+          return (
+            <g>
+              <line x1={lx} y1={lyF + 2} x2={lx} y2={lyR - 2} stroke="rgba(255,255,255,0.3)" strokeWidth={1} strokeDasharray="2 2" />
+              <rect x={lx - bw / 2} y={ly - 8} width={bw} height={16} rx={5} fill="rgba(9,12,16,0.78)" stroke="#93D3AB" strokeOpacity={0.55} strokeWidth={0.8} />
+              <text x={lx} y={ly + 3.3} textAnchor="middle" fontSize={9.5} fontWeight={800} fill="#93D3AB" className="num">{txt}</text>
             </g>
-          </g>
-        )}
-        {[1, 3, 6, 9, 12].map((i) => <text key={i} x={x(i)} y={H - PADB + 13} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,0.4)" className="num">{i}</text>)}
+          );
+        })()}
+        {xTicks.map((i) => <text key={i} x={x(i)} y={H - PADB + 13} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,0.4)" className="num">{i}</text>)}
         {/* x-axis title */}
-        <text x={(PADL + (W - PADR)) / 2} y={H - 5} textAnchor="middle" fontSize={8} fontWeight={700} fill="rgba(255,255,255,0.5)" style={{ letterSpacing: '.08em' }}>MONTHS</text>
+        <text x={(PADL + (W - PADR)) / 2} y={H - 5} textAnchor="middle" fontSize={8} fontWeight={700} fill="rgba(255,255,255,0.5)" style={{ letterSpacing: '.08em' }}>{periodNoun.toUpperCase()}</text>
       </svg>
-      <div className="mt-1 text-center text-[10px] text-white/40">{single ? 'cumulative cost over 12 months · the frontier model was the best value here — nothing cheaper cleared the bar' : 'cumulative cost over 12 months · log scale — the gap between the lines is the savings multiple'}</div>
+      <div className="mt-1 text-center text-[10px] text-white/40">{single ? `cumulative cost over ${N} ${periodNoun} · the frontier model was the best value here — nothing cheaper cleared the bar` : `cumulative cost over ${N} ${periodNoun} · log scale — the gap between the lines is the savings multiple`}</div>
     </div>
   );
 }

@@ -7,9 +7,9 @@ import { QUESTION_LIBRARY, QUESTION_DOMAINS, QUESTION_TIERS, type QTier } from '
 // Simple → small OSS (moss), Medium → large OSS (amber), Complex → frontier (plum).
 
 const TIER_ACCENT: Record<QTier, { chip: string; bar: string; note: string }> = {
-  Simple: { chip: 'bg-moss-wash text-moss', bar: 'bg-moss', note: 'routes to small OSS' },
-  Medium: { chip: 'bg-amber-wash text-amber', bar: 'bg-amber', note: 'routes to large OSS' },
-  Complex: { chip: 'bg-plum-wash text-plum', bar: 'bg-plum', note: 'routes to frontier' },
+  Simple: { chip: 'bg-moss-wash text-moss', bar: 'bg-moss', note: 'routes to Small' },
+  Medium: { chip: 'bg-amber-wash text-amber', bar: 'bg-amber', note: 'routes to Medium' },
+  Complex: { chip: 'bg-plum-wash text-plum', bar: 'bg-plum', note: 'routes to Complex' },
 };
 
 export function QuestionLibrary({ onPick, onClose }: { onPick: (q: string) => void; onClose: () => void }) {

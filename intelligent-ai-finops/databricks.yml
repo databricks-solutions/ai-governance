@@ -1,18 +1,68 @@
-# Databricks Asset Bundle — one-command deploy of the Intelligent AI FinOps app
-# to any workspace.
+# Databricks Asset Bundle: one-command, fully config-driven deploy of the
+# Intelligent AI FinOps app to ANY workspace.
 #
-#   1. npm install && npm run build      # produce ./dist (the built frontend)
-#   2. databricks bundle deploy -t dev --profile <your-profile>
-#   3. databricks bundle run intelligent_ai_finops -t dev --profile <your-profile>
+#   1. npm install && npm run build                               # produce ./dist
+#   2. databricks bundle deploy -t <target> --profile <profile>
+#   3. databricks bundle run intelligent_ai_finops_v2 -t <target> --profile <profile>
 #
-# The app runs in demo mode by default (no serving-endpoint setup needed). Flip
-# FINOPS_DEMO_MODE=false in config/app-env or the app.yaml to hit live endpoints.
+# Everything workspace-specific is a bundle VARIABLE (see `variables:` below),
+# resolved per TARGET. Nothing is hardcoded in app.yaml or the backend; the
+# backend reads only env vars, and this bundle sets them via the app `config.env`
+# block, which OVERRIDES app.yaml at deploy time. To stand it up in your own
+# workspace, fill in the `prod` target's variables (or pass `--var key=value`).
 bundle:
-  name: intelligent-ai-finops
+  name: intelligent-ai-finops-v2
 
-# Only the runtime files are uploaded. node_modules / src / build config are
-# excluded so the Apps builder never runs `npm install`; dist is force-included
-# because .gitignore excludes it locally.
+# Optional gitignored maintainer override, merged in when present. It carries the
+# repo maintainer's real sandbox values + the `dev` app-resource attachments, so
+# nothing workspace-specific ships in this repo. The glob matching zero files (a
+# fresh customer clone) is fine. Customers deploy the `prod` target with their own
+# values instead - see databricks.dev.local.yml.example for the shape.
+include:
+  - databricks.*.local.yml
+
+variables:
+  # ---- Runtime behaviour (safe defaults; usually unchanged) -------------
+  demo_mode:
+    description: "true = fully offline synthesised numbers (zero setup); false = call real Model Serving."
+    default: "false"
+  judge_enabled:
+    description: "LLM-as-judge scoring in the Compare tab."
+    default: "true"
+  dbu_to_usd:
+    description: "Your $/DBU. 0.07 = published Model Serving list rate; set your negotiated rate."
+    default: "0.07"
+  data_source:
+    description: "Cost tab data: system_tables (real UC system tables) or demo."
+    default: "system_tables"
+  embed_endpoint:
+    description: "Embedding endpoint for the semantic cache."
+    default: "databricks-gte-large-en"
+  # ---- Workspace-specific (blank = that feature degrades gracefully) ----
+  # Leave blank and the app falls back safely: cost tab → demo numbers, semantic
+  # cache → in-process, tools demo → sample set. Set them to light the live paths.
+  warehouse_id:
+    description: "Serverless SQL warehouse id the app SP can use (Cost / coding-agents / reliability / tools tabs)."
+    default: ""
+  lakebase_endpoint:
+    description: "Autoscaling Lakebase endpoint path (projects/<p>/branches/<b>/endpoints/<e>) for the durable cache (cost overview + semantic cache pgvector). Optional."
+    default: ""
+  lakebase_host:
+    description: "Lakebase endpoint host (from `postgres list-endpoints ... .status.hosts.host`). Optional."
+    default: ""
+  lakebase_db:
+    description: "Lakebase database name (holds the finops schema + pgvector semcache)."
+    default: "databricks_postgres"
+  tools_catalog:
+    description: "UC catalog holding agent-tool functions for the tool-compression demo. Optional."
+    default: ""
+  tools_schema:
+    description: "UC schema holding agent-tool functions. Optional."
+    default: ""
+
+# Only runtime files are uploaded. node_modules / src / build config are excluded
+# so the Apps builder never runs `npm install`; dist is force-included because
+# .gitignore excludes it locally.
 sync:
   include:
     - dist/**
@@ -28,21 +78,89 @@ sync:
     - tsconfig.tsbuildinfo
     - tailwind.config.ts
     - postcss.config.js
-    # Anchor to the repo root so ONLY the Vite template index.html is excluded -
-    # an unanchored `index.html` also matches dist/index.html (the SPA entry
-    # point) and silently ships a broken build.
-    - /index.html
+    # NOTE: do NOT exclude index.html here. The pattern also matches dist/index.html
+    # (the SPA entry point), so a plain `bundle deploy` would ship stale assets with
+    # an un-updated index.html → a white page after every rebuild. The repo-root Vite
+    # template index.html DOES get uploaded, but it is never served: FastAPI mounts
+    # StaticFiles from ./dist only (see backend/main.py), so the served page is always
+    # dist/index.html. Shipping the harmless root template is the price of a reliable,
+    # one-command deploy (no manual `workspace import` step for customers).
 
 resources:
   apps:
-    intelligent_ai_finops:
-      name: intelligent-ai-finops
-      description: "Intelligent AI FinOps — governed multi-model routing on Databricks (FMAPI + Unity AI Gateway)."
+    intelligent_ai_finops_v2:
+      name: intelligent-ai-finops-v2
+      description: "Intelligent AI FinOps: governed multi-model routing on Databricks (FMAPI + Unity AI Gateway)."
       source_code_path: .
+      # On-behalf-of-user scopes so admin governance writes (rate limits, guardrails,
+      # usage) execute as the signed-in user. `model-serving` = manage serving
+      # endpoints; `sql` = warehouse for cost reads. Declared HERE so bundle deploy
+      # never wipes it. The admin must consent once in-browser at first login.
+      user_api_scopes:
+        - model-serving
+        - sql
+      # App runtime config. This env block is VARIABLE-DRIVEN and OVERRIDES the
+      # values in app.yaml at deploy time (verified precedence), so the committed
+      # app.yaml stays generic and each target injects its own workspace values.
+      config:
+        command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+        env:
+          - name: FINOPS_DEMO_MODE
+            value: ${var.demo_mode}
+          - name: FINOPS_JUDGE_ENABLED
+            value: ${var.judge_enabled}
+          - name: FINOPS_DBU_TO_USD
+            value: ${var.dbu_to_usd}
+          - name: FINOPS_DATA_SOURCE
+            value: ${var.data_source}
+          - name: FINOPS_WAREHOUSE_ID
+            value: ${var.warehouse_id}
+          - name: FINOPS_EMBED_ENDPOINT
+            value: ${var.embed_endpoint}
+          - name: LAKEBASE_ENDPOINT
+            value: ${var.lakebase_endpoint}
+          - name: LAKEBASE_HOST
+            value: ${var.lakebase_host}
+          - name: LAKEBASE_DB
+            value: ${var.lakebase_db}
+          - name: FINOPS_TOOLS_CATALOG
+            value: ${var.tools_catalog}
+          - name: FINOPS_TOOLS_SCHEMA
+            value: ${var.tools_schema}
 
 targets:
+  # Maintainer target (default). All workspace-specific values AND the dev
+  # app-resource attachments (warehouse + embedding) live in a gitignored
+  # `databricks.*.local.yml` merged via `include` above, so nothing workspace-
+  # specific ships in this repo. Without that file, dev has blank values and the
+  # app degrades safely (cost -> demo, cache -> in-process). Customers deploy the
+  # `prod` target below with their own values.
   dev:
     mode: development
     default: true
-    # host comes from --profile (or DATABRICKS_HOST); nothing workspace-specific
-    # is hardcoded, so this bundle deploys to any workspace.
+
+  # Customer deploy. Fill these in for YOUR workspace (or pass --var / add the
+  # grants in V2_SETUP.md). Blank workspace vars degrade gracefully, so a first
+  # deploy always runs even before every grant is in place.
+  #   databricks bundle deploy -t prod --profile <your-profile>
+  #   databricks bundle run  intelligent_ai_finops_v2 -t prod --profile <your-profile>
+  prod:
+    variables:
+      dbu_to_usd: "0.07"          # your negotiated $/DBU
+      warehouse_id: ""            # serverless SQL warehouse id the app SP can use
+      lakebase_endpoint: ""       # optional durable cache: autoscaling endpoint path (see V2_SETUP.md)
+      lakebase_host: ""           # optional durable cache: endpoint host
+      tools_catalog: ""           # optional (agent-tool functions)
+      tools_schema: ""            # optional (agent-tool functions)
+    # RECOMMENDED once your resources exist: attach them so the app SP is granted
+    # access automatically (replaces the manual grant SQL in V2_SETUP.md). Set the
+    # ids/names to resources that EXIST in your workspace, then uncomment. Leave
+    # commented for a first/demo deploy (a blank or missing resource fails deploy).
+    # resources:
+    #   apps:
+    #     intelligent_ai_finops_v2:
+    #       resources:
+    #         - name: warehouse
+    #           sql_warehouse: { id: "<your-serverless-warehouse-id>", permission: CAN_USE }
+    #         - name: embedding
+    #           serving_endpoint: { name: "databricks-gte-large-en", permission: CAN_QUERY }
