@@ -12,7 +12,7 @@ item below as green or red with the exact fix.
 | # | Feature / service | Required for | Notes |
 |---|---|---|---|
 | 1 | **Databricks Apps** | Everything | The app runs as an Apps container. |
-| 2 | **Model Serving / Foundation Model APIs** (pay-per-token) | Live Compare, Smart routing, Gateway API | The endpoints in `config/models.yaml` must exist in your **region**; the app SP needs `CAN_QUERY`. |
+| 2 | **Model Serving / Foundation Model APIs** (pay-per-token) | Live Compare, Smart routing, the OpenAI-compatible proxy (`/v1/chat/completions`) | The endpoints in `config/models.yaml` must exist in your **region**; the app SP needs `CAN_QUERY`. |
 | 3 | **Embedding endpoint** (`databricks-gte-large-en`) | Semantic cache | Present by default in most workspaces; SP needs `CAN_QUERY`. Override with `embed_endpoint`. |
 | 4 | **Serverless SQL warehouse** | Cost & savings, coding-agents, reliability, tools tabs | Any small serverless warehouse; SP needs `CAN USE`. Set `warehouse_id`. |
 | 5 | **Unity Catalog system tables** | Real cost / usage data | Grant SP `SELECT` on `system.ai_gateway` and `system.serving` (and `system.billing` for billed-$). Metastore-admin action. |

@@ -148,19 +148,18 @@ In the manual path, `app.yaml` supplies the env, so set your values there (the b
 1. **Compare models**: one prompt, up to three lanes, live streaming plus an LLM judge;
    the cheapest answer within a judge point of the best wins. Includes an example-question
    library across Simple / Medium / Complex.
-2. **Smart routing**: pick the models you would route across and the governance to apply
-   (rate limits, guardrails, complexity-based routing, budget easing). It routes to the
+2. **Smart routing**: the live `POST /v1/chat/completions` proxy (point any OpenAI client at
+   it with model `finops-auto`). Pick the models you would route across and the governance to
+   apply (rate limits, guardrails, complexity-based routing, budget easing); it routes to the
    cheapest model that clears the complexity bar, and as the budget fills that bar tightens.
-   A User / Admin persona toggle locks the model set for end users.
+   Every response carries a routing receipt (served-by, cost, savings, complexity, guardrail /
+   cache / fallback badges) plus the semantic-cache stats. A User / Admin persona toggle locks
+   the model set for end users.
 3. **Cost & savings**: real spend from system tables, spend by model and tier, the routed
    vs frontier counterfactual (what routing avoided on real traffic), coding-agent spend by
    harness and developer, gateway reliability, chargeback by team, and a forward projection.
-4. **Gateway API**: the live `POST /v1/chat/completions` proxy. Try a prompt (including
-   `finops-auto`), see the routing receipt (served-by, cost, savings, complexity, guardrail
-   / cache / fallback badges), the semantic-cache stats, a budget cap, and the deployment
-   readiness panel.
-5. **Why Databricks**: build-vs-inherit, with the real config and SQL artifacts.
-6. **How it works**: the request flow end to end, one governed gateway to the cheapest
+4. **Why Databricks**: build-vs-inherit, with the real config and SQL artifacts.
+5. **How it works**: the request flow end to end, one governed gateway to the cheapest
    sufficient model and back.
 
 ---
@@ -187,7 +186,6 @@ In the manual path, `app.yaml` supplies the env, so set your values there (the b
 │   ├── codingagents.py      coding-agent spend from user_agent
 │   ├── reliability.py       gateway fallback / error telemetry
 │   ├── setup.py             /api/setup/readiness + endpoint discovery
-│   ├── evalset.py           bring-your-own eval set (routed vs frontier, judged)
 │   ├── compare.py           Compare streaming lanes
 │   └── judge.py             LLM-as-judge (+ best-effort MLflow)
 ├── src/                     Vite + React + TS frontend
