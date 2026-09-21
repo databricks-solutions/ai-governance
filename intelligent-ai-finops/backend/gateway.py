@@ -135,8 +135,11 @@ def resolve_policy(cx: int, prompt: str | None, bands: list[dict] | None,
 
     Two policy modes (see the Routing policy Configure panel):
       - "criteria": free-text rules ("code -> small", "finance -> complex") are
-        parsed to keyword→tier; a matching keyword forces that tier, regardless
-        of the complexity score.
+        parsed to keyword→tier. A matching keyword sets the category, but the
+        complexity score is a FLOOR: a keyword can route an easy or ambiguous
+        query UP to a category, yet never route a genuinely complex query BELOW
+        the tier its complexity requires (so "sql -> small" cannot send a hard
+        SQL-architecture question to a tiny model).
       - "bands" (default): the complexity score falls into a user-defined band.
     With no user policy at all, the default config thresholds apply.
     Returns (tier, label, matched_keyword)."""
@@ -144,8 +147,20 @@ def resolve_policy(cx: int, prompt: str | None, bands: list[dict] | None,
     mode = policy.get("mode")
     clean = [b for b in (bands or []) if b.get("tier") in _VALID_TIERS]
 
-    # 1) criteria mode: a keyword rule wins over the score. Prefer structured
-    # rules ([{keywords, tier}]) from the row editor; fall back to parsing free text.
+    # The complexity score's implied tier - the routing FLOOR. Customer bands set
+    # it if any were defined; otherwise the default config thresholds do.
+    def _score_tier() -> tuple[str, str | None]:
+        if clean:
+            for b in sorted(clean, key=lambda x: x.get("min", 0)):
+                if b.get("min", 0) <= cx <= b.get("max", 100):
+                    return b["tier"], b.get("label")
+            top = max(clean, key=lambda x: x.get("max", 100))  # above all bands → the top one
+            return top["tier"], top.get("label")
+        return required_tier(cx), None
+
+    # 1) criteria mode: a keyword sets the category, bounded below by complexity.
+    # Prefer structured rules ([{keywords, tier}]) from the row editor; fall back
+    # to parsing free text.
     if mode == "criteria" and prompt:
         low = prompt.lower()
         rules = policy.get("rules")
@@ -163,18 +178,16 @@ def resolve_policy(cx: int, prompt: str | None, bands: list[dict] | None,
         for kws, tier in parsed:
             for kw in kws:
                 if kw and kw in low:
-                    return tier, f'criteria "{kw}"', kw
+                    floor_tier, _ = _score_tier()
+                    # Keyword can raise the tier; complexity wins when the keyword
+                    # would under-route a harder query below its required tier.
+                    if _RANK[tier] >= _RANK[floor_tier]:
+                        return tier, f'criteria "{kw}"', kw
+                    return floor_tier, (f'complexity {cx} (kept above criteria "{kw}")'), kw
 
-    # 2) score falls into a band
-    if clean:
-        for b in sorted(clean, key=lambda x: x.get("min", 0)):
-            if b.get("min", 0) <= cx <= b.get("max", 100):
-                return b["tier"], b.get("label"), None
-        top = max(clean, key=lambda x: x.get("max", 100))  # above all bands → the top one
-        return top["tier"], top.get("label"), None
-
-    # 3) default policy thresholds
-    return required_tier(cx), None, None
+    # 2) no keyword matched → the complexity score decides (bands or thresholds)
+    tier, label = _score_tier()
+    return tier, label, None
 
 
 def _action_label(action: str) -> str:

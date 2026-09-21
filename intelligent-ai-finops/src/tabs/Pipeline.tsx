@@ -397,7 +397,8 @@ export function Pipeline() {
       }
       // Complexity: a curated question's hand-tuned score wins; else the classifier scores
       // it live. In Manual mode (auto-classifier OFF) the keyword criteria decide the
-      // category (a match overrides the score); anything unmatched falls back to the score.
+      // category, but complexity is a floor (a keyword can raise the tier, never route a
+      // complex query below its score); anything unmatched falls back to the score.
       const complexity = knownCx.get(text) ?? undefined;
 
       const finopsOpts: Record<string, unknown> = {
@@ -600,7 +601,7 @@ export function Pipeline() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-2 text-[11px] leading-[1.5] text-white/45">A prompt containing one of a category's keywords routes to that category; anything unmatched falls back to the classifier's score. In production the small router LLM interprets these directly.</p>
+                  <p className="mt-2 text-[11px] leading-[1.5] text-white/45">A prompt containing one of a category's keywords routes to that category, but complexity is a floor: keywords can raise a query to a bigger model, never send a genuinely complex prompt to a smaller one. Anything unmatched falls back to the classifier's score. In production the small router LLM interprets these directly.</p>
                 </div>
               )}
 
