@@ -111,7 +111,16 @@ uvicorn backend.main:app --port 8000
 ```
 For hot-reload frontend dev: `npm run dev` (Vite on :5173, proxies `/api` to :8000).
 
-### Deploy to your workspace (Asset Bundle, recommended)
+### Deploy to your workspace (one step)
+```bash
+./deploy.sh --profile <your-profile>                    # build + deploy + run + print URL
+./deploy.sh --profile <your-profile> --var demo_mode=true  # zero-setup offline demo
+```
+`deploy.sh` runs the three steps below in order and prints the app URL. Everything
+workspace-specific is a bundle variable with a safe default, so the first deploy always
+comes up (features degrade gracefully until you grant them). See `./deploy.sh --help`.
+
+### Deploy to your workspace (Asset Bundle, the steps deploy.sh runs)
 ```bash
 npm install && npm run build     # dist must exist before deploy
 
