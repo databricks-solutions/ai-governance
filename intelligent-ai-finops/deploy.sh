@@ -1,41 +1,43 @@
 #!/usr/bin/env bash
 #
-# One-step deploy of the Intelligent AI FinOps app to ANY Databricks workspace.
+# One-step deploy (and optional live wiring) of the Intelligent AI FinOps app.
 #
-# It runs the three steps the bundle needs, in order:
-#   1. build the React frontend  (npm ci && npm run build  -> ./dist)
-#   2. databricks bundle deploy  (upload files + create the app resource)
-#   3. databricks bundle run     (start the app)
-# then prints the app URL.
+# Deploy only:
+#   ./deploy.sh --profile <profile>                        # build + deploy + run + URL
+#   ./deploy.sh --profile <profile> --var demo_mode=true   # zero-setup offline demo
+#   ./deploy.sh --profile <profile> --no-build             # reuse ./dist
 #
-# Everything workspace-specific is a bundle variable with a safe default, so a
-# first deploy always comes up (features degrade gracefully until you grant them
-# - see V2_SETUP.md). For a zero-prerequisite demo, deploy with demo mode on:
-#   ./deploy.sh --profile <profile> --var demo_mode=true
+# Full LIVE setup in one shot (deploy + grant the app SP + readiness + smoke test):
+#   ./deploy.sh --profile <profile> --warehouse-id <id> --grant-embedding --check --smoke
 #
-# Usage:
-#   ./deploy.sh --profile <profile> [--target prod] [--no-build] [--var k=v ...]
+# Flags:
+#   --profile <p>            (required) Databricks CLI profile = target workspace
+#   --target <t>             bundle target (default: prod)
+#   --no-build               skip npm build, reuse ./dist
+#   --var k=v                extra bundle variable (repeatable), passed through
+#   --warehouse-id <id>      set warehouse_id var AND grant the app SP CAN_USE on it
+#   --grant-embedding [name] grant the app SP CAN_QUERY on the embedding endpoint
+#                            (default name: databricks-gte-large-en)
+#   --check                  after deploy, GET /api/setup/readiness and print it
+#   --smoke                  after deploy, POST a finops-auto call and print the receipt
+#   -h | --help
 #
-# Examples:
-#   ./deploy.sh --profile my-workspace                       # build + deploy + run (target: prod)
-#   ./deploy.sh --profile my-workspace --var demo_mode=true  # zero-setup offline demo
-#   ./deploy.sh --profile my-workspace --no-build            # skip npm build (reuse ./dist)
+# The one step this cannot script: the first-login OAuth consent (model-serving + sql).
+# The script prints the app URL so you can approve it in the browser. Grants are
+# best-effort (a warning, not a failure, if you lack permission on that object).
 #
-# Prerequisites: Databricks CLI (>= v0.230), Node.js/npm (unless --no-build), and
-# an authenticated profile (`databricks auth login --profile <profile>`).
+# Prerequisites: Databricks CLI, Node/npm (unless --no-build), an authenticated profile,
+# and (for --check/--smoke) an OAuth-capable profile so `databricks auth token` works.
 
 set -euo pipefail
-
-# Always run from the app directory (this script's location), so it works no
-# matter where the caller invokes it from.
 cd "$(dirname "$0")"
 
-APP_NAME="intelligent-ai-finops-v2"      # the deployed Databricks App name
-BUNDLE_RESOURCE="intelligent_ai_finops_v2"  # the resource key in databricks.yml
+APP_NAME="intelligent-ai-finops-v2"
+BUNDLE_RESOURCE="intelligent_ai_finops_v2"
 
-PROFILE=""
-TARGET="prod"
-BUILD=1
+PROFILE=""; TARGET="prod"; BUILD=1
+WAREHOUSE_ID=""; GRANT_EMB=0; EMB_NAME="databricks-gte-large-en"
+DO_CHECK=0; DO_SMOKE=0
 PASS=()
 
 while [[ $# -gt 0 ]]; do
@@ -44,8 +46,13 @@ while [[ $# -gt 0 ]]; do
     --target)  TARGET="${2:-}";  shift 2 ;;
     --no-build) BUILD=0; shift ;;
     --var) PASS+=(--var "${2:-}"); shift 2 ;;
-    -h|--help)
-      sed -n '2,29p' "$0"; exit 0 ;;
+    --warehouse-id) WAREHOUSE_ID="${2:-}"; shift 2 ;;
+    --grant-embedding)
+      GRANT_EMB=1
+      if [[ $# -ge 2 && "${2:0:2}" != "--" ]]; then EMB_NAME="$2"; shift 2; else shift; fi ;;
+    --check) DO_CHECK=1; shift ;;
+    --smoke) DO_SMOKE=1; shift ;;
+    -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
     --) shift; while [[ $# -gt 0 ]]; do PASS+=("$1"); shift; done ;;
     *) echo "Unknown argument: $1" >&2; echo "Run: ./deploy.sh --help" >&2; exit 1 ;;
   esac
@@ -53,9 +60,13 @@ done
 
 if [[ -z "$PROFILE" ]]; then
   echo "ERROR: --profile is required." >&2
-  echo "Usage: ./deploy.sh --profile <profile> [--target prod] [--no-build] [--var k=v ...]" >&2
+  echo "Usage: ./deploy.sh --profile <profile> [--target prod] [--no-build] [--var k=v] \\" >&2
+  echo "                   [--warehouse-id <id>] [--grant-embedding [name]] [--check] [--smoke]" >&2
   exit 1
 fi
+
+# --warehouse-id also drives the bundle var so the app reads live cost data.
+[[ -n "$WAREHOUSE_ID" ]] && PASS+=(--var "warehouse_id=$WAREHOUSE_ID")
 
 echo "==> Intelligent AI FinOps deploy  (profile=$PROFILE, target=$TARGET)"
 
@@ -65,10 +76,7 @@ if [[ "$BUILD" -eq 1 ]]; then
   npm run build
 else
   echo "==> [1/3] Skipping build (--no-build); reusing ./dist"
-  if [[ ! -d dist ]]; then
-    echo "ERROR: --no-build was set but ./dist does not exist. Run once without --no-build first." >&2
-    exit 1
-  fi
+  [[ -d dist ]] || { echo "ERROR: --no-build set but ./dist is missing. Run once without --no-build." >&2; exit 1; }
 fi
 
 echo "==> [2/3] Deploying the bundle"
@@ -77,7 +85,56 @@ databricks bundle deploy -t "$TARGET" --profile "$PROFILE" "${PASS[@]}"
 echo "==> [3/3] Starting the app"
 databricks bundle run "$BUNDLE_RESOURCE" -t "$TARGET" --profile "$PROFILE"
 
-echo "==> Done. App URL:"
-databricks apps get "$APP_NAME" --profile "$PROFILE" -o json \
-  | python3 -c "import sys,json; print(json.load(sys.stdin).get('url','(deploy succeeded; check the workspace Apps page)'))" \
-  2>/dev/null || echo "  (deploy succeeded; open the Apps page in your workspace to find the URL)"
+# ---- discover the app URL + its service principal -------------------------
+INFO=$(databricks apps get "$APP_NAME" --profile "$PROFILE" -o json 2>/dev/null || echo '{}')
+APP_URL=$(echo "$INFO" | python3 -c "import sys,json;print(json.load(sys.stdin).get('url',''))" 2>/dev/null || true)
+APP_SP=$(echo "$INFO" | python3 -c "import sys,json;print(json.load(sys.stdin).get('service_principal_client_id',''))" 2>/dev/null || true)
+echo "==> App URL: ${APP_URL:-<open the workspace Apps page to find it>}"
+[[ -n "$APP_SP" ]] && echo "==> App service principal: $APP_SP"
+
+# ---- optional live grants (best-effort) -----------------------------------
+_grant() { local label="$1"; shift
+  if "$@" >/dev/null 2>&1; then echo "==> [grant] $label: OK"
+  else echo "==> [grant] $label: could not apply (you may lack permission on that object; grant it manually)"; fi; }
+
+if [[ -n "$WAREHOUSE_ID" && -n "$APP_SP" ]]; then
+  _grant "warehouse $WAREHOUSE_ID -> CAN_USE" \
+    databricks permissions update warehouses "$WAREHOUSE_ID" \
+      --json "{\"access_control_list\":[{\"service_principal_name\":\"$APP_SP\",\"permission_level\":\"CAN_USE\"}]}" \
+      --profile "$PROFILE"
+fi
+if [[ "$GRANT_EMB" -eq 1 && -n "$APP_SP" ]]; then
+  _grant "$EMB_NAME -> CAN_QUERY" \
+    databricks serving-endpoints update-permissions "$EMB_NAME" \
+      --json "{\"access_control_list\":[{\"service_principal_name\":\"$APP_SP\",\"permission_level\":\"CAN_QUERY\"}]}" \
+      --profile "$PROFILE"
+fi
+
+# ---- the one non-scriptable step ------------------------------------------
+echo
+echo "==> ACTION REQUIRED (browser, one time): open the app and approve the consent"
+echo "    for the model-serving + sql scopes so live calls run on your behalf:"
+echo "      ${APP_URL:-<app URL above>}"
+
+_token() { databricks auth token -p "$PROFILE" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])" 2>/dev/null || true; }
+
+# ---- optional readiness check ---------------------------------------------
+if [[ "$DO_CHECK" -eq 1 && -n "$APP_URL" ]]; then
+  echo "==> [check] /api/setup/readiness"
+  TOK=$(_token)
+  curl -sS "$APP_URL/api/setup/readiness" -H "Authorization: Bearer $TOK" | python3 -m json.tool \
+    || echo "    (readiness call failed - approve the consent above, then retry)"
+fi
+
+# ---- optional live smoke test ---------------------------------------------
+if [[ "$DO_SMOKE" -eq 1 && -n "$APP_URL" ]]; then
+  echo "==> [smoke] finops-auto test call"
+  TOK=${TOK:-$(_token)}
+  curl -sS "$APP_URL/v1/chat/completions" -H "Authorization: Bearer $TOK" -H "Content-Type: application/json" \
+    -d '{"model":"finops-auto","messages":[{"role":"user","content":"Design an optimal Spark SQL plan for a 50TB skewed join."}]}' \
+    | python3 -c "import sys,json;d=json.load(sys.stdin);f=d.get('x_finops',{});print('    routed:',d.get('model'),'| cost:',f.get('costUsd'),'| saved%:',f.get('savingsPct'))" \
+    || echo "    (smoke call failed - approve the consent above, then retry)"
+fi
+
+echo "==> Done."
