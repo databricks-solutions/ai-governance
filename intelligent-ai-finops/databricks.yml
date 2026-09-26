@@ -43,22 +43,22 @@ variables:
   # cache → in-process, tools demo → sample set. Set them to light the live paths.
   warehouse_id:
     description: "Serverless SQL warehouse id the app SP can use (Cost / coding-agents / reliability / tools tabs)."
-    default: ""
+    default: "unset"
   lakebase_endpoint:
     description: "Autoscaling Lakebase endpoint path (projects/<p>/branches/<b>/endpoints/<e>) for the durable cache (cost overview + semantic cache pgvector). Optional."
-    default: ""
+    default: "unset"
   lakebase_host:
     description: "Lakebase endpoint host (from `postgres list-endpoints ... .status.hosts.host`). Optional."
-    default: ""
+    default: "unset"
   lakebase_db:
     description: "Lakebase database name (holds the finops schema + pgvector semcache)."
     default: "databricks_postgres"
   tools_catalog:
     description: "UC catalog holding agent-tool functions for the tool-compression demo. Optional."
-    default: ""
+    default: "unset"
   tools_schema:
     description: "UC schema holding agent-tool functions. Optional."
-    default: ""
+    default: "unset"
 
 # Only runtime files are uploaded. node_modules / src / build config are excluded
 # so the Apps builder never runs `npm install`; dist is force-included because
@@ -146,12 +146,15 @@ targets:
   #   databricks bundle run  intelligent_ai_finops_v2 -t prod --profile <your-profile>
   prod:
     variables:
-      dbu_to_usd: "0.07"          # your negotiated $/DBU
-      warehouse_id: ""            # serverless SQL warehouse id the app SP can use
-      lakebase_endpoint: ""       # optional durable cache: autoscaling endpoint path (see V2_SETUP.md)
-      lakebase_host: ""           # optional durable cache: endpoint host
-      tools_catalog: ""           # optional (agent-tool functions)
-      tools_schema: ""            # optional (agent-tool functions)
+      dbu_to_usd: "0.07"               # your negotiated $/DBU
+      # "unset" = feature off. Bundles drop empty-string env values (the Apps API then
+      # rejects them), so optional vars use this sentinel; the app treats it as absent.
+      # Replace with your real values (or pass --var) to light up each feature.
+      warehouse_id: "unset"            # serverless SQL warehouse id the app SP can use
+      lakebase_endpoint: "unset"       # optional durable cache: autoscaling endpoint path (see V2_SETUP.md)
+      lakebase_host: "unset"           # optional durable cache: endpoint host
+      tools_catalog: "unset"           # optional (agent-tool functions)
+      tools_schema: "unset"            # optional (agent-tool functions)
     # RECOMMENDED once your resources exist: attach them so the app SP is granted
     # access automatically (replaces the manual grant SQL in V2_SETUP.md). Set the
     # ids/names to resources that EXIST in your workspace, then uncomment. Leave

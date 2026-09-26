@@ -27,7 +27,7 @@ env:
   # Serverless SQL warehouse the app service principal queries (Cost / coding-agents
   # / reliability / tools tabs). Blank → those tabs fall back to demo. See V2_SETUP.md.
   - name: FINOPS_WAREHOUSE_ID
-    value: ""
+    value: "unset"
   # Embedding endpoint for the semantic cache (any workspace has this by default).
   - name: FINOPS_EMBED_ENDPOINT
     value: "databricks-gte-large-en"
@@ -36,14 +36,14 @@ env:
   # across restarts/replicas). LAKEBASE_ENDPOINT is the autoscaling endpoint path
   # (projects/<p>/branches/<b>/endpoints/<e>); setup + SP role in V2_SETUP.md.
   - name: LAKEBASE_ENDPOINT
-    value: ""
+    value: "unset"
   - name: LAKEBASE_HOST
-    value: ""
+    value: "unset"
   - name: LAKEBASE_DB
     value: "databricks_postgres"
   # Agent tools the router prunes over = real Unity Catalog functions in this
   # catalog.schema (discovered live). Blank → a built-in sample set.
   - name: FINOPS_TOOLS_CATALOG
-    value: ""
+    value: "unset"
   - name: FINOPS_TOOLS_SCHEMA
-    value: ""
+    value: "unset"
