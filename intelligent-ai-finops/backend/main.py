@@ -13,6 +13,17 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+# Optional config vars are declared with an "unset" sentinel because Databricks Asset
+# Bundles drop empty-string env values (which the Apps API then rejects with
+# "Must specify environment variable source"). Normalize the sentinel (and any blank)
+# to absent BEFORE the engines import, so their os.environ.get(name, "") reads them as
+# unset and the corresponding feature stays off. Real values pass through untouched.
+import os as _os
+for _k in ("FINOPS_WAREHOUSE_ID", "LAKEBASE_ENDPOINT", "LAKEBASE_HOST",
+           "FINOPS_TOOLS_CATALOG", "FINOPS_TOOLS_SCHEMA"):
+    if _os.environ.get(_k, "").strip().lower() in ("", "unset"):
+        _os.environ.pop(_k, None)
+
 from . import compare, gateway, judge, models, optimize, pipeline
 from .appconfig import load_config
 
