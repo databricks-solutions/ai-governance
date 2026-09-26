@@ -113,12 +113,24 @@ For hot-reload frontend dev: `npm run dev` (Vite on :5173, proxies `/api` to :80
 
 ### Deploy to your workspace (one step)
 ```bash
-./deploy.sh --profile <your-profile>                    # build + deploy + run + print URL
+./deploy.sh --profile <your-profile>                       # build + deploy + run + print URL
 ./deploy.sh --profile <your-profile> --var demo_mode=true  # zero-setup offline demo
 ```
 `deploy.sh` runs the three steps below in order and prints the app URL. Everything
 workspace-specific is a bundle variable with a safe default, so the first deploy always
 comes up (features degrade gracefully until you grant them). See `./deploy.sh --help`.
+
+Full **live** setup in one shot — deploy, grant the app's service principal, check
+readiness, and smoke-test a real routed call:
+```bash
+./deploy.sh --profile <your-profile> \
+  --warehouse-id <serverless-warehouse-id> \
+  --grant-embedding --check --smoke
+```
+This sets `warehouse_id`, grants the app SP `CAN_USE` on that warehouse and `CAN_QUERY`
+on the embedding endpoint (best-effort), runs `/api/setup/readiness`, and posts a
+`finops-auto` test call. The one step it can't script is the first-login OAuth consent
+(`model-serving` + `sql`) — it prints the app URL so you approve it in the browser.
 
 ### Deploy to your workspace (Asset Bundle, the steps deploy.sh runs)
 ```bash
