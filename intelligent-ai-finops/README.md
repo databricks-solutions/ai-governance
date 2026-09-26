@@ -132,6 +132,14 @@ on the embedding endpoint (best-effort), runs `/api/setup/readiness`, and posts 
 `finops-auto` test call. The one step it can't script is the first-login OAuth consent
 (`model-serving` + `sql`) — it prints the app URL so you approve it in the browser.
 
+### Roll back / tear down (inverse of deploy.sh)
+```bash
+./rollback.sh --profile <your-profile>          # prompts for confirmation
+./rollback.sh --profile <your-profile> --yes    # non-interactive
+```
+Runs `databricks bundle destroy` to remove the app and the bundle-uploaded files, so you
+can redeploy a clean slate. Warehouse / model / embedding endpoints are left untouched.
+
 ### Deploy to your workspace (Asset Bundle, the steps deploy.sh runs)
 ```bash
 npm install && npm run build     # dist must exist before deploy
