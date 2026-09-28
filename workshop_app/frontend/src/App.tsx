@@ -127,7 +127,7 @@ function Shell() {
           </div>
         )}
         {route === "faq" && <Faq />}
-        {route === "prereqs" && <Prerequisites />}
+        {route === "prereqs" && <Prerequisites onProgressChange={refreshProgress} />}
         {route === "outcomes" && (
           <Outcomes
             pillars={workshop?.pillars}

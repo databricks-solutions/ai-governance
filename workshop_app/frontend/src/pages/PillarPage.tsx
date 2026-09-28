@@ -27,12 +27,13 @@ export default function PillarPage({
         </div>
       </PageHeader>
 
-      <div className="mx-auto max-w-4xl space-y-6 px-8 py-12 lg:px-14">
+      <div className="mx-auto max-w-4xl space-y-3 px-8 py-12 lg:px-14">
         {pillar.steps.map((step, i) => (
           <StepCard
             key={step.id}
             index={i + 1}
             pillarId={pillar.id}
+            groupTitle={pillar.title}
             step={step}
             saved={progress[step.id] ?? null}
             onProgressChange={onProgressChange}
