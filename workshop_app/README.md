@@ -49,7 +49,7 @@ Beyond the core workshop, six optional **~3-hour accelerators** each get their o
 concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
 Each accelerator is **additive** to the core — it only covers what the core does not. IDs are
-stable (`acc_*`), so the internal app's scope import still resolves them.
+stable (`acc_*`), so saved progress and the outcomes export resolve them across deploys.
 
 - **MCPs** — managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, telemetry.
 - **Agents** — register, version, own, trace, evaluate, and manage an agent's lifecycle.

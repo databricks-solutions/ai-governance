@@ -144,7 +144,6 @@ function Shell() {
             accelerators={accel?.accelerators}
             progress={progress}
             go={setRoute}
-            onProgressChange={refreshProgress}
           />
         )}
         {workshop &&
