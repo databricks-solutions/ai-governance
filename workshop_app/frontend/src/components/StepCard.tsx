@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle, Ban, ChevronDown } from "lucide-react";
-import { api, stepOutcome, type Step, type TestResult, type ProgressMap } from "@/lib/api";
+import { api, stepOutcome, unmetDependencies, type Step, type TestResult, type ProgressMap } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { shortTitle } from "@/lib/text";
 import McpDiagram from "@/components/McpDiagram";
@@ -36,6 +36,8 @@ export default function StepCard({
   groupTitle,
   step,
   saved,
+  progress,
+  stepTitles,
   onProgressChange,
 }: {
   index: number;
@@ -44,6 +46,9 @@ export default function StepCard({
   groupTitle?: string;
   step: Step;
   saved: Saved;
+  /** Full progress map + a cross-pillar id->title lookup, for the dependency banner. */
+  progress: ProgressMap;
+  stepTitles: Record<string, string>;
   onProgressChange: () => void;
 }) {
   const [running, setRunning] = useState<null | "action" | "verify">(null);
@@ -72,6 +77,11 @@ export default function StepCard({
   // must not look complete — that is the difference between an honest workshop record and
   // a green wall of checks.
   const actionRequired = status === "action_required";
+
+  // Prerequisites not yet done. Surfaced as a warn-but-allow banner: the room may have set the
+  // dependency up out-of-band, so Try-It stays live — we flag the likely cause of a failure
+  // before it happens rather than blocking. Suppressed once this step is itself achieved.
+  const blockedBy = achieved ? [] : unmetDependencies(step, progress, stepTitles);
 
   return (
     <div className={cn("rounded-2xl border bg-white", achieved ? "border-navy/25" : "border-navy/10")}>
@@ -110,6 +120,14 @@ export default function StepCard({
           {step.coming_soon && (
             <span className="shrink-0 rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-navy">
               Coming soon
+            </span>
+          )}
+          {blockedBy.length > 0 && (
+            <span
+              className="shrink-0 rounded bg-[#FDF3E0] px-1.5 py-0.5 text-[10px] font-semibold text-[#B7791F]"
+              title={`Needs first: ${blockedBy.map((d) => d.title).join(", ")}`}
+            >
+              NEEDS SETUP
             </span>
           )}
         </button>
@@ -155,6 +173,19 @@ export default function StepCard({
           {/* Optional diagram, named by `visual:` in the step config. Some concepts are
               structural and a paragraph cannot carry them. */}
           {step.visual && <div className="mb-4">{VISUALS[step.visual] ?? null}</div>}
+
+          {/* Dependency warning: this step reads something an earlier step sets up. Warn, don't
+              block — the Try-It below stays enabled in case it was arranged out-of-band. */}
+          {blockedBy.length > 0 && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-[#B7791F]/30 bg-[#FDF3E0]/60 p-3 text-xs leading-relaxed text-navy">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#B7791F]" />
+              <span>
+                <span className="font-semibold">Do this first:</span>{" "}
+                {blockedBy.map((d) => d.title).join(", ")}. You can still run the step below if it
+                is already set up.
+              </span>
+            </div>
+          )}
 
           {/* Actions row: manual deep-link, Try-It, Verify */}
           <div className="flex flex-wrap items-center gap-2">

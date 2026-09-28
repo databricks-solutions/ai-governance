@@ -160,6 +160,7 @@ pillars:
       - id: choice_default_access
         title: "Choice: Choose which models teams can access"
         outcome: "We can choose which models each team and the wider organization can access — governed by Unity Catalog grants, not per-developer API keys."
+        depends_on: [choice_model_services]
         concept: |
           Choice starts with deciding **which models each team and the wider organization can
           reach** — and enforcing it centrally. Provided model services are **closed by default**:
@@ -285,18 +286,40 @@ pillars:
           label: Show 30-day spend by model
           test: gateway_spend_by_model
 
+      - id: cost_governed_endpoint
+        title: "Cost: Stand up the governed endpoint"
+        outcome: "We can put a control layer in front of a model — fallback, inference-table logging, usage tracking, and the attach point for the rate limits and guardrails that follow."
+        depends_on: [choice_model_services]
+        concept: |
+          The rate limits, budgets, and guardrails ahead all attach to a **governed endpoint** —
+          so we stand it up here, before the steps that read it. A governed endpoint puts a
+          control layer in front of a model: a fallback for resilience, an inference table
+          logging every payload, usage tracking, and the attachment point for rate limits (next)
+          and guardrails (in Control).
+
+          The app never creates the endpoint unattended on a customer workspace: **Try It**
+          checks whether it exists and, if not, hands you the config to create it in the UI;
+          **Verify** confirms it is present with usage tracking and the inference table on.
+        action:
+          label: Create / verify governed endpoint
+          test: create_governed_endpoint
+        verify:
+          label: Check endpoint config
+          test: verify_governed_endpoint
+
       - id: cost_rate_limits
         title: "Cost: Enforce rate limits (QPM/TPM)"
-        outcome: "We can enforce QPM/TPM rate limits per service, user, and group and see HTTP 429 when exceeded — the ceiling that reliably holds today."
+        outcome: "We can enforce QPM/TPM rate limits per endpoint, user, and group and see HTTP 429 when exceeded — the ceiling that reliably holds today."
+        depends_on: [cost_governed_endpoint]
         concept: |
           Two controls, easily conflated. **Rate limits** cap *throughput* — exceeding one
           returns HTTP 429 immediately. They are GA. **Budgets** cap *spend*, and today they
           reliably **alert**; hard blocking is still rolling out. Rate limits are therefore the
           control that reliably enforces a hard ceiling today.
 
-          They apply per service, per user, and per group, in queries/minute (QPM) and
-          tokens/minute (TPM), with the most restrictive limit winning. This reads back what
-          is enforced on the governed endpoint; set limits in the AI Gateway UI so the
+          This step reads the limits configured on the **governed endpoint** you stood up above,
+          in queries/minute (QPM) and tokens/minute (TPM) — set per endpoint, per user, and per
+          group, with the most restrictive winning. Set limits in the AI Gateway UI so the
           workshop never changes throughput on a live customer endpoint.
         action:
           label: Show enforced rate limits
@@ -419,23 +442,13 @@ pillars:
     title: Control
     tagline: Policies, guardrails, identity propagation, and the telemetry that records them.
     steps:
-      - id: control_governed_endpoint
-        title: "Control: Create a governed endpoint"
-        outcome: "We can put a control layer in front of a model — fallback, inference-table logging, usage tracking, and the attach point for guardrails and rate limits."
-        concept: |
-          A governed endpoint puts a control layer in front of a model: a fallback for
-          resilience, an inference table logging every payload, usage tracking, and the
-          attachment point for guardrails and rate limits.
-        action:
-          label: Create / verify governed endpoint
-          test: create_governed_endpoint
-        verify:
-          label: Check endpoint config
-          test: verify_governed_endpoint
-
+      # The governed endpoint itself is now stood up in the Cost pillar (cost_governed_endpoint),
+      # because Cost's rate-limit and budget steps read it first. These Control steps govern that
+      # same endpoint, so they depend on it.
       - id: control_endpoint_acl
         title: "Control: Review who can call an endpoint"
         outcome: "We can review endpoint ACLs (CAN_QUERY / CAN_VIEW / CAN_MANAGE) and spot over-broad or shadow-endpoint grants."
+        depends_on: [cost_governed_endpoint]
         concept: |
           The access question, at endpoint grain: **`CAN_QUERY`**, `CAN_VIEW`, and
           `CAN_MANAGE`. Two things to read carefully in the result:
@@ -455,6 +468,7 @@ pillars:
       - id: control_guardrails
         title: "Control: Prove a guardrail blocks a prompt"
         outcome: "We can screen inputs and outputs for PII and unsafe content and prove a blocked prompt is actually stopped."
+        depends_on: [cost_governed_endpoint]
         concept: |
           Guardrails screen inputs and outputs for PII, unsafe content, and blocked keywords.
           Configure PII and safety filters in the AI Gateway UI — there is no full CRUD API yet.

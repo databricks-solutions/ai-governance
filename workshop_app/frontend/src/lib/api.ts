@@ -18,6 +18,10 @@ export interface Step {
   concept?: string;
   /** Key of a diagram to render under the concept — see VISUALS in StepCard. */
   visual?: string;
+  /** Ids of steps that must be `done` before this one is meaningful (e.g. the governed
+   *  endpoint must exist before its rate limits can be read). Surfaced as a warn-but-allow
+   *  banner — never a hard block — so a room that set something up out-of-band is never trapped. */
+  depends_on?: string[];
   action?: StepAction;
   verify?: StepAction;
   manual?: StepManual;
@@ -81,6 +85,20 @@ export function stepOutcome(saved: ProgressMap[string] | null | undefined) {
   const outcome = saved?.outcome ?? null;
   const poc = !!saved?.poc;
   return { status, outcome, poc, done: outcome === "done" || status === "done", na: outcome === "na" };
+}
+
+/** A step's unmet dependencies: the `depends_on` ids that are not yet achieved. A dependency
+ *  counts as met only when it is `done` (its Try-It passed or it was hand-marked done) — an
+ *  `action_required` prerequisite (e.g. the endpoint still needs creating) is deliberately still
+ *  unmet, since that is exactly the setup this step needs. Returns [{id, title}] for the banner. */
+export function unmetDependencies(
+  step: { depends_on?: string[] },
+  progress: ProgressMap,
+  titles: Record<string, string>,
+): { id: string; title: string }[] {
+  return (step.depends_on ?? [])
+    .filter((id) => !stepOutcome(progress[id]).done)
+    .map((id) => ({ id, title: titles[id] ?? id }));
 }
 
 /** Achieved / applicable / total counts for a group of steps (N/A excluded from applicable). */
