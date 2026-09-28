@@ -1,11 +1,11 @@
 """Workshop content, test execution, and progress tracking."""
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel
 
-from .. import deep_links, pdf, routing, store
+from .. import config, deep_links, pdf, routing, store
 from ..config import get_accelerators, get_brochure, get_prerequisites, get_steps
 from ..tests_registry import run_test
 
@@ -103,8 +103,16 @@ class RunTest(BaseModel):
 
 
 @router.post("/test")
-def run_and_record(body: RunTest):
-    result = run_test(body.test)
+def run_and_record(body: RunTest, request: Request):
+    # Databricks Apps forwards the signed-in user's token here (user authorization enabled via
+    # user_api_scopes). Scope it to THIS request so tests that must run on-behalf-of the user
+    # (MCP tool calls) can pick it up, and clear it afterwards — user tokens are per-request.
+    token = request.headers.get("x-forwarded-access-token")
+    handle = config.set_forwarded_token(token)
+    try:
+        result = run_test(body.test)
+    finally:
+        config.reset_forwarded_token(handle)
     # A test can come back three ways, and collapsing them would overstate progress:
     # ok + action_required means "ran fine, but nothing is proven yet" (a guided step, or
     # telemetry with no data). Recording that as `done` would inflate the progress bar and

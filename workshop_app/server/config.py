@@ -1,4 +1,7 @@
 """Config loader + auth helpers (dual-mode: Databricks App vs local dev)."""
+from __future__ import annotations
+
+import contextvars
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -8,6 +11,14 @@ from databricks.sdk import WorkspaceClient
 
 IS_DATABRICKS_APP = bool(os.environ.get("DATABRICKS_APP_NAME"))
 _CONFIG_DIR = Path(__file__).parent.parent / "config"
+
+# The signed-in user's forwarded access token for the CURRENT request, set by the /test route
+# from the `X-Forwarded-Access-Token` header (Databricks Apps user authorization). It lets a
+# test call downstream services AS the user (on-behalf-of), not as the app's service principal.
+# A ContextVar because a test function takes no request argument — the route sets it around the
+# call and clears it after. Per-request only: user tokens expire in ~1h, so it is never cached.
+_forwarded_user_token: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "forwarded_user_token", default=None)
 
 
 @lru_cache(maxsize=1)
@@ -76,6 +87,57 @@ def get_workspace_client() -> WorkspaceClient:
         return WorkspaceClient()
     profile = os.environ.get("DATABRICKS_PROFILE", "DEFAULT")
     return WorkspaceClient(profile=profile)
+
+
+def set_forwarded_token(token: str | None) -> contextvars.Token:
+    """Record the current request's forwarded user token; returns a reset handle for the route."""
+    return _forwarded_user_token.set(token or None)
+
+
+def reset_forwarded_token(handle: contextvars.Token) -> None:
+    _forwarded_user_token.reset(handle)
+
+
+def has_user_token() -> bool:
+    return bool(_forwarded_user_token.get())
+
+
+def get_user_workspace_client() -> WorkspaceClient:
+    """A client authenticated AS the signed-in user (on-behalf-of), for calls that must run as
+    the caller rather than the app service principal — e.g. MCP tool invocation. Falls back to
+    the app-SP client when no forwarded token is present (local dev, or user authorization not
+    enabled), so callers must check `has_user_token()` before *claiming* OBO in their result.
+    """
+    token = _forwarded_user_token.get()
+    if token and IS_DATABRICKS_APP:
+        host = (os.environ.get("DATABRICKS_HOST") or WorkspaceClient().config.host or "").rstrip("/")
+        # auth_type="pat" forces the SDK to authenticate with ONLY this bearer token. Without it
+        # the ambient app-SP OAuth env vars (DATABRICKS_CLIENT_ID/SECRET) ALSO match and the SDK
+        # refuses with "more than one authorization method configured: oauth and pat".
+        return WorkspaceClient(host=host, token=token, auth_type="pat")
+    return get_workspace_client()
+
+
+def governed_service_fqn() -> str:
+    """The governed model service as a v3 UC FQN `<catalog>.<schema>.<service>`.
+
+    `governed_endpoint.service` in config is either a bare service name (resolved against the
+    workshop's own catalog.schema) or an already-qualified FQN such as `system.ai.<model>`
+    (used verbatim). Returns "" when nothing is configured. This replaces the old flat v1
+    serving-endpoint name — every governed step addresses this FQN on the v3 Gateway path.
+    """
+    cfg = get_config()
+    ge = cfg.get("governed_endpoint", {}) or {}
+    svc = (ge.get("service") or "").strip()
+    if not svc:
+        return ""
+    if svc.count(".") >= 2:            # already fully qualified (e.g. system.ai.claude-...)
+        return svc
+    cat = (cfg.get("catalog", {}) or {}).get("name")
+    sch = (cfg.get("catalog", {}) or {}).get("schema")
+    if not (cat and sch):
+        return svc
+    return f"{cat}.{sch}.{svc}"
 
 
 def get_oauth_token() -> str:

@@ -32,11 +32,18 @@ gateway:
   open_weight_model_service: system.ai.glm-5-3-flash
 
 # The governed endpoint the workshop creates and layers controls onto (Control pillar).
-# primary_model/fallback_model are shown as hints for the guided (UI) endpoint creation — the
-# app never invokes them here. They name v3 UC model services (catalog.schema.service).
+# The governed model SERVICE — a v3 Unity Catalog securable (catalog.schema.service), NOT a
+# legacy v1 serving endpoint. Every governed step (create/verify, ACL, rate limits, guardrails,
+# invocation) addresses it by FQN on the v3 `/ai-gateway/mlflow/v1` path.
+#
+# `service` is either a bare name (resolved to <catalog>.<schema>.<service> against the
+# workshop's own catalog/schema — the default, a service the customer creates in front of
+# `base_model`) or an already-qualified FQN like `system.ai.claude-sonnet-4-5` to point the
+# governed steps at a provided model instead. base_model/fallback_model are hints for the
+# guided (UI) creation — the app never creates the service unattended on a customer workspace.
 governed_endpoint:
-  name: ai-governance-workshop-governed
-  primary_model: system.ai.claude-sonnet-4-5
+  service: governed
+  base_model: system.ai.claude-sonnet-4-5
   fallback_model: system.ai.meta-llama-3-3-70b-instruct
   inference_table_prefix: workshop_governed
   rate_limit_per_user_per_min: 50

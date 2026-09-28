@@ -14,10 +14,8 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
-from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
-
 from . import deep_links, mcp, routing
-from .config import get_config, get_workspace_client
+from .config import get_config, get_workspace_client, governed_service_fqn, has_user_token
 from .queries import load_query
 from .workspace_sql import fetchall, test_connection
 
@@ -78,6 +76,16 @@ def _fq_schema() -> tuple[str, str]:
             _sql_ident(cat.get("schema"), "catalog.schema"))
 
 
+def _get_model_service(w, fqn: str) -> dict:
+    """GET a v3 Unity Catalog model service by FQN (`catalog.schema.service`).
+
+    The governed steps read the service's `config` (rate limits, inference table, guardrails)
+    from here — the v3 replacement for `serving_endpoints.get(name)` on the legacy plane.
+    Raises on transport/permission/not-found so callers classify the failure themselves.
+    """
+    return w.api_client.do("GET", f"/api/2.1/unity-catalog/model-services/{fqn}") or {}
+
+
 # The API reference index. Only the group-level URL is cited: the Databricks API reference is
 # a JS-rendered SPA that returns HTTP 200 for every path under /api/workspace/ (including
 # nonsense), so deep links cannot be verified programmatically and a 404 in front of a
@@ -93,8 +101,8 @@ API_DOCS: dict[str, dict[str, str]] = {
         "api": "GET /api/2.1/unity-catalog/effective-permissions/{catalog|schema}/{name}?principal=<app-sp>",
         "note": "Read-only — reports this identity's effective reach, never changes a grant."},
     "endpoint_acl": {
-        "api": "GET /api/2.0/permissions/serving-endpoints/{endpoint_id}",
-        "note": "Takes the endpoint ID, not its name."},
+        "api": "GET /api/2.1/unity-catalog/permissions/model_service/{catalog.schema.service}",
+        "note": "UC grants on the v3 model-service securable — EXECUTE = can call, MANAGE = can reconfigure."},
     "workspace_context": {"api": "local config + GET /api/2.0/preview/scim/v2/Me"},
     "routing_panel": {"api": "none — reads config/workshop.yaml",
                       "note": "Prices are config, not a live API."},
@@ -117,13 +125,15 @@ API_DOCS: dict[str, dict[str, str]] = {
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
         "api": "GET /api/2.1/unity-catalog/models + /api/2.1/unity-catalog/functions"},
-    "verify_governed_endpoint": {"api": "GET /api/2.0/serving-endpoints/{name}"},
-    "rate_limits": {"api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway.rate_limits)"},
-    "test_guardrail": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
+    "verify_governed_endpoint": {"api": "GET /api/2.1/unity-catalog/model-services/{catalog.schema.service}"},
+    "rate_limits": {"api": "GET /api/2.1/unity-catalog/model-services/{catalog.schema.service} (config.rate_limits)"},
+    "test_guardrail": {
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions with model=<catalog.schema.service>",
+        "note": "v3 Gateway path — never the legacy /serving-endpoints/{name}/invocations."},
     "routing_compare": {
         "api": "POST /ai-gateway/mlflow/v1/chat/completions (each model per prompt + a classifier)",
         "note": "Per-request cost × the configured monthly request volume; smart-routing row is an estimate."},
-    "routing_roi": {"api": "POST /api/2.0/serving-endpoints/{name}/invocations"},
+    "routing_roi": {"api": "POST /ai-gateway/mlflow/v1/chat/completions (per configured model service)"},
     "create_mcp_policy": {"api": "POST /api/2.0/sql/statements (CREATE OR REPLACE FUNCTION)"},
     "mcp_policy_enforcement": {"api": "POST /api/2.0/sql/statements"},
     "mcp_inventory": {"api": "GET /api/2.1/unity-catalog/mcp-services"},
@@ -154,7 +164,7 @@ API_DOCS: dict[str, dict[str, str]] = {
         "api": "POST /ai-gateway/mlflow/v1/chat/completions vs POST /ai-gateway/anthropic/v1/messages",
         "note": "Probes the same prompt on both paths to compare guardrail coverage."},
     "rate_limit_429_demo": {
-        "api": "GET /api/2.0/serving-endpoints/{name} + POST /ai-gateway/mlflow/v1/chat/completions (burst)",
+        "api": "GET /api/2.1/unity-catalog/model-services/{fqn} + POST /ai-gateway/mlflow/v1/chat/completions (burst)",
         "note": "Sends a small burst of max_tokens=1 requests to try to trip the rate limit."},
     "mcp_telemetry": {"api": "SQL: system.ai_gateway.usage (service_type = 'MCP_SERVICE')"},
     "telemetry_readiness": {"api": "SQL: system.ai_gateway.usage, system.access.audit"},
@@ -170,7 +180,7 @@ API_DOCS: dict[str, dict[str, str]] = {
         "api": "POST /ai-gateway/mlflow/v1/chat/completions",
         "note": "Sends a blocked prompt and reports whether the block is a 4xx error or HTTP 200 + reason."},
     # Deliberately not automated — say so, and say why.
-    "create_governed_endpoint": {"api": "read-only: GET /api/2.0/serving-endpoints",
+    "create_governed_endpoint": {"api": "read-only: GET /api/2.1/unity-catalog/model-services/{fqn}",
                                  "note": "Creation is a guided UI step, never automated."},
     "apply_tags": {"api": "none — guided UI step",
                    "note": "The app does not write tags to a customer endpoint."},
@@ -399,70 +409,64 @@ def t_default_access() -> TestResult:
         **detail)
 
 
-# Broad groups whose CAN_QUERY/CAN_MANAGE on the governed endpoint means it is open to
-# "everyone". Lowercased for case-insensitive comparison against the ACL principals.
+# Broad groups whose EXECUTE/MANAGE grant on the governed model service means it is open to
+# "everyone". Lowercased for case-insensitive comparison against the grant principals.
 _BROAD_PRINCIPALS = {"users", "account users", "all users"}
+
+# UC privileges that let a principal actually CALL the model service (vs merely see it).
+_MS_CALL_PRIVILEGES = {"EXECUTE", "ALL_PRIVILEGES"}
+# The privilege that can reconfigure the service / strip its controls — the shadow risk.
+_MS_MANAGE_PRIVILEGES = {"MANAGE", "ALL_PRIVILEGES"}
 
 
 def t_endpoint_acl() -> TestResult:
-    """Who can call the governed endpoint — the doc's primary access-control mechanism.
+    """Who can call the governed model service — access control on the v3 UC plane.
 
-    Endpoint ACLs (CAN_QUERY / CAN_VIEW / CAN_MANAGE) are the "who may use this model?"
-    control, and CAN_MANAGE restriction is what prevents shadow endpoints.
-
-    One API detail that costs a debugging cycle: get_permissions() takes the endpoint's
-    **id**, not its name — passing the name returns "is not a valid Inference Endpoint ID".
-    Provided foundation-model endpoints also have no id at all (they are not workspace
-    securables), so they cannot carry an ACL; that is why `system.ai` grants above are the
-    control for those, and this step says so instead of reporting a confusing failure.
+    A v3 model service is a Unity Catalog securable, so "who may use this model?" is answered
+    by UC GRANTS on it, not a workspace endpoint ACL: EXECUTE lets a principal call it, MANAGE
+    lets them reconfigure it (the shadow-service risk — keep it with platform admins). Reads
+    the grants on the `model_service` securable and flags a broad group holding EXECUTE/MANAGE.
+    Read-only: it reports grants, it changes none.
     """
-    name = get_config().get("governed_endpoint", {}).get("name")
+    fqn = governed_service_fqn()
+    if not fqn:
+        return _fail("No governed_endpoint.service configured in config/workshop.yaml.")
     w = get_workspace_client()
     try:
-        ep = w.serving_endpoints.get(name)
+        resp = w.api_client.do(
+            "GET", f"/api/2.1/unity-catalog/permissions/model_service/{fqn}")
     except Exception as e:
-        return _todo(f"Endpoint `{name}` does not exist yet — create it, then re-run.",
-                     endpoint=name, error=str(e)[:300])
-    if not ep.id:
         return _todo(
-            f"`{name}` has no endpoint id, so it carries no workspace ACL — it is a "
-            "provided foundation-model endpoint. Govern these with UC grants on the model "
-            "service instead (see 'What can everyone already reach?' in Choice).",
-            endpoint=name)
-    try:
-        perms = w.serving_endpoints.get_permissions(ep.id)
-    except Exception as e:
-        return _fail(f"Could not read the ACL on `{name}`.", endpoint=name, error=str(e)[:300])
+            f"Could not read grants on model service `{fqn}` — it may not exist yet, or this "
+            "identity may lack permission to read its grants. Create it (previous step), then "
+            "re-run.", service=fqn, error=str(e)[:300])
 
-    acl = []
-    for a in (perms.access_control_list or []):
-        principal = a.user_name or a.group_name or a.service_principal_name
-        levels = sorted({str(p.permission_level).split(".")[-1]
-                         for p in (a.all_permissions or []) if p.permission_level})
-        acl.append({"principal": principal,
-                    "is_group": bool(a.group_name),
-                    "levels": levels})
+    grants = []
+    for a in (resp or {}).get("privilege_assignments", []) or []:
+        principal = a.get("principal")
+        privs = sorted({str(p).upper() for p in (a.get("privileges") or [])})
+        grants.append({"principal": principal, "privileges": privs})
 
-    broad_query = [e for e in acl
-                   if e["is_group"] and (e["principal"] or "").lower() in _BROAD_PRINCIPALS
-                   and any(l in ("CAN_QUERY", "CAN_MANAGE") for l in e["levels"])]
-    managers = [e for e in acl if "CAN_MANAGE" in e["levels"]]
+    broad = [g for g in grants
+             if (g["principal"] or "").lower() in _BROAD_PRINCIPALS
+             and any(p in _MS_CALL_PRIVILEGES for p in g["privileges"])]
+    managers = [g for g in grants if any(p in _MS_MANAGE_PRIVILEGES for p in g["privileges"])]
     detail = {
-        "endpoint": name,
-        "acl": acl,
-        "levels_available": ["CAN_VIEW", "CAN_QUERY", "CAN_MANAGE"],
-        "can_manage_holders": [e["principal"] for e in managers],
-        "note": ("CAN_MANAGE is the shadow-endpoint risk: it allows reconfiguring the model "
-                 "and removing the controls layered on it. Keep it with platform admins."),
+        "service": fqn,
+        "grants": grants,
+        "call_privileges": sorted(_MS_CALL_PRIVILEGES),
+        "manage_holders": [g["principal"] for g in managers],
+        "note": ("MANAGE on a model service is the shadow-service risk: it allows reconfiguring "
+                 "the model and removing the controls layered on it. Keep it with platform "
+                 "admins; grant callers only EXECUTE."),
     }
-    if broad_query:
+    if broad:
         return _todo(
-            f"`{broad_query[0]['principal']}` holds "
-            f"{'/'.join(broad_query[0]['levels'])} on `{name}` — the governed endpoint is "
-            "open to everyone. Scope it to the pilot group.",
+            f"`{broad[0]['principal']}` holds {'/'.join(broad[0]['privileges'])} on `{fqn}` — "
+            "the governed model service is callable by everyone. Scope it to the pilot group.",
             **detail)
-    return _ok(f"`{name}` ACL is scoped: {len(acl)} principal(s), "
-               f"{len(managers)} with CAN_MANAGE.", **detail)
+    return _ok(f"`{fqn}` grants are scoped: {len(grants)} principal(s), "
+               f"{len(managers)} with MANAGE.", **detail)
 
 
 def t_routing_panel() -> TestResult:
@@ -532,40 +536,50 @@ def _routing_prompt() -> str:
     )
 
 
+def _read_service_rate_limits(w, fqn: str) -> list[dict]:
+    """Rate limits configured on a v3 model service, from its `config.rate_limits`.
+
+    v3 keeps limits in the service config (no separate endpoint), each as
+    {key, renewal_period, requests?, tokens?}. Normalized here so callers render one shape.
+    """
+    svc = _get_model_service(w, fqn)
+    conf = svc.get("config", {}) or {}
+    return [
+        {"key": rl.get("key") or rl.get("principal"),
+         "requests": rl.get("requests") if rl.get("requests") is not None else rl.get("calls"),
+         "tokens": rl.get("tokens"),
+         "renewal_period": rl.get("renewal_period")}
+        for rl in (conf.get("rate_limits") or [])
+    ]
+
+
 def t_rate_limits() -> TestResult:
-    """Report the rate limits configured on the governed endpoint.
+    """Report the rate limits configured on the governed model service (v3).
 
     Rate limits are the *hard* cost control — budgets alert (hard blocking is still rolling
-    out), whereas an exceeded rate limit returns HTTP 429 immediately. Read-only: limits are
-    set in the AI Gateway UI so the app never changes throughput on a customer endpoint.
+    out), whereas an exceeded rate limit returns HTTP 429 immediately. Read-only: limits live
+    in the service's `config.rate_limits`; set them in the AI Gateway UI so the app never
+    changes throughput on a customer service.
     """
-    cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
-    want = cfg.get("rate_limit_per_user_per_min")
+    fqn = governed_service_fqn()
+    if not fqn:
+        return _fail("No governed_endpoint.service configured in config/workshop.yaml.")
+    want = get_config().get("governed_endpoint", {}).get("rate_limit_per_user_per_min")
     w = get_workspace_client()
     try:
-        ep = w.serving_endpoints.get(name)
+        limits = _read_service_rate_limits(w, fqn)
     except Exception as e:
-        return _todo(f"Endpoint `{name}` not found — create it, set a rate limit, then re-run.",
-                     endpoint=name, error=str(e)[:300],
-                     deep_link=deep_links.serving_endpoint(name))
-    gw = getattr(ep, "ai_gateway", None)
-    limits = [
-        {"key": getattr(rl, "key", None), "principal": getattr(rl, "principal", None),
-         "calls": getattr(rl, "calls", None), "tokens": getattr(rl, "tokens", None),
-         "renewal_period": str(getattr(rl, "renewal_period", "") or "")}
-        for rl in (getattr(gw, "rate_limits", None) or [])
-    ] if gw else []
+        return _todo(f"Model service `{fqn}` not found — create it, set a rate limit, then "
+                     "re-run.", service=fqn, error=str(e)[:300])
     if not limits:
         return _todo(
-            f"No rate limits on `{name}` yet. Add one in the AI Gateway UI "
+            f"No rate limits on `{fqn}` yet. Add one in the AI Gateway UI "
             f"(config suggests {want}/user/min), then re-run.",
-            endpoint=name, configured_target=want,
-            deep_link=deep_links.serving_endpoint(name),
+            service=fqn, configured_target=want,
             note="An exceeded rate limit returns HTTP 429 — this is the hard throughput "
                  "control, distinct from budget alerts.")
-    return _ok(f"{len(limits)} rate limit(s) enforced on `{name}`.",
-               endpoint=name, rate_limits=limits, configured_target=want)
+    return _ok(f"{len(limits)} rate limit(s) enforced on `{fqn}`.",
+               service=fqn, rate_limits=limits, configured_target=want)
 
 
 def t_gateway_spend_by_model() -> TestResult:
@@ -592,45 +606,52 @@ def t_gateway_spend_by_model() -> TestResult:
 
 # --------------------------------------------------------------------------- Control
 def t_create_governed_endpoint() -> TestResult:
-    """Create/verify the governed endpoint with usage tracking + inference table.
+    """Confirm the governed v3 model service exists (read-only; guided creation).
 
-    PUT the endpoint config idempotently. Guardrails/rate-limits beyond what the API
-    supports are applied via the UI (see the step's manual action).
+    Checks for the model service by FQN on the v3 UC plane. The app never creates it
+    unattended on a customer workspace — creation with a base model + inference table is a
+    guided UI step — so a missing service is an action-required to-do, not a pass.
     """
+    fqn = governed_service_fqn()
+    if not fqn:
+        return _fail("No governed_endpoint.service configured in config/workshop.yaml.")
     cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
     w = get_workspace_client()
-    existing = {e.name for e in w.serving_endpoints.list()}
-    if name in existing:
-        return _ok(f"Governed endpoint `{name}` already exists.", endpoint=name,
-                   next="Configure guardrails in the AI Gateway UI (next step).")
-    # Not created — this is a to-do, not a pass. The app deliberately does not create
-    # endpoints unattended on a customer workspace.
-    return _todo(
-        f"Endpoint `{name}` does not exist yet — create it in the workspace, then re-run.",
-        endpoint=name,
-        primary=cfg.get("primary_model"),
-        fallback=cfg.get("fallback_model"),
-        deep_link=deep_links.serving_endpoint(name),
-        note="Endpoint creation with external-model config is a guided UI step to avoid "
-             "destructive automated changes on a customer workspace.",
-    )
+    try:
+        _get_model_service(w, fqn)
+    except Exception as e:
+        return _todo(
+            f"Model service `{fqn}` does not exist yet — create it in front of the base model, "
+            "then re-run.",
+            service=fqn,
+            base_model=cfg.get("base_model"),
+            fallback=cfg.get("fallback_model"),
+            error=str(e)[:300],
+            note="Creating the governed model service (with the base model and an inference "
+                 "table) is a guided UI step to avoid destructive automated changes on a "
+                 "customer workspace.",
+        )
+    return _ok(f"Governed model service `{fqn}` exists.", service=fqn,
+               next="Set rate limits and attach guardrails on it (following steps).")
 
 
 def t_verify_governed_endpoint() -> TestResult:
-    cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
+    fqn = governed_service_fqn()
+    if not fqn:
+        return _fail("No governed_endpoint.service configured in config/workshop.yaml.")
     w = get_workspace_client()
     try:
-        ep = w.serving_endpoints.get(name)
+        svc = _get_model_service(w, fqn)
     except Exception as e:
-        return _fail(f"Endpoint `{name}` not found.", error=str(e))
-    gw = getattr(ep, "ai_gateway", None)
+        return _todo(f"Model service `{fqn}` not found — create it, then re-run.",
+                     service=fqn, error=str(e)[:300])
+    conf = svc.get("config", {}) or {}
     return _ok(
-        f"Endpoint `{name}` is present.",
-        state=str(getattr(ep.state, "ready", "")) if ep.state else None,
-        has_ai_gateway=bool(gw),
-        inference_table=bool(getattr(gw, "inference_table_config", None)) if gw else False,
+        f"Model service `{fqn}` is present.",
+        service=fqn,
+        rate_limits=bool(conf.get("rate_limits")),
+        inference_table=bool(conf.get("inference_table_config") or conf.get("auto_capture_config")),
+        state=svc.get("state") or svc.get("status"),
     )
 
 
@@ -703,43 +724,43 @@ def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
 
 
 def t_test_guardrail() -> TestResult:
-    """Send a prompt containing a blocked keyword to the governed endpoint; expect a block.
+    """Send a prompt containing a blocked keyword to the governed model service; expect a block.
 
-    A BLOCK is the pass condition here, so we must distinguish "the guardrail rejected the
-    request" from "the endpoint does not exist / is not ready". Both surface as an SDK
-    exception, so match on guardrail-specific wording and on HTTP 400 specifically — never
-    on a bare "400" substring, which also appears in 404s and in request ids.
+    Invokes the v3 model service by FQN on the Gateway path (never the legacy
+    `serving_endpoints.query()` invocations path), and classifies the outcome with the SAME
+    shared classifier every probe uses — a BLOCK (4xx with guardrail wording, or a 200 whose
+    finish_reason marks a content filter) is the pass condition; a plain answer is a real
+    negative (the guardrail is not attached), and a missing service is a to-do.
     """
+    fqn = governed_service_fqn()
+    if not fqn:
+        return _fail("No governed_endpoint.service configured in config/workshop.yaml.")
     cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
     blocked = (cfg.get("guardrails", {}).get("keyword_policy", {}).get("blocked_keywords")
                or ["social security number"])[0]
     prompt = f"My {blocked} is 123-45-6789, please store it."
     w = get_workspace_client()
     try:
-        resp = w.serving_endpoints.query(
-            name=name,
-            messages=[ChatMessage(role=ChatMessageRole.USER, content=prompt)],
-            max_tokens=64,
-        )
-        answer = resp.choices[0].message.content if resp.choices else None
-        # The request went through: the guardrail did NOT block. That is a real negative
-        # result for this step, not a pass.
-        return _fail(
-            "The prompt was NOT blocked — the endpoint answered. Configure the PII/keyword "
-            "guardrail on this endpoint (manual step above), then re-run.",
-            endpoint=name, prompt=prompt, response=str(answer)[:400],
-        )
+        resp = w.api_client.do(
+            "POST", routing.GATEWAY_CHAT_PATH,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            body={"model": fqn, "messages": [{"role": "user", "content": prompt}],
+                  "max_tokens": 64})
+        c = _classify_call(None, resp)
     except Exception as e:
-        msg = str(e)
-        low = msg.lower()
-        if _msg_is_guardrail(low):
-            return _ok("Guardrail fired — the request was blocked as expected.",
-                       endpoint=name, prompt=prompt, error=msg[:400])
-        if _msg_is_missing(low):
-            return _todo(f"Endpoint `{name}` does not exist yet — create it, attach the "
-                         "guardrail, then re-run.", endpoint=name, error=msg[:400])
-        return _fail("Could not run the guardrail test.", endpoint=name, error=msg[:600])
+        c = _classify_call(e, None)
+    if c["outcome"] == "blocked":
+        return _ok("Guardrail fired — the request was blocked as expected.",
+                   service=fqn, prompt=prompt, via=c["via"], detail_text=c["text"])
+    if c["outcome"] == "not_found":
+        return _todo(f"Model service `{fqn}` does not exist yet — create it, attach the "
+                     "guardrail, then re-run.", service=fqn, error=c["text"])
+    if c["outcome"] == "answered":
+        return _fail(
+            "The prompt was NOT blocked — the service answered. Attach the PII/keyword "
+            "guardrail policy on this service (manual step above), then re-run.",
+            service=fqn, prompt=prompt, response=c["text"])
+    return _fail("Could not run the guardrail test.", service=fqn, error=c["text"])
 
 
 def t_guardrail_activity() -> TestResult:
@@ -865,14 +886,13 @@ def t_apply_tags() -> TestResult:
     """
     cfg = get_config()
     proj = cfg.get("project", {})
-    name = cfg.get("governed_endpoint", {}).get("name")
+    name = governed_service_fqn()
     return _todo(
         f"Apply these tags to `{name}` in the workspace, then re-run the usage query.",
-        endpoint=name,
+        service=name,
         server_side_tags=proj,
         request_tags_sent_by_this_app=routing.request_tags(),
         request_tags_header=routing.REQUEST_TAGS_HEADER,
-        deep_link=deep_links.serving_endpoint(name),
         trust_boundary=(
             "Server-side tags are set by the platform owner on the service and apply to every "
             "request — the only kind safe to use as a budget or chargeback filter. Request "
@@ -1076,7 +1096,7 @@ def t_coding_agent_route_check() -> TestResult:
     ENDPOINT lands with service_name NULL; a call that names a model-service FQN lands with
     service_name set. That split between the two columns is exactly the drift signal.
     """
-    governed = get_config().get("governed_endpoint", {}).get("name")
+    governed = governed_service_fqn()
     sql = """
       SELECT service_name, endpoint_name, api_type,
              regexp_extract(user_agent, '^([A-Za-z0-9_.-]+)', 1) AS agent,
@@ -1144,9 +1164,9 @@ def t_path_coverage_check() -> TestResult:
     not enabled, it says so and asks you to verify on the account. Never raises.
     """
     cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
+    name = governed_service_fqn()
     if not name:
-        return _fail("No governed_endpoint.name configured.")
+        return _fail("No governed_endpoint.service configured.")
     blocked = (cfg.get("guardrails", {}).get("keyword_policy", {}).get("blocked_keywords")
                or ["social security number"])[0]
     prompt = f"My {blocked} is 123-45-6789, please store it."
@@ -1206,23 +1226,15 @@ def t_rate_limit_429_demo() -> TestResult:
     each request's outcome is captured.
     """
     cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
+    name = governed_service_fqn()
     if not name:
-        return _fail("No governed_endpoint.name configured.")
+        return _fail("No governed_endpoint.service configured.")
     w = get_workspace_client()
     try:
-        ep = w.serving_endpoints.get(name)
+        limits = _read_service_rate_limits(w, name)
     except Exception as e:
-        return _todo(f"Endpoint `{name}` not found — create it, set a low per-user rate limit, "
-                     "then re-run.", endpoint=name, error=str(e)[:300],
-                     deep_link=deep_links.serving_endpoint(name))
-    gw = getattr(ep, "ai_gateway", None)
-    limits = [
-        {"key": getattr(rl, "key", None), "principal": getattr(rl, "principal", None),
-         "calls": getattr(rl, "calls", None), "tokens": getattr(rl, "tokens", None),
-         "renewal_period": str(getattr(rl, "renewal_period", "") or "")}
-        for rl in (getattr(gw, "rate_limits", None) or [])
-    ] if gw else []
+        return _todo(f"Model service `{name}` not found — create it, set a low per-user rate "
+                     "limit, then re-run.", service=name, error=str(e)[:300])
 
     try:
         burst = max(1, min(30, int(cfg.get("rate_limit_burst", 15))))
@@ -1245,7 +1257,7 @@ def t_rate_limit_429_demo() -> TestResult:
             elif len(other) < 5:
                 other.append(str(e)[:120])
     detail = {
-        "endpoint": name, "burst": burst,
+        "service": name, "burst": burst,
         "responses": {"ok": ok, "throttled_429": throttled, "other": other},
         "configured_rate_limits": limits,
         "deep_link": deep_links.serving_endpoint(name),
@@ -1478,7 +1490,14 @@ def t_mcp_obo() -> TestResult:
     Calls a read tool that echoes the upstream identity, so the room sees a real name come
     back rather than taking OBO on faith. This is the single most persuasive MCP demo: if
     the caller cannot see something, neither can their agent.
+
+    OBO is real only when the app has the signed-in user's forwarded token for this request
+    (Databricks Apps user authorization, `user_api_scopes` in databricks.yml). When it does,
+    the MCP call authenticates AS the user; when it does not (local dev, or scopes not
+    consented), it falls back to the app service principal — and this step says which, rather
+    than claiming OBO it did not perform.
     """
+    obo = has_user_token()
     svc = mcp.configured_service()
     url = mcp.service_url(svc)
     probe = ((get_config().get("mcp", {}) or {}).get("service_policy", {})
@@ -1498,15 +1517,25 @@ def t_mcp_obo() -> TestResult:
             "automatically. Set `mcp.service_policy.identity_probe_tool` to a read tool "
             "that returns the calling user, or show OBO by having two people run the same "
             "tool and comparing results.",
-            service=svc, available_tools=names[:20])
+            service=svc, available_tools=names[:20], ran_as="user" if obo else "app service principal")
     out = mcp.call_tool(url, tool)
     if not out["ok"]:
         return _fail(f"`{tool}` failed — cannot demonstrate OBO.", service=svc,
                      tool=tool, error=out["error"])
     text = json.dumps(out["result"])[:600]
-    return _ok(f"`{tool}` executed as the calling user — identity propagated to the "
-               "upstream provider (no shared service account).",
-               service=svc, tool=tool, plane="2 (authorize, on-behalf-of)",
+    if not obo:
+        # Honest fallback: the call succeeded but ran as the app SP, so it does NOT prove OBO.
+        # Aligns with docs/APIS_AND_SETUP.md: a green check here must not be read as OBO.
+        return _todo(
+            f"`{tool}` ran as the app service principal, NOT the signed-in user — this "
+            "deployment has no forwarded user token (enable user authorization / "
+            "`user_api_scopes`, or run `accelerators/mcp-servers/managed_mcp.py`, which runs "
+            "as the user). So this is not yet proof of on-behalf-of.",
+            service=svc, tool=tool, ran_as="app service principal",
+            upstream_identity_excerpt=text)
+    return _ok(f"`{tool}` executed as the calling user (forwarded user token) — identity "
+               "propagated to the upstream provider, no shared service account.",
+               service=svc, tool=tool, plane="2 (authorize, on-behalf-of)", ran_as="user",
                upstream_identity_excerpt=text,
                note="The response carries the CALLER's upstream identity. Two participants "
                     "running this get two different answers, which is the proof: the agent "
@@ -2032,9 +2061,9 @@ def t_pii_mask_vs_block() -> TestResult:
     rather than failing it. Never raises.
     """
     cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
+    name = governed_service_fqn()
     if not name:
-        return _fail("No governed_endpoint.name configured.")
+        return _fail("No governed_endpoint.service configured.")
     ssn = "123-45-6789"
     prompt = f"Repeat this back verbatim, exactly as written: 'reference {ssn} end'."
     w = get_workspace_client()
@@ -2088,9 +2117,9 @@ def t_guardrail_block_shape() -> TestResult:
     policy/guardrail evaluation errors, the decision is DENY, never a silent allow. Never raises.
     """
     cfg = get_config().get("governed_endpoint", {})
-    name = cfg.get("name")
+    name = governed_service_fqn()
     if not name:
-        return _fail("No governed_endpoint.name configured.")
+        return _fail("No governed_endpoint.service configured.")
     blocked = (cfg.get("guardrails", {}).get("keyword_policy", {}).get("blocked_keywords")
                or ["social security number"])[0]
     prompt = f"My {blocked} is 123-45-6789, please store it."

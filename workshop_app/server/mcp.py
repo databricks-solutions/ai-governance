@@ -30,7 +30,7 @@ import json
 import urllib.error
 import urllib.request
 
-from .config import get_config, get_workspace_client
+from .config import get_config, get_user_workspace_client, get_workspace_client
 
 PROTOCOL_VERSION = "2025-11-25"
 _TIMEOUT = 60
@@ -50,7 +50,10 @@ def _host() -> str:
 
 
 def _headers() -> dict:
-    w = get_workspace_client()
+    # On-behalf-of: authenticate MCP tool calls as the signed-in USER when the app has a
+    # forwarded user token for this request, so identity propagates to the upstream provider
+    # (the whole point of the OBO demo). Falls back to the app service principal otherwise.
+    w = get_user_workspace_client()
     return {
         **w.config.authenticate(),
         "Content-Type": "application/json",

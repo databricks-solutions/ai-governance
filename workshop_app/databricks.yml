@@ -133,6 +133,16 @@ resources:
       # reach the app straight from the bundle variables — one source of truth, no per-deploy
       # config file to pin. get_config() reads WORKSHOP_CATALOG/WORKSHOP_SCHEMA and
       # get_warehouse_id() reads DATABRICKS_WAREHOUSE_ID.
+      # User authorization (on-behalf-of). `forward_user_access_token` makes the platform pass
+      # the signed-in user's token to the app as `X-Forwarded-Access-Token`, and
+      # `user_api_scopes` are the scopes users consent to on first open — together they let MCP
+      # tool calls run AS the user, not the app service principal (server/config.py OBO helpers,
+      # server/mcp.py). `serving.serving-endpoints` covers the AI Gateway / MCP-service plane the
+      # OBO demo calls. These are App-resource fields (NOT under `config`). Verify after deploy:
+      # `databricks apps get ai-governance-workshop -o json | jq .effective_user_api_scopes`.
+      forward_user_access_token: true
+      user_api_scopes:
+        - serving.serving-endpoints
       config:
         command:
           - "python"

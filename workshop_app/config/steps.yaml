@@ -287,29 +287,32 @@ pillars:
           test: gateway_spend_by_model
 
       - id: cost_governed_endpoint
-        title: "Cost: Stand up the governed endpoint"
-        outcome: "We can put a control layer in front of a model — fallback, inference-table logging, usage tracking, and the attach point for the rate limits and guardrails that follow."
+        title: "Cost: Stand up the governed model service"
+        outcome: "We can put a control layer in front of a model as a v3 Unity Catalog model service (catalog.schema.service) — the attach point for the rate limits and guardrails that follow, with an inference table logging every payload."
         depends_on: [choice_model_services]
         concept: |
-          The rate limits, budgets, and guardrails ahead all attach to a **governed endpoint** —
-          so we stand it up here, before the steps that read it. A governed endpoint puts a
-          control layer in front of a model: a fallback for resilience, an inference table
+          The rate limits, budgets, and guardrails ahead all attach to a **governed model
+          service** — a v3 Unity Catalog securable (`catalog.schema.service`), not a legacy v1
+          serving endpoint — so we stand it up here, before the steps that read it. It puts a
+          control layer in front of a base model: a fallback for resilience, an inference table
           logging every payload, usage tracking, and the attachment point for rate limits (next)
-          and guardrails (in Control).
+          and guardrails (in Control). Every governed step addresses it by **FQN** on the v3
+          `/ai-gateway/mlflow/v1` path.
 
-          The app never creates the endpoint unattended on a customer workspace: **Try It**
-          checks whether it exists and, if not, hands you the config to create it in the UI;
-          **Verify** confirms it is present with usage tracking and the inference table on.
+          The app never creates the service unattended on a customer workspace: **Try It** checks
+          whether the model service exists (`GET /api/2.1/unity-catalog/model-services/{fqn}`)
+          and, if not, hands you the config to create it in the UI; **Verify** confirms it is
+          present with its rate-limit and inference-table config.
         action:
-          label: Create / verify governed endpoint
+          label: Create / verify governed model service
           test: create_governed_endpoint
         verify:
-          label: Check endpoint config
+          label: Check model-service config
           test: verify_governed_endpoint
 
       - id: cost_rate_limits
         title: "Cost: Enforce rate limits (QPM/TPM)"
-        outcome: "We can enforce QPM/TPM rate limits per endpoint, user, and group and see HTTP 429 when exceeded — the ceiling that reliably holds today."
+        outcome: "We can enforce QPM/TPM rate limits per service, user, and group and see HTTP 429 when exceeded — the ceiling that reliably holds today."
         depends_on: [cost_governed_endpoint]
         concept: |
           Two controls, easily conflated. **Rate limits** cap *throughput* — exceeding one
@@ -317,15 +320,16 @@ pillars:
           reliably **alert**; hard blocking is still rolling out. Rate limits are therefore the
           control that reliably enforces a hard ceiling today.
 
-          This step reads the limits configured on the **governed endpoint** you stood up above,
-          in queries/minute (QPM) and tokens/minute (TPM) — set per endpoint, per user, and per
-          group, with the most restrictive winning. Set limits in the AI Gateway UI so the
-          workshop never changes throughput on a live customer endpoint.
+          This step reads the limits configured on the **governed model service** you stood up
+          above (from its `config.rate_limits`), in queries/minute (QPM) and tokens/minute (TPM)
+          — set per service, per user, and per group, with the most restrictive winning. Set
+          limits in the AI Gateway UI so the workshop never changes throughput on a live
+          customer service.
         action:
           label: Show enforced rate limits
           test: rate_limits
         manual:
-          label: Set a rate limit on the endpoint
+          label: Set a rate limit on the model service
           deep_link: serving_endpoint
 
       - id: cost_budgets
@@ -442,27 +446,32 @@ pillars:
     title: Control
     tagline: Policies, guardrails, identity propagation, and the telemetry that records them.
     steps:
-      # The governed endpoint itself is now stood up in the Cost pillar (cost_governed_endpoint),
-      # because Cost's rate-limit and budget steps read it first. These Control steps govern that
-      # same endpoint, so they depend on it.
+      # The governed model service itself is now stood up in the Cost pillar
+      # (cost_governed_endpoint), because Cost's rate-limit and budget steps read it first. These
+      # Control steps govern that same service, so they depend on it.
       - id: control_endpoint_acl
-        title: "Control: Review who can call an endpoint"
-        outcome: "We can review endpoint ACLs (CAN_QUERY / CAN_VIEW / CAN_MANAGE) and spot over-broad or shadow-endpoint grants."
+        title: "Control: Review who can call the model service"
+        outcome: "We can review the Unity Catalog grants on the governed model service (EXECUTE = can call, MANAGE = can reconfigure) and spot over-broad or shadow-service grants."
         depends_on: [cost_governed_endpoint]
         concept: |
-          The access question, at endpoint grain: **`CAN_QUERY`**, `CAN_VIEW`, and
-          `CAN_MANAGE`. Two things to read carefully in the result:
+          On the v3 plane, "who may call this model?" is a **Unity Catalog grant** question on
+          the model-service securable — not a workspace endpoint ACL. Two privileges to read
+          carefully in the result:
 
-          - A broad group holding `CAN_QUERY` means the governed endpoint is open to everyone,
-            which undoes the scoping you set up in Choice.
-          - `CAN_MANAGE` is the **shadow-endpoint risk** — it lets someone reconfigure the
-            model or strip the guardrails off it. Keep it with platform admins only.
+          - **`EXECUTE`** is the right to call the service. A broad group (e.g. `account users`)
+            holding it means the governed service is callable by everyone, which undoes the
+            scoping you set up in Choice.
+          - **`MANAGE`** is the **shadow-service risk** — it lets someone reconfigure the model
+            or strip the guardrails off it. Keep it with platform admins only; grant callers
+            only `EXECUTE`.
 
-          Note what this does *not* cover: provided foundation-model endpoints have no
-          workspace ACL at all. Those are governed by the UC grants on the model service — the
-          two controls are separate, and you need both.
+          This reads the grants on the `model_service` securable
+          (`GET /api/2.1/unity-catalog/permissions/model_service/{fqn}`) and flags a broad group
+          holding EXECUTE/MANAGE. It is read-only — it reports grants, it changes none. To do a
+          live before/after, grant `EXECUTE` to `account users` in the UI, re-run (it flags
+          "open to everyone"), then revoke and re-run.
         action:
-          label: Show the endpoint ACL
+          label: Show the model-service grants
           test: endpoint_acl
 
       - id: control_guardrails
