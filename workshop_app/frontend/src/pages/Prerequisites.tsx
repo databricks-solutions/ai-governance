@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle, ExternalLink } from "lucide-react";
 import { api, type Prerequisites as Prereqs } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
+import { inline } from "@/components/Markdown";
 import { cn } from "@/lib/cn";
+
+// Item labels and `why` blurbs in config/prerequisites.yaml use inline markdown (**bold**,
+// *italic*, `code`). Render it with the app's shared inline renderer so it doesn't show as
+// literal punctuation.
+const Md = ({ text, className }: { text: string; className?: string }) => (
+  <span className={className} dangerouslySetInnerHTML={{ __html: inline(text) }} />
+);
 
 // The pre-workshop checklist. Content is config-driven (config/prerequisites.yaml) so an SE can
 // tailor it per customer without a code change.
@@ -180,14 +188,13 @@ export default function Prerequisites() {
                       )}
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-baseline gap-2">
-                          <span
+                          <Md
+                            text={item.item}
                             className={cn(
                               "text-sm font-semibold",
                               on ? "text-navy/50 line-through" : "text-navy",
                             )}
-                          >
-                            {item.item}
-                          </span>
+                          />
                           {item.blocker && (
                             <span className="rounded bg-lava/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lava">
                               hard blocker
@@ -199,7 +206,7 @@ export default function Prerequisites() {
                             </span>
                           )}
                         </div>
-                        {item.why && <p className="mt-1 text-xs leading-relaxed text-muted">{item.why}</p>}
+                        {item.why && <Md text={item.why} className="mt-1 block text-xs leading-relaxed text-muted" />}
                         {item.who && (
                           <p className="mt-1 text-[11px] text-navy-300">
                             <span className="font-semibold">Persona:</span> {item.who}

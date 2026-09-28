@@ -72,13 +72,15 @@ def _esc(text: Any) -> str:
 
 
 def _md_inline(text: Any) -> str:
-    """Render the small amount of inline markdown the configs use: `code` and **bold**.
+    """Render the small amount of inline markdown the configs use: `code`, **bold**, *italic*.
 
-    Escaping happens first, so the markup we emit is the only markup in the output.
+    Escaping happens first, so the markup we emit is the only markup in the output. Bold runs
+    before italic so `**...**` is consumed before the single-asterisk pass sees it.
     """
     import re
     s = _esc(text)
     s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+    s = re.sub(r"(^|[\s(])\*([^*\n]+)\*", r"\1<i>\2</i>", s)
     s = re.sub(r"`([^`]+)`", rf'<font face="Courier" color="{NAVY}">\1</font>', s)
     return s
 
