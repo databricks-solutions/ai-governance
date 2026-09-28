@@ -399,6 +399,11 @@ def t_default_access() -> TestResult:
         **detail)
 
 
+# Broad groups whose CAN_QUERY/CAN_MANAGE on the governed endpoint means it is open to
+# "everyone". Lowercased for case-insensitive comparison against the ACL principals.
+_BROAD_PRINCIPALS = {"users", "account users", "all users"}
+
+
 def t_endpoint_acl() -> TestResult:
     """Who can call the governed endpoint — the doc's primary access-control mechanism.
 
