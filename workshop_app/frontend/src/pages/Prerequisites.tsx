@@ -3,7 +3,15 @@ import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle, C
 import { api, type Prerequisites as Prereqs, type PrereqItem } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import ResetPanel from "@/components/ResetPanel";
+import { inline } from "@/components/Markdown";
 import { cn } from "@/lib/cn";
+
+// Item labels and `why` blurbs in config/prerequisites.yaml use inline markdown (**bold**,
+// *italic*, `code`). Render it with the app's shared inline renderer so it doesn't show as
+// literal punctuation.
+const Md = ({ text, className }: { text: string; className?: string }) => (
+  <span className={className} dangerouslySetInnerHTML={{ __html: inline(text) }} />
+);
 
 // The pre-workshop checklist. Content is config-driven (config/prerequisites.yaml) so an SE can
 // tailor it per customer without a code change.
@@ -250,9 +258,10 @@ function PrereqRow({
           aria-expanded={hasDetail ? open : undefined}
           className={cn("flex min-w-0 flex-1 items-center gap-2 text-left", !hasDetail && "cursor-default")}
         >
-          <span className={cn("truncate text-[13px] font-semibold", checked ? "text-navy/50 line-through" : "text-navy")}>
-            {item.item}
-          </span>
+          <Md
+            text={item.item}
+            className={cn("truncate text-[13px] font-semibold", checked ? "text-navy/50 line-through" : "text-navy")}
+          />
           {item.blocker && (
             <span className="shrink-0 rounded bg-lava/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lava">
               hard blocker
@@ -280,7 +289,7 @@ function PrereqRow({
 
       {open && hasDetail && (
         <div className="pb-4 pl-12 pr-4">
-          {item.why && <p className="text-xs leading-relaxed text-muted">{item.why}</p>}
+          {item.why && <Md text={item.why} className="block text-xs leading-relaxed text-muted" />}
           {item.who && (
             <p className="mt-1 text-[11px] text-navy-300">
               <span className="font-semibold">Persona:</span> {item.who}
