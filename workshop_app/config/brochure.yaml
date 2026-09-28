@@ -9,39 +9,34 @@
 # Keep it to ONE page — it is a hand-out, not a spec.
 
 title: AI Governance Workshop
-subtitle: Work with Databricks to stand up Unity AI Gateway in your workshop and see it live.
-duration: 3-hour hands-on workshop (plus ~1 hour slides/discussion)
-format: Live in your own Databricks workspace
+subtitle: Work with Databricks to stand up Unity Gateway in your workshop and see it live.
 
 # The one-line frame that sits under the title band.
 lead: >-
-  In one focused 4-hour session your platform team builds a governed AI control plane and proves it
-  works: every model, tool, and agent behind one Unity Catalog control plane, with the cost,
-  choice, and control to run AI at scale without slowing teams down.
+  In one focused four hour session, we are going to review the concepts behind Unity Gateway and
+  prove it works in your environment. We will set up model services, tools, and budgets and show
+  how Databricks delivers choice, cost, and control to run AI at scale.
 
 # The three pillars — the spine of the workshop and of the brochure.
 pillars:
   - id: choice
     title: Choice
     blurb: >-
-      Put any model, tool, or agent behind one control plane, addressed as a Unity Catalog
-      securable instead of a workspace endpoint name. Discover the model surface and register
-      agents and MCP servers as first-class, governed assets.
+      Put any model, tool, or agent behind one Unity Catalog name — proprietary and open-weight
+      alike — and choose which models each team can reach.
   - id: cost
     title: Cost
     blurb: >-
-      Measure what routing between models actually saves on your own prompts, set budgets and
-      hard spend caps, and attribute every request to a team — turning AI spend from a blind
-      spot into a measured, controllable line item.
+      Project routing savings on your own prompts, set budgets and rate limits, and attribute
+      spend by team and by task.
   - id: control
     title: Control
     blurb: >-
-      Rate limits, guardrails, and MCP service policies that deny the right calls — plus the
-      audit trail and telemetry that prove they fired. The evidence a security and risk team
-      asks for before they say yes.
+      Rate limits, guardrails, and MCP policies that deny the right calls — with the audit trail
+      and telemetry that prove they fired.
 
 # Who should be in the room — role plus a short line on why they're there.
-personas_intro: "Built for the team that owns AI in production. Ideal attendees:"
+personas_intro: "A successful workshop will have the following attendees:"
 personas:
   - role: Platform Admins
     value: Own the control plane, model serving, Unity Catalog, and budget controls.
@@ -61,9 +56,9 @@ accelerators:
   title: Go deeper with accelerators
   intro: "There are also six optional ~3-hour accelerators to explore concepts deeper:"
   items:
-    - "**MCP Servers** — on-behalf-of identity, UC permissions, and service policies"
-    - "**Agent Registry** — register, version, and own a representative agent"
-    - "**Coding Agents** — govern dev-agent traffic with per-developer attribution and secret detection"
-    - "**External Providers** — route Bedrock, OpenAI, and Anthropic through the Gateway"
-    - "**Policies & Guardrails** — safety filters and a custom PII-leakage judge"
+    - "**MCP** — on-behalf-of identity, UC permissions, and service policies"
+    - "**Agents** — register, version, and own a representative agent"
+    - "**Coding** — govern dev-agent traffic with per-developer attribution and secret detection"
+    - "**Providers** — route Bedrock, OpenAI, and Anthropic through the Gateway"
+    - "**Policies** — safety filters and a custom PII-leakage judge"
     - "**Skills** — build, govern, and deploy Agent Skills in Genie Code with a tiered registry and allowlist enforcement"

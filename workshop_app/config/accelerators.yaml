@@ -26,7 +26,7 @@ accelerators:
     tagline: "Additive to the core MCP-policy step: managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, and telemetry."
     steps:
       - id: acc_mcp_two_kinds
-        title: Two kinds of MCP — and UC objects as tools
+        title: "Tell managed MCP from MCP Services"
         outcome: "We can tell managed UC-native endpoints from MCP Services and list both — the distinction that decides which controls apply."
         concept: |
           Two different things are both called "MCP" on Databricks. They are frequently
@@ -71,7 +71,7 @@ accelerators:
           test: mcp_managed_tools
 
       - id: acc_mcp_service_tools
-        title: MCP Service — the live tool surface
+        title: "List an MCP Service's live tools"
         outcome: "We can list the live tool surface of an MCP Service over JSON-RPC."
         concept: |
           This is a `tools/call`-capable service; the tool list returns over JSON-RPC.
@@ -84,7 +84,7 @@ accelerators:
           test: mcp_service_tools
 
       - id: acc_mcp_grants
-        title: Who is allowed to call it (Plane 2)
+        title: "Scope who can call it (Plane 2)"
         outcome: "We can see and scope the UC grants that decide who may call an MCP service."
         concept: |
           The permission question, checked before writing any policy: this is the control
@@ -180,7 +180,7 @@ accelerators:
           test: mcp_readonly_enforcement
 
       - id: acc_mcp_external
-        title: External & custom MCP — the activation path
+        title: "Register an external or custom MCP"
         outcome: "We can register an external or custom MCP server so service policies can govern it."
         concept: |
           For a customer **not yet running MCP on Databricks**, registering an external
@@ -213,7 +213,7 @@ accelerators:
           test: mcp_tool_metadata_scan
 
       - id: acc_mcp_telemetry
-        title: What was actually recorded
+        title: "See what MCP telemetry records"
         outcome: "We can see exactly what MCP telemetry is recorded — identity and tool, not payloads."
         concept: |
           This step is precise about what telemetry exists, because it is easy to
@@ -322,7 +322,7 @@ accelerators:
           label: Open the governed endpoint (copy the base URL)
           deep_link: serving_endpoint
       - id: acc_coding_route_check
-        title: Is it actually routed?
+        title: "Confirm it's actually routed"
         outcome: "We can confirm coding-agent traffic actually lands on the governed model service, not a legacy endpoint."
         concept: |
           The most common silent failure: the client is "pointed at the gateway" but still
@@ -336,7 +336,7 @@ accelerators:
           label: Check where coding-agent traffic is actually landing
           test: coding_agent_route_check
       - id: acc_coding_smart_routing
-        title: Smart routing for coding-agent traffic
+        title: "Enable smart routing for coding agents"
         outcome: "We can let Databricks-managed smart routing pick the model per coding request — cheap for boilerplate, frontier for the hard reasoning — without the developer choosing, and without changing the client."
         concept: |
           A coding agent defaults every request to one frontier model. **Smart routing**
@@ -353,7 +353,7 @@ accelerators:
         manual:
           label: Enable smart routing for the coding harness (account setting); route a session through it
       - id: acc_coding_omnigent
-        title: Omnigent — the meta-harness above coding agents
+        title: "Put Omnigent above coding agents"
         outcome: "We can put Omnigent above Claude Code / Codex / Cursor as one governed routing layer, so model choice happens above the harness while attribution and controls stay on the gateway."
         concept: |
           **Omnigent** is a meta-harness that sits above the individual coding harnesses (Claude
@@ -375,7 +375,7 @@ accelerators:
         manual:
           label: Put Omnigent in front of the coding harnesses, pointed at the governed gateway
       - id: acc_coding_attribution
-        title: Per-developer attribution
+        title: "Attribute spend per developer"
         outcome: "We can attribute coding-agent spend and usage per developer with no tagging required."
         concept: |
           Coding agents identify themselves in `user_agent` (`claude-cli/…`, `ucode/…`,
@@ -385,7 +385,7 @@ accelerators:
           label: Check coding-agent usage & attribution
           test: coding_agent_usage
       - id: acc_coding_path_coverage
-        title: Do the controls fire on the path the agent uses?
+        title: "Check controls fire on the agent's path"
         outcome: "We can check whether guardrails and limits fire on the provider-native path coding agents use."
         concept: |
           Guardrails and rate limits are reliably enforced on the OpenAI-compatible chat path
@@ -458,7 +458,7 @@ accelerators:
           label: Find external-provider routes on this workspace
           test: external_provider_routing
       - id: acc_ext_secrets
-        title: Credentials in secrets, never inline
+        title: "Confirm credentials live in secrets"
         outcome: "We can confirm provider keys are stored as secrets, never inline."
         concept: |
           A provider key pasted into config is the pitfall the guide calls out first. Store it
@@ -499,7 +499,7 @@ accelerators:
         manual:
           label: Disable a provider/model family in the AI Gateway
       - id: acc_ext_spend
-        title: Spend by external provider
+        title: "Read spend by external provider"
         outcome: "We can read spend by external provider to see where the money goes."
         concept: |
           `system.ai_gateway.external_model_spend` reports estimated USD per model for
@@ -509,7 +509,7 @@ accelerators:
           label: Show 30-day spend by external provider
           test: gateway_spend_by_model
       - id: acc_ext_fallback
-        title: Fallback & traffic splitting
+        title: "Configure fallback & traffic splitting"
         outcome: "We can configure fallback and traffic splitting across providers for resilience."
         concept: |
           A single provider is a single point of failure. Configure a fallback model and split
@@ -523,7 +523,7 @@ accelerators:
     tagline: "Additive to the core guardrail step: mask vs block, how a block is delivered, path coverage, effectiveness benchmarking, prompt-injection, groundedness, and custom per-use-case policies."
     steps:
       - id: acc_pg_mask_vs_block
-        title: Mask vs block
+        title: "Compare mask vs block"
         outcome: "We can tell whether PII is blocked, masked, or passed through intact."
         concept: |
           BLOCK refuses the request; MASK lets it through with the PII removed. MASK is the more
@@ -534,7 +534,7 @@ accelerators:
           label: Probe whether PII is blocked, masked, or passed through
           test: pii_mask_vs_block
       - id: acc_pg_block_shape
-        title: How a block is delivered (and fail-closed)
+        title: "See how a block is delivered"
         outcome: "We can see how a block is delivered (4xx vs HTTP 200 + reason) and that evaluation is fail-closed."
         concept: |
           A block can come back two ways: a **4xx error**, or **HTTP 200 with a refusal reason**.
@@ -549,7 +549,7 @@ accelerators:
           label: Send a blocked prompt and report the block shape
           test: guardrail_block_shape
       - id: acc_pg_path_coverage
-        title: Does the guardrail fire on every path?
+        title: "Check the guardrail fires on every path"
         outcome: "We can check the guardrail fires on every gateway path, not just the OpenAI-compatible one."
         concept: |
           A guardrail is only as good as its coverage. Controls are reliably enforced on the
@@ -561,7 +561,7 @@ accelerators:
           label: Compare guardrail coverage across both gateway paths
           test: path_coverage_check
       - id: acc_pg_effectiveness
-        title: Measure effectiveness — benchmark & red-team
+        title: "Measure guardrail effectiveness"
         outcome: "We can confirm the payloads and telemetry a guardrail benchmark and red-team review need are present."
         concept: |
           "Is the guardrail on?" is not "does it work?". The guardrail benchmark
@@ -575,7 +575,7 @@ accelerators:
           label: Check guardrail + judge readiness (payloads, telemetry)
           test: pii_safety_readiness
       - id: acc_pg_prompt_injection
-        title: Prompt-injection & jailbreak
+        title: "Block prompt-injection & jailbreak"
         outcome: "We can enable prompt-injection / jailbreak protection and prove it blocks a jailbreak."
         concept: |
           Content safety is not the same as prompt-injection defense. Enable the
@@ -585,7 +585,7 @@ accelerators:
         manual:
           label: Enable jailbreak/prompt-injection guardrail; test a jailbreak prompt
       - id: acc_pg_groundedness
-        title: Hallucination & groundedness
+        title: "Flag ungrounded responses"
         outcome: "We can enable a groundedness guardrail and flag an ungrounded response."
         concept: |
           For RAG and assistant use cases, a confident but ungrounded answer is the risk. Enable
@@ -604,7 +604,7 @@ accelerators:
           label: Create a custom policy function
           test: create_mcp_policy
       - id: acc_pg_per_use_case
-        title: Per-use-case / per-agent policies
+        title: "Attach per-use-case policies"
         outcome: "We can attach different policies per use case or per agent, not one-size-fits-all."
         concept: |
           A single global policy is rarely right — a medical assistant and an internal code
@@ -618,7 +618,7 @@ accelerators:
     tagline: "Not in the core at all: build, govern, and deploy Agent Skills in Genie Code — a runtime allowlist and a tiered registry."
     steps:
       - id: acc_skills_what
-        title: What an Agent Skill is — and the three instruction layers
+        title: "Understand Agent Skills & the three layers"
         outcome: "We can explain what an Agent Skill is and the three instruction layers it sits in."
         concept: |
           An **Agent Skill** is a markdown file (instructions + a couple of examples) that
@@ -657,7 +657,7 @@ accelerators:
         manual:
           label: Create a skill .md and save it under ~/.assistant/skills/
       - id: acc_skills_verify
-        title: See it load — and prove the allowlist
+        title: "Prove the skills allowlist"
         outcome: "We can prove the skills folder is a runtime allowlist — in it is invokable, out of it is not."
         concept: |
           Open **Assistant → Settings → Agent Skills** and confirm your skill appears. Then the
@@ -684,7 +684,7 @@ accelerators:
         manual:
           label: Add a registry.yaml entry (owner, tier, data scope, tags)
       - id: acc_skills_github_workflow
-        title: The GitHub registry and its PR gates
+        title: "Promote a skill through GitHub PR gates"
         outcome: "We can promote skills through a GitHub PR with lint, secret-scan, and eval gates."
         concept: |
           Skills live in one Git repo — `/tier1`, `/tier2`, `/tier3`, and a `registry.yaml`
@@ -697,7 +697,7 @@ accelerators:
           `accelerators/skills/skills-collaboration-framework/` — copy it into your own repo and
           open a PR to see the gates fire.
       - id: acc_skills_eval
-        title: Make the skill testable — a minimal eval
+        title: "Add a minimal eval to a skill"
         outcome: "We can make a skill testable with a minimal LLM-judge eval."
         concept: |
           A skill without an eval is a hope, not a control. Write 3–5 golden prompt/answer pairs
@@ -707,7 +707,7 @@ accelerators:
         manual:
           label: Run the eval cells in build_a_skill.py (golden Q&A + judge)
       - id: acc_skills_security
-        title: Security & data-classification gates
+        title: "Pass security & data-classification gates"
         outcome: "We can pass a skill through secret-scan and data-classification gates."
         concept: |
           Two gates every skill passes before it can touch anything sensitive: a **secret scan**
@@ -719,7 +719,7 @@ accelerators:
         manual:
           label: Run the secret-scan cell; confirm the declared data scope
       - id: acc_skills_deploy
-        title: Deploy and retire
+        title: "Deploy and retire skills"
         outcome: "We can deploy and retire skills so the registry stays a living allowlist."
         concept: |
           Deployment is the GitHub Action sync above landing the skill in the workspace

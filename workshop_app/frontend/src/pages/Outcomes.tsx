@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Loader2, Target, Trash2 } from "lucide-react";
-import { api, groupCounts, stepOutcome, type Pillar, type ProgressMap } from "@/lib/api";
+import { Loader2, Target, ChevronDown } from "lucide-react";
+import { groupCounts, stepOutcome, type Pillar, type ProgressMap, type Step } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import OutcomeControls from "@/components/OutcomeControls";
 import ExportPanel from "@/components/ExportPanel";
+import ResetPanel from "@/components/ResetPanel";
 import { Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { shortTitle } from "@/lib/text";
 
 // The workshop outcomes checklist — every core and accelerator step in one place, checkable on
 // its own so the workshop can guide activities even without the interactive Try-It flow. It
@@ -150,26 +152,15 @@ export default function Outcomes({
                 </div>
                 <div className="overflow-hidden rounded-2xl border border-navy/10 bg-white">
                   {g.steps.map((step, idx) => (
-                    <div
+                    <OutcomeRow
                       key={step.id}
-                      className={cn(
-                        "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4",
-                        idx > 0 && "border-t border-navy/[0.07]",
-                      )}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-navy">{step.title}</div>
-                        {step.outcome && (
-                          <div className="mt-0.5 text-xs leading-relaxed text-muted">{step.outcome}</div>
-                        )}
-                      </div>
-                      <OutcomeControls
-                        stepId={step.id}
-                        pillarId={g.id}
-                        saved={progress[step.id] ?? null}
-                        onChange={onProgressChange}
-                      />
-                    </div>
+                      step={step}
+                      groupId={g.id}
+                      groupTitle={g.title}
+                      saved={progress[step.id] ?? null}
+                      onProgressChange={onProgressChange}
+                      first={idx === 0}
+                    />
                   ))}
                 </div>
               </section>
@@ -190,48 +181,55 @@ export default function Outcomes({
   );
 }
 
-/** Clear all workshop progress so the room can start fresh. Destructive — confirms first, and
- *  points the presenter at Export above to keep a record before wiping. */
-function ResetPanel({ onReset }: { onReset: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-
-  async function reset() {
-    if (!window.confirm(
-      "Clear ALL workshop progress on this deployment? Every step returns to not-started. " +
-      "This cannot be undone — export the outcomes above first if you need the record.",
-    )) return;
-    setBusy(true);
-    setMsg("");
-    try {
-      const res = await api.resetProgress();
-      setMsg(`Cleared ${res.cleared} step(s). Starting fresh.`);
-      onReset();
-    } catch (e) {
-      setMsg(`Reset failed: ${e}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
+/** One outcome row: a collapsed one-liner (short title · Done/N/A · expand) that opens to reveal
+ *  the "We can…" outcome statement. Keeps the checklist scannable while the detail stays a click
+ *  away. Shares the same backing state as the step cards via OutcomeControls. */
+function OutcomeRow({
+  step,
+  groupId,
+  groupTitle,
+  saved,
+  onProgressChange,
+  first,
+}: {
+  step: Step;
+  groupId: string;
+  groupTitle: string;
+  saved: ProgressMap[string] | null;
+  onProgressChange: () => void;
+  first: boolean;
+}) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-navy/10 bg-white p-5">
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold text-navy">Start over</div>
-        <div className="mt-0.5 text-xs text-muted">
-          Clears all progress on this deployment — for re-running the workshop or resetting a demo.
-          Export above first; this can't be undone.
+    <div className={cn(!first && "border-t border-navy/[0.07]")}>
+      <div className="flex items-center gap-3 p-4">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="min-w-0 flex-1 text-left"
+        >
+          <span className="block truncate text-[13px] font-medium text-navy">{shortTitle(step.title, groupTitle)}</span>
+        </button>
+        <div className="shrink-0">
+          <OutcomeControls stepId={step.id} pillarId={groupId} saved={saved} onChange={onProgressChange} />
         </div>
+        {step.outcome && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-label={open ? "Collapse" : "Expand"}
+            className="shrink-0 rounded-full p-1 text-navy-300 hover:bg-navy/5 hover:text-navy"
+          >
+            <ChevronDown className={cn("h-4.5 w-4.5 transition-transform", open && "rotate-180")} />
+          </button>
+        )}
       </div>
-      <button
-        onClick={reset}
-        disabled={busy}
-        className="inline-flex shrink-0 items-center gap-2 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:border-lava hover:text-lava disabled:opacity-40"
-      >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        Reset workshop progress
-      </button>
-      {msg && <span className="w-full text-xs text-muted">{msg}</span>}
+      {open && step.outcome && (
+        <p className="px-4 pb-4 text-xs leading-relaxed text-muted">{step.outcome}</p>
+      )}
     </div>
   );
 }
+

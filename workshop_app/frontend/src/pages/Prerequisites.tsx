@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle, ExternalLink } from "lucide-react";
-import { api, type Prerequisites as Prereqs } from "@/lib/api";
+import { CheckSquare, Square, FileDown, FileText, Loader2, Clock, AlertCircle, CheckCircle2, ExternalLink, ChevronDown } from "lucide-react";
+import { api, type Prerequisites as Prereqs, type PrereqItem } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
+import ResetPanel from "@/components/ResetPanel";
 import { cn } from "@/lib/cn";
 
 // The pre-workshop checklist. Content is config-driven (config/prerequisites.yaml) so an SE can
@@ -22,7 +23,7 @@ function loadChecked(): Record<string, boolean> {
   }
 }
 
-export default function Prerequisites() {
+export default function Prerequisites({ onProgressChange }: { onProgressChange: () => void }) {
   const [data, setData] = useState<Prereqs | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>(loadChecked);
@@ -127,21 +128,48 @@ export default function Prerequisites() {
       </div>
 
       {blockers.length > 0 && (
-        <div className="mb-8 flex items-start gap-3 rounded-2xl border border-lava/40 bg-lava/[0.05] p-4">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-lava" />
-          <div className="text-sm leading-relaxed text-navy">
-            <span className="font-semibold">
-              Hard blockers — {blockersUnmet.length} of {blockers.length} still open.
-            </span>{" "}
-            The workshop cannot run until these are met: without Unity Catalog and the Unity AI
-            Gateway there is nothing to govern. Confirm them (checked below) before scheduling.
+        blockersUnmet.length === 0 ? (
+          <div className="mb-8 flex items-start gap-3 rounded-2xl border border-[#1E7E34]/30 bg-[#E6F4EA]/60 p-4">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#1E7E34]" />
+            <div className="text-sm leading-relaxed text-navy">
+              <span className="font-semibold">Hard blockers — all {blockers.length} confirmed.</span>{" "}
+              Unity Catalog and Unity Gateway are in place — you're clear to schedule the workshop.
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mb-8 flex items-start gap-3 rounded-2xl border border-lava/40 bg-lava/[0.05] p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-lava" />
+            <div className="text-sm leading-relaxed text-navy">
+              <span className="font-semibold">
+                Hard blockers — {blockersUnmet.length} of {blockers.length} still open.
+              </span>{" "}
+              The workshop cannot run until these are met: without Unity Catalog and Unity Gateway
+              there is nothing to govern. Confirm them (checked below) before scheduling.
+            </div>
+          </div>
+        )
       )}
 
       {data.lead_time_note && (
         <p className="mb-8 whitespace-pre-line text-sm leading-relaxed text-muted">{data.lead_time_note}</p>
       )}
+
+      {/* The two `system` grants — moved here from the Walkthrough. An account/metastore admin
+          runs these once; kept short on purpose (the checklist item above tracks it). */}
+      <div className="mb-8 rounded-2xl border border-navy/10 bg-oat p-5">
+        <h2 className="text-sm font-semibold text-navy">
+          The two <code className="rounded bg-navy/5 px-1">system</code> grants
+        </h2>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          Let the app read Gateway telemetry (the cost and audit steps). An account or metastore
+          admin runs these once — get the app's service principal with{" "}
+          <code className="rounded bg-navy/5 px-1">databricks apps get ai-governance-workshop</code>.
+          The workshop still runs without them; those steps just show “action needed”.
+        </p>
+        <pre className="mt-3 overflow-x-auto rounded-xl bg-navy/[0.03] p-3.5 text-[11.5px] leading-relaxed text-navy/80">{`GRANT USE CATALOG ON CATALOG system TO \`<app-service-principal>\`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO \`<app-service-principal>\`;
+GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO \`<app-service-principal>\`;`}</pre>
+      </div>
 
       <div className="flex flex-col gap-8">
         {data.groups.map((g) => {
@@ -162,59 +190,104 @@ export default function Prerequisites() {
               {g.intro && <p className="mb-3 text-sm leading-relaxed text-muted">{g.intro}</p>}
 
               <div className="overflow-hidden rounded-2xl border border-navy/10 bg-white">
-                {g.items.map((item, idx) => {
-                  const on = !!checked[item.id];
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => toggle(item.id)}
-                      className={cn(
-                        "flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-oat/60",
-                        idx > 0 && "border-t border-navy/[0.07]",
-                      )}
-                    >
-                      {on ? (
-                        <CheckSquare className="mt-0.5 h-5 w-5 shrink-0 text-lava" strokeWidth={2} />
-                      ) : (
-                        <Square className="mt-0.5 h-5 w-5 shrink-0 text-navy-300" strokeWidth={2} />
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-baseline gap-2">
-                          <span
-                            className={cn(
-                              "text-sm font-semibold",
-                              on ? "text-navy/50 line-through" : "text-navy",
-                            )}
-                          >
-                            {item.item}
-                          </span>
-                          {item.blocker && (
-                            <span className="rounded bg-lava/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lava">
-                              hard blocker
-                            </span>
-                          )}
-                          {item.optional && (
-                            <span className="rounded bg-navy/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                              scope-dependent
-                            </span>
-                          )}
-                        </div>
-                        {item.why && <p className="mt-1 text-xs leading-relaxed text-muted">{item.why}</p>}
-                        {item.who && (
-                          <p className="mt-1 text-[11px] text-navy-300">
-                            <span className="font-semibold">Persona:</span> {item.who}
-                          </p>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                {g.items.map((item, idx) => (
+                  <PrereqRow
+                    key={item.id}
+                    item={item}
+                    checked={!!checked[item.id]}
+                    onToggle={() => toggle(item.id)}
+                    first={idx === 0}
+                  />
+                ))}
               </div>
             </section>
           );
         })}
         </div>
+
+        <ResetPanel onReset={onProgressChange} />
       </div>
+    </div>
+  );
+}
+
+/** One prerequisite: a collapsed one-liner (checkbox · item · badges · expand) that opens to
+ *  reveal the "why" and the persona. The checkbox and the expander are separate actions — ticking
+ *  never expands, and expanding never ticks. The chevron only appears when there is detail to show. */
+function PrereqRow({
+  item,
+  checked,
+  onToggle,
+  first,
+}: {
+  item: PrereqItem;
+  checked: boolean;
+  onToggle: () => void;
+  first: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = !!(item.why || item.who);
+  return (
+    <div className={cn(!first && "border-t border-navy/[0.07]")}>
+      <div className="flex items-center gap-3 p-4 transition-colors hover:bg-oat/60">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={checked}
+          aria-label={checked ? "Uncheck" : "Check"}
+          className="shrink-0"
+        >
+          {checked ? (
+            <CheckSquare className="h-5 w-5 text-lava" strokeWidth={2} />
+          ) : (
+            <Square className="h-5 w-5 text-navy-300" strokeWidth={2} />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => hasDetail && setOpen((o) => !o)}
+          aria-expanded={hasDetail ? open : undefined}
+          className={cn("flex min-w-0 flex-1 items-center gap-2 text-left", !hasDetail && "cursor-default")}
+        >
+          <span className={cn("truncate text-[13px] font-semibold", checked ? "text-navy/50 line-through" : "text-navy")}>
+            {item.item}
+          </span>
+          {item.blocker && (
+            <span className="shrink-0 rounded bg-lava/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lava">
+              hard blocker
+            </span>
+          )}
+          {item.optional && (
+            <span className="shrink-0 rounded bg-navy/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+              scope-dependent
+            </span>
+          )}
+        </button>
+
+        {hasDetail && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-label={open ? "Collapse" : "Expand"}
+            className="shrink-0 rounded-full p-1 text-navy-300 hover:bg-navy/5 hover:text-navy"
+          >
+            <ChevronDown className={cn("h-4.5 w-4.5 transition-transform", open && "rotate-180")} />
+          </button>
+        )}
+      </div>
+
+      {open && hasDetail && (
+        <div className="pb-4 pl-12 pr-4">
+          {item.why && <p className="text-xs leading-relaxed text-muted">{item.why}</p>}
+          {item.who && (
+            <p className="mt-1 text-[11px] text-navy-300">
+              <span className="font-semibold">Persona:</span> {item.who}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

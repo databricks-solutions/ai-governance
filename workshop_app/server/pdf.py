@@ -228,6 +228,11 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
                                    leading=15, textColor=HexColor(LAVA), spaceAfter=10),
         "lead": ParagraphStyle("bl", parent=base, fontName="Helvetica", fontSize=9.5,
                                leading=13.5, textColor=HexColor(MUTED), spaceAfter=4),
+        # Persona intro sits at the same left inset as the persona rows below it, so the block
+        # lines up under the heading instead of the role names hanging out at the page margin.
+        "persona_intro": ParagraphStyle("bpi", parent=base, fontName="Helvetica", fontSize=9.5,
+                                        leading=13.5, textColor=HexColor(MUTED), spaceAfter=4,
+                                        leftIndent=9),
         "h2": ParagraphStyle("bh2", parent=base, fontName="Helvetica-Bold", fontSize=11.5,
                              leading=14, textColor=HexColor(NAVY), spaceBefore=14, spaceAfter=6),
         "pillar_title": ParagraphStyle("bpt", parent=base, fontName="Helvetica-Bold",
@@ -287,7 +292,7 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
     # Three pillars as a 3-column card row: navy title cell over a white blurb cell.
     pillars = b.get("pillars", [])[:3]
     if pillars:
-        story.append(Paragraph("What you'll cover", st["h2"]))
+        story.append(Paragraph("What we'll cover", st["h2"]))
         titles = [Paragraph(_esc(p.get("title")), st["pillar_title"]) for p in pillars]
         blurbs = [Paragraph(_md_inline(p.get("blurb")), st["pillar_body"]) for p in pillars]
         n = len(pillars)
@@ -311,7 +316,7 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
     if personas:
         story.append(Paragraph("Who it's for", st["h2"]))
         if b.get("personas_intro"):
-            story.append(Paragraph(_md_inline(b["personas_intro"]), st["lead"]))
+            story.append(Paragraph(_md_inline(b["personas_intro"]), st["persona_intro"]))
             story.append(Spacer(1, 2))
         # Support both the {role, value} dict form and a bare-string role.
         rows = []
@@ -323,7 +328,7 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
         pers = Table(rows, colWidths=[2.3 * inch, avail_w - 2.3 * inch])
         pers.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 9), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ("LINEBELOW", (0, 0), (-1, -2), 0.4, HexColor(RULE)),
         ]))

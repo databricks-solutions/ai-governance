@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle, Ban } from "lucide-react";
+import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle, Ban, ChevronDown } from "lucide-react";
 import { api, stepOutcome, type Step, type TestResult, type ProgressMap } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { shortTitle } from "@/lib/text";
 import McpDiagram from "@/components/McpDiagram";
 import Markdown from "@/components/Markdown";
 import ResultDetail from "@/components/ResultDetail";
@@ -32,18 +33,24 @@ function Badge({ kind }: { kind: keyof typeof BADGES }) {
 export default function StepCard({
   index,
   pillarId,
+  groupTitle,
   step,
   saved,
   onProgressChange,
 }: {
   index: number;
   pillarId: string;
+  /** The pillar/accelerator title, used to strip a redundant "<group>: " prefix from the step title. */
+  groupTitle?: string;
   step: Step;
   saved: Saved;
   onProgressChange: () => void;
 }) {
   const [running, setRunning] = useState<null | "action" | "verify">(null);
   const [result, setResult] = useState<TestResult | null>(saved?.last_result ?? null);
+  // Collapsed by default: the room scans a clean one-line-per-step list, then opens the step it
+  // is working on to reveal the concept, Try-It/Verify, and results.
+  const [open, setOpen] = useState(false);
   const status = saved?.status ?? "not_started";
   // Achieved = Try-It passed OR hand-marked done; `na` = marked not-applicable.
   const { done: achieved, na } = stepOutcome(saved);
@@ -67,15 +74,16 @@ export default function StepCard({
   const actionRequired = status === "action_required";
 
   return (
-    <div className={cn("rounded-2xl border bg-white p-6", achieved ? "border-navy/25" : "border-navy/10")}>
-      {/* Header */}
-      <div className="mb-3 flex items-start gap-3">
+    <div className={cn("rounded-2xl border bg-white", achieved ? "border-navy/25" : "border-navy/10")}>
+      {/* Collapsed header — one line per step: status · title · Done/N/A · expand. The title and
+          chevron toggle the disclosure; the outcome chips act on their own and never toggle. */}
+      <div className="flex items-center gap-3 p-4">
         <span
           className={cn(
-            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border",
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border",
             achieved ? "border-navy bg-navy text-white" : "border-navy/20 bg-navy/[0.02] text-navy-300",
           )}
-          title={achieved ? "Achieved" : na ? "Marked N/A" : "Not done yet — set the outcome below"}
+          title={achieved ? "Achieved" : na ? "Marked N/A" : "Not done yet — set the outcome"}
         >
           {achieved ? (
             <Check className="h-4 w-4" strokeWidth={3} />
@@ -85,126 +93,148 @@ export default function StepCard({
             <Circle className="h-3.5 w-3.5" />
           )}
         </span>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-navy-300">Step {index}</div>
-            {actionRequired && (
-              <span className="rounded bg-[#FDF3E0] px-2 py-0.5 text-[11px] font-semibold text-[#B7791F]">
-                ACTION NEEDED
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-semibold text-navy">{step.title}</h3>
-            {step.coming_soon && (
-              <span className="rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-navy">
-                Coming soon
-              </span>
-            )}
-          </div>
-          {step.outcome && (
-            <p className="mt-1 text-sm leading-relaxed text-muted">{step.outcome}</p>
-          )}
-        </div>
-      </div>
 
-      {/* Concept */}
-      {step.concept && (
-        <div className="mb-4 rounded-xl bg-oat p-4">
-          <div className="mb-1.5">
-            <Badge kind="concept" />
-          </div>
-          <Markdown text={step.concept.trim()} compact />
-        </div>
-      )}
-
-      {/* Optional diagram, named by `visual:` in the step config. Some concepts are
-          structural and a paragraph cannot carry them. */}
-      {step.visual && <div className="mb-4">{VISUALS[step.visual] ?? null}</div>}
-
-      {/* Actions row: manual deep-link, Try-It, Verify */}
-      <div className="flex flex-wrap items-center gap-2">
-        {step.manual?.url && (
-          <a
-            href={step.manual.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-[#B7791F]/30 bg-[#FDF3E0] px-4 py-2 text-sm font-semibold text-[#B7791F] hover:border-[#B7791F]/60"
-          >
-            <Badge kind="manual" /> {step.manual.label} <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        )}
-        {step.action?.test && (
-          <button
-            onClick={() => run("action", step.action!.test!)}
-            disabled={running !== null}
-            className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700 disabled:opacity-40"
-          >
-            {running === "action" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            {step.action.label}
-          </button>
-        )}
-        {step.verify?.test && (
-          <button
-            onClick={() => run("verify", step.verify!.test!)}
-            disabled={running !== null}
-            className="inline-flex items-center gap-2 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:border-navy/50 disabled:opacity-40"
-          >
-            {running === "verify" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Badge kind="verify" />}
-            {step.verify.label}
-          </button>
-        )}
-      </div>
-
-      {/* Outcome — Done / N/A / Add-to-POC, set by hand and independent of running Try-It. */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-navy/[0.07] pt-4">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Outcome</span>
-        <OutcomeControls stepId={step.id} pillarId={pillarId} saved={saved} onChange={onProgressChange} />
-      </div>
-
-      {/* Result — three states, not two: passed, action needed, failed. */}
-      {result && (
-        <div
-          className={cn(
-            "mt-4 rounded-xl border p-4",
-            result.status === "action_required"
-              ? "border-[#B7791F]/30 bg-[#FDF3E0]/60"
-              : result.ok
-                ? "border-[#1E7E34]/20 bg-[#E6F4EA]/50"
-                : "border-lava/30 bg-lava/[0.04]",
-          )}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            {result.status === "action_required" ? (
-              <AlertCircle className="h-4.5 w-4.5 shrink-0 text-[#B7791F]" />
-            ) : result.ok ? (
-              <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-[#1E7E34]" />
-            ) : (
-              <XCircle className="h-4.5 w-4.5 shrink-0 text-lava" />
-            )}
-            <span className="text-navy">{result.summary}</span>
+          <span className="shrink-0 text-xs font-semibold tabular-nums text-navy-300">{index}.</span>
+          <span className="truncate text-[13px] font-semibold text-navy">{shortTitle(step.title, groupTitle)}</span>
+          {actionRequired && (
+            <span className="shrink-0 rounded bg-[#FDF3E0] px-1.5 py-0.5 text-[10px] font-semibold text-[#B7791F]">
+              ACTION NEEDED
+            </span>
+          )}
+          {step.coming_soon && (
+            <span className="shrink-0 rounded-full bg-navy/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-navy">
+              Coming soon
+            </span>
+          )}
+        </button>
+
+        <div className="hidden shrink-0 sm:block">
+          <OutcomeControls stepId={step.id} pillarId={pillarId} saved={saved} onChange={onProgressChange} />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-label={open ? "Collapse step" : "Expand step"}
+          className="shrink-0 rounded-full p-1 text-navy-300 hover:bg-navy/5 hover:text-navy"
+        >
+          <ChevronDown className={cn("h-5 w-5 transition-transform", open && "rotate-180")} />
+        </button>
+      </div>
+
+      {/* Detail — revealed on expand. Everything that used to be always-on lives here now. */}
+      {open && (
+        <div className="border-t border-navy/[0.07] px-4 pb-5 pt-4">
+          {step.outcome && (
+            <p className="mb-4 text-sm leading-relaxed text-muted">{step.outcome}</p>
+          )}
+
+          {/* On phones the outcome chips can't fit the collapsed row, so surface them here too. */}
+          <div className="mb-4 flex items-center gap-x-3 sm:hidden">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-navy-300">Outcome</span>
+            <OutcomeControls stepId={step.id} pillarId={pillarId} saved={saved} onChange={onProgressChange} />
           </div>
-          {/* What this step actually called. Shown so the room can see exactly what the app
-              does to their workspace — the first question a platform team asks. */}
-          {result.api && (
-            <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted">
-              <span className="font-semibold uppercase tracking-wider text-[10px]">API</span>
-              <code className="rounded bg-navy/5 px-1.5 py-0.5 text-[11px] text-navy">{result.api}</code>
-              {result.api_index && (
-                <a
-                  href={result.api_index}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 underline decoration-navy/20 hover:decoration-navy/60"
-                >
-                  reference <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-              {result.api_note && <span className="italic">{result.api_note}</span>}
+
+          {/* Concept */}
+          {step.concept && (
+            <div className="mb-4 rounded-xl bg-oat p-4">
+              <div className="mb-1.5">
+                <Badge kind="concept" />
+              </div>
+              <Markdown text={step.concept.trim()} compact />
             </div>
           )}
-          {result.detail && Object.keys(result.detail).length > 0 && (
-            <ResultDetail detail={result.detail} />
+
+          {/* Optional diagram, named by `visual:` in the step config. Some concepts are
+              structural and a paragraph cannot carry them. */}
+          {step.visual && <div className="mb-4">{VISUALS[step.visual] ?? null}</div>}
+
+          {/* Actions row: manual deep-link, Try-It, Verify */}
+          <div className="flex flex-wrap items-center gap-2">
+            {step.manual?.url && (
+              <a
+                href={step.manual.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-[#B7791F]/30 bg-[#FDF3E0] px-4 py-2 text-sm font-semibold text-[#B7791F] hover:border-[#B7791F]/60"
+              >
+                <Badge kind="manual" /> {step.manual.label} <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+            {step.action?.test && (
+              <button
+                onClick={() => run("action", step.action!.test!)}
+                disabled={running !== null}
+                className="inline-flex items-center gap-2 rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700 disabled:opacity-40"
+              >
+                {running === "action" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {step.action.label}
+              </button>
+            )}
+            {step.verify?.test && (
+              <button
+                onClick={() => run("verify", step.verify!.test!)}
+                disabled={running !== null}
+                className="inline-flex items-center gap-2 rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy hover:border-navy/50 disabled:opacity-40"
+              >
+                {running === "verify" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Badge kind="verify" />}
+                {step.verify.label}
+              </button>
+            )}
+          </div>
+
+          {/* Result — three states, not two: passed, action needed, failed. */}
+          {result && (
+            <div
+              className={cn(
+                "mt-4 rounded-xl border p-4",
+                result.status === "action_required"
+                  ? "border-[#B7791F]/30 bg-[#FDF3E0]/60"
+                  : result.ok
+                    ? "border-[#1E7E34]/20 bg-[#E6F4EA]/50"
+                    : "border-lava/30 bg-lava/[0.04]",
+              )}
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                {result.status === "action_required" ? (
+                  <AlertCircle className="h-4.5 w-4.5 shrink-0 text-[#B7791F]" />
+                ) : result.ok ? (
+                  <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-[#1E7E34]" />
+                ) : (
+                  <XCircle className="h-4.5 w-4.5 shrink-0 text-lava" />
+                )}
+                <span className="text-navy">{result.summary}</span>
+              </div>
+              {/* What this step actually called. Shown so the room can see exactly what the app
+                  does to their workspace — the first question a platform team asks. */}
+              {result.api && (
+                <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted">
+                  <span className="font-semibold uppercase tracking-wider text-[10px]">API</span>
+                  <code className="rounded bg-navy/5 px-1.5 py-0.5 text-[11px] text-navy">{result.api}</code>
+                  {result.api_index && (
+                    <a
+                      href={result.api_index}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 underline decoration-navy/20 hover:decoration-navy/60"
+                    >
+                      reference <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {result.api_note && <span className="italic">{result.api_note}</span>}
+                </div>
+              )}
+              {result.detail && Object.keys(result.detail).length > 0 && (
+                <ResultDetail detail={result.detail} />
+              )}
+            </div>
           )}
         </div>
       )}
