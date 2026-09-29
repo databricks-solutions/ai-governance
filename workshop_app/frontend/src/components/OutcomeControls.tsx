@@ -5,10 +5,10 @@ import { cn } from "@/lib/cn";
 
 // The per-step outcome control: Done / N/A / Add-to-POC. Shared by the step cards and the
 // outcomes checklist on the Prerequisites page, so both edit the same backing state and stay
-// in sync. Done and N/A are mutually exclusive; "Add to POC" is an independent flag.
-//
-// A step reads as done when the interactive Try-It test passed OR it was hand-marked done — so
-// a room that runs activities without clicking Try-It can still record real outcomes here.
+// in sync. The three are a SINGLE mutually-exclusive selection: a step is Done, or N/A, or
+// flagged for the POC, or none. Selecting one clears the others; clicking the active one clears
+// it. A step reads as done only when it was hand-marked here (a passing Try-It is shown by the
+// result badge, but never auto-marks the outcome).
 export default function OutcomeControls({
   stepId,
   pillarId,
@@ -22,15 +22,18 @@ export default function OutcomeControls({
   onChange: () => void;
   className?: string;
 }) {
-  const { outcome, poc, done, na, status } = stepOutcome(saved);
+  const { outcome, poc, done, na } = stepOutcome(saved);
   const [busy, setBusy] = useState(false);
-  // Done shows lit because the Try-It test passed, not because someone ticked it here.
-  const autoDone = status === "done" && outcome !== "done";
 
-  async function send(nextOutcome: string | null, nextPoc: boolean) {
+  // One selection at a time: setting an outcome clears POC, and flagging POC clears the outcome.
+  async function select(kind: "done" | "na" | "poc") {
     setBusy(true);
     try {
-      await api.setOutcome({ step_id: stepId, pillar_id: pillarId, outcome: nextOutcome, poc: nextPoc });
+      const body =
+        kind === "poc"
+          ? { outcome: null as string | null, poc: !poc }
+          : { outcome: outcome === kind ? null : kind, poc: false };
+      await api.setOutcome({ step_id: stepId, pillar_id: pillarId, ...body });
       onChange();
     } finally {
       setBusy(false);
@@ -41,16 +44,16 @@ export default function OutcomeControls({
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <Chip
         active={done}
-        onClick={() => send(outcome === "done" ? null : "done", poc)}
+        onClick={() => select("done")}
         disabled={busy}
         tone="done"
         icon={<Check className="h-3.5 w-3.5" strokeWidth={3} />}
-        label={autoDone ? "Done · auto" : "Done"}
-        title={autoDone ? "Achieved by running Try-It" : "Mark this outcome done"}
+        label="Done"
+        title="Mark this outcome done"
       />
       <Chip
         active={na}
-        onClick={() => send(outcome === "na" ? null : "na", poc)}
+        onClick={() => select("na")}
         disabled={busy}
         tone="na"
         icon={<Ban className="h-3.5 w-3.5" />}
@@ -59,12 +62,12 @@ export default function OutcomeControls({
       />
       <Chip
         active={poc}
-        onClick={() => send(outcome, !poc)}
+        onClick={() => select("poc")}
         disabled={busy}
         tone="poc"
         icon={<FilePlus2 className="h-3.5 w-3.5" />}
         label="Add to POC"
-        title="Flag this step for the POC follow-up"
+        title="Flag this step for the POC follow-up (clears Done/N/A)"
       />
     </div>
   );

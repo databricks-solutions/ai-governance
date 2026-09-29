@@ -5,10 +5,13 @@ import { groupCounts, type Pillar, type ProgressMap } from "@/lib/api";
 export default function PillarPage({
   pillar,
   progress,
+  stepTitles,
   onProgressChange,
 }: {
   pillar: Pillar;
   progress: ProgressMap;
+  /** step id -> title, spanning all pillars, for cross-pillar dependency banners. */
+  stepTitles: Record<string, string>;
   onProgressChange: () => void;
 }) {
   const { done, applicable } = groupCounts(pillar.steps, progress);
@@ -36,6 +39,8 @@ export default function PillarPage({
             groupTitle={pillar.title}
             step={step}
             saved={progress[step.id] ?? null}
+            progress={progress}
+            stepTitles={stepTitles}
             onProgressChange={onProgressChange}
           />
         ))}

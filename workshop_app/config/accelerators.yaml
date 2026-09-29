@@ -1,4 +1,4 @@
-# Optional add-on accelerators — each a ~3-hour deep dive on one customer need, run after
+# Optional add-on accelerators - each a ~3-hour deep dive on one customer need, run after
 # the core choice/cost/control workshop. Same step shape as pillars (config/steps.yaml),
 # so they reuse the StepCard UI, the backend tests, and the outcomes export. `test` values
 # map to server/tests_registry.py; several reuse core tests.
@@ -16,7 +16,7 @@ overview:
     **To run one:**
 
     1. Pick the accelerator matching the customer's priority.
-    2. Check its prerequisites are in place on the workspace — they are noted on the page.
+    2. Check its prerequisites are in place on the workspace - they are noted on the page.
     3. Work top to bottom, capturing notes as you go.
     4. Export outcomes at the end (Walkthrough → Export).
 
@@ -27,28 +27,28 @@ accelerators:
     steps:
       - id: acc_mcp_two_kinds
         title: "Tell managed MCP from MCP Services"
-        outcome: "We can tell managed UC-native endpoints from MCP Services and list both — the distinction that decides which controls apply."
+        outcome: "We can tell managed UC-native endpoints from MCP Services and list both - the distinction that decides which controls apply."
         concept: |
           Two different things are both called "MCP" on Databricks. They are frequently
           conflated, and which one you use determines which controls apply:
 
-          - **Managed (UC-native) endpoints** — `/api/2.0/mcp/functions|genie|sql|ai-search`.
+          - **Managed (UC-native) endpoints** - `/api/2.0/mcp/functions|genie|sql|ai-search`.
             These expose Unity Catalog objects as tools. Governed by **authentication** and
             **UC grants**. They are *not* `MCP_SERVICE` securables, so
             **service policies cannot attach to them.**
-          - **MCP Services** — `/ai-gateway/mcp-services/<catalog>.<schema>.<name>`. Real UC
+          - **MCP Services** - `/ai-gateway/mcp-services/<catalog>.<schema>.<name>`. Real UC
             securables: the Databricks-provided `system.ai.*` services plus any
             **external/custom** server you register behind an HTTP connection. These get UC
             grants **and** service policies (ALLOW / DENY / ASK).
 
           Three planes run in sequence on every governed tool call:
 
-          1. **Authenticate** — the OAuth scope decides which endpoint *family* you reach
+          1. **Authenticate** - the OAuth scope decides which endpoint *family* you reach
              (`unity-catalog`, `genie`, `ai-search`, `sql`). It grants no per-object access.
-          2. **Authorize** — UC grants decide the object: `USE CATALOG` + `USE SCHEMA` to
+          2. **Authorize** - UC grants decide the object: `USE CATALOG` + `USE SCHEMA` to
              **see** a tool, `EXECUTE` to **call** it. Holding EXECUTE without the two USE
              grants is the most common silent failure.
-          3. **Behavior** — service policies inspect the request/response and return
+          3. **Behavior** - service policies inspect the request/response and return
              ALLOW / DENY / ASK. **MCP Services only.**
 
           The diagram below shows the full model on one page. The action lists the MCP
@@ -56,10 +56,10 @@ accelerators:
 
           On the managed side specifically: the managed endpoint turns the UC functions in a
           schema into MCP tools. Note the deny behavior: a caller without `USE CATALOG` +
-          `USE SCHEMA` gets an **empty list**, not an error — *deny by absence*, at object
+          `USE SCHEMA` gets an **empty list**, not an error - *deny by absence*, at object
           grain. An empty result is therefore ambiguous, so read the outcome carefully.
           Governance here is UC grants plus column masks / ABAC on the underlying data. Note
-          that masks are an **access** control, not a **safety** control — they don't stop
+          that masks are an **access** control, not a **safety** control - they don't stop
           prompt injection, and they don't constrain what an agent does downstream with a
           result it was entitled to read.
         visual: mcp_planes
@@ -91,7 +91,7 @@ accelerators:
           that decides *callability*.
 
           By default, **`system.ai` grants `EXECUTE` to all account users**, so a provided
-          service is open to the whole account until it is scoped. Recommended posture is **deny-by-absence** — register in a
+          service is open to the whole account until it is scoped. Recommended posture is **deny-by-absence** - register in a
           customer-owned catalog and grant explicitly, rather than revoking inside
           `system.ai`, where a schema-level revoke may not cascade to individual objects.
         action:
@@ -103,12 +103,12 @@ accelerators:
         outcome: "We can prove a tool runs as the calling user (on-behalf-of), not a shared service account."
         concept: |
           The tool runs as the **calling user**, not a shared
-          service account. If a user can't see a record, neither can their agent — and no
+          service account. If a user can't see a record, neither can their agent - and no
           per-provider secrets are handed out.
 
           This calls a read tool that echoes the upstream identity, so you see a real name
           come back rather than taking OBO on trust. Have two participants run it and compare
-          — different answers is the proof.
+          - different answers is the proof.
 
           One limitation: nothing today expresses *"the analyst may, but her agent may
           not."* The only way to separate them is to give the agent its own identity,
@@ -123,7 +123,7 @@ accelerators:
         concept: |
           Service policies attach **only** to
           `MCP_SERVICE` securables. Point one at a managed UC-native endpoint and there is
-          nothing to attach to — the product surfaces this confusingly, so verify first.
+          nothing to attach to - the product surfaces this confusingly, so verify first.
 
           Attaching needs `EXECUTE` on the policy function and `MANAGE` on the service.
         action:
@@ -137,15 +137,15 @@ accelerators:
           A service policy is a UC SQL function taking `event VARIANT` and returning
           **ALLOW**, **DENY**, or **ASK** (ASK pauses for human approval via URL-mode
           elicitation, cached an hour). It runs **ON CALL** against the request and
-          **ON RESULT** against the response, and evaluation is **fail-closed** — an error
+          **ON RESULT** against the response, and evaluation is **fail-closed** - an error
           during evaluation means DENY.
 
           Two implementation details: the function is
           `to_variant_object(...)` (not `to_variant`, which doesn't exist), and VARIANT paths
-          need casting — `event:context.tool.name::STRING`.
+          need casting - `event:context.tool.name::STRING`.
 
           There are built-in LLM-as-judge guardrails (`system.ai.block_unsafe_content`,
-          `block_jailbreak`, `block_hallucination`, and possibly `block_pii` — the reference docs
+          `block_jailbreak`, `block_hallucination`, and possibly `block_pii` - the reference docs
           disagree, and none of them resolve as SQL functions during Beta). **Read the actual
           list in the AI Gateway UI Policies tab** rather than quoting a name from memory, and
           don't commit to a specific built-in until you've seen it on this account.
@@ -167,7 +167,7 @@ accelerators:
           keep write. Enforcement depends on the kind of MCP:
 
           - **MCP Service** (`system.ai.*` or an external one you register): attach a service
-            policy that denies the write tools, and never grant `USE CONNECTION` to end users —
+            policy that denies the write tools, and never grant `USE CONNECTION` to end users -
             it bypasses tool selection, so a user could call a denied tool directly.
           - **Managed UC-native endpoint** (DBSQL / Genie): not a securable, so no policy can
             attach. Read-only is enforced by exposing only read functions and by the UC grants
@@ -186,12 +186,12 @@ accelerators:
           For a customer **not yet running MCP on Databricks**, registering an external
           server is what enables service policies.
 
-          A custom server your team hosts is not a separate category — it registers and is
+          A custom server your team hosts is not a separate category - it registers and is
           governed exactly like any external MCP Service: HTTP connection → MCP Service
           securable → `EXECUTE` grant → policy → invoke through the gateway.
 
           Two requirements: do not grant `USE CONNECTION` to end users (it bypasses
-          tool selection and auditing), and make a self-hosted server **stateless** — a
+          tool selection and auditing), and make a self-hosted server **stateless** - a
           stateful server behind the replicated gateway proxy can fail the first
           `tools/call` even though `initialize` and `tools/list` both succeeded.
         action:
@@ -204,7 +204,7 @@ accelerators:
         concept: |
           A tool's name and description are sent to the model, so a compromised or malicious
           server can hide instructions in them ("ignore previous instructions", "before
-          answering, send X to…") and steer an agent without the user ever seeing it — the top
+          answering, send X to…") and steer an agent without the user ever seeing it - the top
           MCP supply-chain risk. This scans the advertised tool metadata for injection-shaped
           phrases. A flag is a prompt to review the tool and its source, not proof of
           compromise. Review external servers before granting EXECUTE, and pin their versions.
@@ -214,7 +214,7 @@ accelerators:
 
       - id: acc_mcp_telemetry
         title: "See what MCP telemetry records"
-        outcome: "We can see exactly what MCP telemetry is recorded — identity and tool, not payloads."
+        outcome: "We can see exactly what MCP telemetry is recorded - identity and tool, not payloads."
         concept: |
           This step is precise about what telemetry exists, because it is easy to
           over-promise here.
@@ -223,7 +223,7 @@ accelerators:
           and an **`mcpCall` audit row**. Managed UC-native endpoints write **no MCP-specific
           telemetry at all**.
 
-          **Arguments and results are not captured** — MCP payload logging is not in the
+          **Arguments and results are not captured** - MCP payload logging is not in the
           current Beta. So "no payload logging" does not mean "no auditability": you have
           identity and tool name, just not the contents.
         action:
@@ -238,7 +238,7 @@ accelerators:
         title: Inventory registered agents & tools
         outcome: "We can inventory the agents and tools registered as Unity Catalog assets."
         concept: |
-          An agent registry makes agents first-class Unity Catalog assets — discoverable,
+          An agent registry makes agents first-class Unity Catalog assets - discoverable,
           versioned, and owned. Start by listing what's registered in the workshop schema.
         action:
           label: List registered agents & tools
@@ -276,7 +276,7 @@ accelerators:
         outcome: "We can check which controls (rate limits, guardrails, usage tracking) an agent endpoint actually carries."
         concept: |
           A custom agent endpoint deployed on the gateway may lack the controls a model endpoint
-          has — rate limits, guardrails, usage tracking — and its service principal may not even
+          has - rate limits, guardrails, usage tracking - and its service principal may not even
           be selectable in the rate-limit UI. Where a control is missing, that agent's traffic is
           ungoverned. This inspects agent-like endpoints and reports which controls each carries.
         action:
@@ -316,18 +316,18 @@ accelerators:
 
           Prefer **OAuth** over a PAT. OAuth tokens auto-refresh on a short lifetime; a PAT is
           long-lived and carries the broad `all-apis` scope, so a leaked one is far more
-          damaging. `ucode` is the quickest path — it configures the base URL and per-user
+          damaging. `ucode` is the quickest path - it configures the base URL and per-user
           OAuth for you.
         manual:
           label: Open the governed endpoint (copy the base URL)
-          deep_link: serving_endpoint
+          deep_link: model_service
       - id: acc_coding_route_check
         title: "Confirm it's actually routed"
         outcome: "We can confirm coding-agent traffic actually lands on the governed model service, not a legacy endpoint."
         concept: |
           The most common silent failure: the client is "pointed at the gateway" but still
           resolves a legacy or provided endpoint name, so the limits and guardrails configured
-          on the new model service never apply — and nothing errors to say so.
+          on the new model service never apply - and nothing errors to say so.
 
           A gateway call that names a plain **endpoint** records `service_name` as NULL; a call
           that names a **model-service FQN** records `service_name`. This check splits recent
@@ -337,17 +337,17 @@ accelerators:
           test: coding_agent_route_check
       - id: acc_coding_smart_routing
         title: "Enable smart routing for coding agents"
-        outcome: "We can let Databricks-managed smart routing pick the model per coding request — cheap for boilerplate, frontier for the hard reasoning — without the developer choosing, and without changing the client."
+        outcome: "We can let Databricks-managed smart routing pick the model per coding request - cheap for boilerplate, frontier for the hard reasoning - without the developer choosing, and without changing the client."
         concept: |
           A coding agent defaults every request to one frontier model. **Smart routing**
           (Databricks-managed) instead selects a model **per request** behind the same governed
-          gateway — a cheap model for boilerplate and simple edits, a frontier model for the hard
-          reasoning — so spend drops without the developer picking a model or the client changing.
+          gateway - a cheap model for boilerplate and simple edits, a frontier model for the hard
+          reasoning - so spend drops without the developer picking a model or the client changing.
 
           It is enabled per account and consumed through the coding harnesses (**`ucode`** and
           **Omnigent**, next), governed by the same rate limits, guardrails, and per-developer
           attribution as any other gateway traffic. It is **Beta**, and there is no
-          chat-completions API to invoke it directly from this app — so quantify the payoff in the
+          chat-completions API to invoke it directly from this app - so quantify the payoff in the
           core **Cost → Project routing savings** step (which estimates the smart-routing figure),
           then enable it for the harness here and route a session through it.
         manual:
@@ -358,14 +358,14 @@ accelerators:
         concept: |
           **Omnigent** is a meta-harness that sits above the individual coding harnesses (Claude
           Code, Codex, Cursor, and custom agents). Instead of each developer wiring each tool to
-          the gateway one by one, Omnigent routes **above the harness** — applying smart routing
-          and a single governed path — while every request still lands on the same gateway with
+          the gateway one by one, Omnigent routes **above the harness** - applying smart routing
+          and a single governed path - while every request still lands on the same gateway with
           its rate limits, guardrails, and per-developer attribution intact.
 
           Two reasons it matters for a coding rollout:
 
           - **One integration point.** Point Omnigent at the governed gateway once and every
-            harness underneath inherits routing + governance — rather than N per-tool setups that
+            harness underneath inherits routing + governance - rather than N per-tool setups that
             drift apart.
           - **Routing where the work is.** Model selection happens at the layer that sees the
             task, so the cheap-vs-frontier decision is made per request across every coding tool.
@@ -391,7 +391,7 @@ accelerators:
           Guardrails and rate limits are reliably enforced on the OpenAI-compatible chat path
           (`/ai-gateway/mlflow/v1/chat/completions`). Coding agents often call the
           **provider-native** path (`/ai-gateway/anthropic/v1/messages`). Whether the same
-          controls fire there is account- and version-dependent — and a control that silently
+          controls fire there is account- and version-dependent - and a control that silently
           does not fire on the path a client actually uses is the most dangerous kind of gap.
 
           This probes the same guardrail-triggering prompt on both paths and compares. Treat it
@@ -403,7 +403,7 @@ accelerators:
         title: Prove the rate limit bites (HTTP 429)
         outcome: "We can prove a per-user rate limit throttles a coding agent with HTTP 429."
         concept: |
-          A rate limit is the hard cost control — an exceeded limit returns **HTTP 429**
+          A rate limit is the hard cost control - an exceeded limit returns **HTTP 429**
           immediately, unlike a budget alert, which does not block. Set a low per-user limit in
           the AI Gateway UI, then send a burst and watch it throttle.
 
@@ -411,7 +411,7 @@ accelerators:
           the limit must apply to the caller's identity (or be endpoint-wide) to trip.
         manual:
           label: Set a low per-user rate limit on the endpoint
-          deep_link: serving_endpoint
+          deep_link: model_service
         verify:
           label: Send a burst and look for a 429
           test: rate_limit_429_demo
@@ -420,7 +420,7 @@ accelerators:
         outcome: "We can pin which models coding agents are allowed to call to an approved list."
         concept: |
           Left to defaults, every developer picks their own model. Governing coding-agent model
-          choice means an approved list enforced centrally — pin the models the governed endpoint
+          choice means an approved list enforced centrally - pin the models the governed endpoint
           exposes so agents can only call what is sanctioned, rather than any frontier model a
           developer names.
         manual:
@@ -438,7 +438,7 @@ accelerators:
 
   - id: acc_external_provider
     title: "Providers"
-    tagline: "Additive to the core — everything specific to bringing an OUTSIDE provider (Bedrock, OpenAI, Anthropic) under governance: add it, secure its credentials, bind it, migrate and attribute its traffic, verify its cost, ban it, or fail it over."
+    tagline: "Additive to the core - everything specific to bringing an OUTSIDE provider (Bedrock, OpenAI, Anthropic) under governance: add it, secure its credentials, bind it, migrate and attribute its traffic, verify its cost, ban it, or fail it over."
     steps:
       - id: acc_ext_route
         title: Route a provider through the Gateway
@@ -448,7 +448,7 @@ accelerators:
           with business-relevant tags, so they inherit the same limits, guardrails, and logging.
 
           For Anthropic specifically, the newer **OAuth-relay** path lets you connect a
-          Claude subscription without storing a long-lived key — the gateway relays a
+          Claude subscription without storing a long-lived key - the gateway relays a
           short-lived token. Prefer it where available; otherwise the key goes in a secret
           (next step).
         manual:
@@ -462,7 +462,7 @@ accelerators:
         outcome: "We can confirm provider keys are stored as secrets, never inline."
         concept: |
           A provider key pasted into config is the pitfall the guide calls out first. Store it
-          in a Databricks secret scope and reference it as `{{secrets/<scope>/<key>}}` — a read
+          in a Databricks secret scope and reference it as `{{secrets/<scope>/<key>}}` - a read
           of the endpoint then returns the reference, never the value. This lists the secret
           scopes present and checks which external-model endpoints reference a secret.
         action:
@@ -473,7 +473,7 @@ accelerators:
         outcome: "We can confirm approved models are bound to approved workspaces via catalog isolation."
         concept: |
           "Approved models" is only advisory until the catalog holding them is
-          `isolation_mode = ISOLATED` with explicit workspace bindings — otherwise any workspace
+          `isolation_mode = ISOLATED` with explicit workspace bindings - otherwise any workspace
           on the metastore can bind the catalog and use what is in it. This reports the catalog's
           isolation mode and its bindings.
         action:
@@ -527,7 +527,7 @@ accelerators:
         outcome: "We can tell whether PII is blocked, masked, or passed through intact."
         concept: |
           BLOCK refuses the request; MASK lets it through with the PII removed. MASK is the more
-          common production choice — a benign request that happens to contain PII still gets an
+          common production choice - a benign request that happens to contain PII still gets an
           answer. This sends a prompt that echoes a synthetic SSN and classifies the outcome:
           blocked, masked, or passed through intact.
         action:
@@ -538,13 +538,13 @@ accelerators:
         outcome: "We can see how a block is delivered (4xx vs HTTP 200 + reason) and that evaluation is fail-closed."
         concept: |
           A block can come back two ways: a **4xx error**, or **HTTP 200 with a refusal reason**.
-          It matters for coding agents — they resend conversation history, so a 4xx block on one
+          It matters for coding agents - they resend conversation history, so a 4xx block on one
           turn can re-trigger on every later benign turn ("sticky block") until a new session.
           The rolling fix returns 200 + a reason so the client can continue. This reports which
           shape your account returns.
 
           Either way, evaluation is **fail-closed**: if a policy or guardrail errors while
-          evaluating, the gateway returns DENY — never a silent allow.
+          evaluating, the gateway returns DENY - never a silent allow.
         action:
           label: Send a blocked prompt and report the block shape
           test: guardrail_block_shape
@@ -555,7 +555,7 @@ accelerators:
           A guardrail is only as good as its coverage. Controls are reliably enforced on the
           OpenAI-compatible chat path; whether they also fire on the provider-native path that
           coding agents use is account- and version-dependent. This probes the same
-          guardrail-triggering prompt on both paths and compares — a silent gap here means the
+          guardrail-triggering prompt on both paths and compares - a silent gap here means the
           guardrail does not cover the traffic you care about.
         action:
           label: Compare guardrail coverage across both gateway paths
@@ -567,7 +567,7 @@ accelerators:
           "Is the guardrail on?" is not "does it work?". The guardrail benchmark
           (`accelerators/policies-and-guardrails/guardrail_benchmark.py`) scores guardrails on a **labeled** set
           across PII redaction, PII blocking, unsafe content, jailbreak/prompt-injection, and
-          hallucination — online guardrails versus an offline LLM-as-judge — and can tune a
+          hallucination - online guardrails versus an offline LLM-as-judge - and can tune a
           policy to cut the false-positive rate. This step confirms the payloads and telemetry
           that a judge and red-team review read from are present, so the benchmark has data to
           score. Custom / in-house guardrails plug in at the same layer.
@@ -580,7 +580,7 @@ accelerators:
         concept: |
           Content safety is not the same as prompt-injection defense. Enable the
           jailbreak / prompt-injection guardrail and test a known jailbreak prompt to confirm it
-          is blocked — this is the control for customer-facing assistants that untrusted users
+          is blocked - this is the control for customer-facing assistants that untrusted users
           can prompt directly.
         manual:
           label: Enable jailbreak/prompt-injection guardrail; test a jailbreak prompt
@@ -607,7 +607,7 @@ accelerators:
         title: "Attach per-use-case policies"
         outcome: "We can attach different policies per use case or per agent, not one-size-fits-all."
         concept: |
-          A single global policy is rarely right — a medical assistant and an internal code
+          A single global policy is rarely right - a medical assistant and an internal code
           helper need different rules. Attach different policies per use case or per agent so the
           control matches the risk of each surface rather than the lowest common denominator.
         manual:
@@ -615,7 +615,7 @@ accelerators:
 
   - id: acc_skills
     title: "Skills"
-    tagline: "Not in the core at all: build, govern, and deploy Agent Skills in Genie Code — a runtime allowlist and a tiered registry."
+    tagline: "Not in the core at all: build, govern, and deploy Agent Skills in Genie Code - a runtime allowlist and a tiered registry."
     steps:
       - id: acc_skills_what
         title: "Understand Agent Skills & the three layers"
@@ -628,10 +628,10 @@ accelerators:
 
           Genie Code takes instructions from three layers, from personal to org-wide:
 
-          - **User instructions** — `~/.assistant_instructions.md`, editable by the user (type
+          - **User instructions** - `~/.assistant_instructions.md`, editable by the user (type
             `#` in chat to add one fast). Personal, per-user.
-          - **Workspace instructions** — set by a workspace admin, applied across the workspace.
-          - **Agent Skills** — the markdown files in `~/.assistant/skills/`. This is the layer
+          - **Workspace instructions** - set by a workspace admin, applied across the workspace.
+          - **Agent Skills** - the markdown files in `~/.assistant/skills/`. This is the layer
             you govern.
 
           The hands-on notebook for this accelerator is
@@ -643,27 +643,27 @@ accelerators:
         concept: |
           Before building anything, search the registry: discovery beats rebuilding the same
           skill a fifth time. A quick dupe-check against the tiered registry is the cheapest
-          governance step there is — it keeps the catalog small and trustworthy.
+          governance step there is - it keeps the catalog small and trustworthy.
         manual:
           label: Search the registry for an existing skill before building
       - id: acc_skills_create
         title: Build and place a minimal skill
         outcome: "We can build a minimal skill and place it in the workspace allowlist."
         concept: |
-          Write a small skill file — a title, a few lines of instruction, and two worked
-          examples — and drop it in `~/.assistant/skills/`. Keep it narrow: one capability done
+          Write a small skill file - a title, a few lines of instruction, and two worked
+          examples - and drop it in `~/.assistant/skills/`. Keep it narrow: one capability done
           well beats a catch-all. `example_skill.md` is a governance-relevant starting point (a
           Unity Catalog query helper) you can adapt.
         manual:
           label: Create a skill .md and save it under ~/.assistant/skills/
       - id: acc_skills_verify
         title: "Prove the skills allowlist"
-        outcome: "We can prove the skills folder is a runtime allowlist — in it is invokable, out of it is not."
+        outcome: "We can prove the skills folder is a runtime allowlist - in it is invokable, out of it is not."
         concept: |
           Open **Assistant → Settings → Agent Skills** and confirm your skill appears. Then the
           governance point: a skill **in** the folder is invokable; a skill **not** in the folder
           cannot be called, no matter how a user prompts. The folder *is* the allowlist, and it
-          is enforced at runtime — not advisory. Move a skill out, refresh, and watch it become
+          is enforced at runtime - not advisory. Move a skill out, refresh, and watch it become
           uninvokable.
         manual:
           label: Confirm the skill in Agent Skills settings; test in-allowlist vs removed
@@ -673,12 +673,12 @@ accelerators:
         concept: |
           Friction should scale with risk, not block everything:
 
-          - **Tier 1 — personal**: sandbox, no production data, no review. Keep this
+          - **Tier 1 - personal**: sandbox, no production data, no review. Keep this
             zero-friction, or people route around governance.
-          - **Tier 2 — team**: peer- and steward-reviewed, limited data scope.
-          - **Tier 3 — enterprise**: security review, evals, full audit trail, regulated data.
+          - **Tier 2 - team**: peer- and steward-reviewed, limited data scope.
+          - **Tier 3 - enterprise**: security review, evals, full audit trail, regulated data.
 
-          Pick a tier and write the skill's `registry.yaml` entry — owner, tier, tags, declared
+          Pick a tier and write the skill's `registry.yaml` entry - owner, tier, tags, declared
           data scope, and (for Tier 2/3) an eval score. Before building anything, **dupe-check**
           the registry: discovery beats rebuilding the same skill a fifth time.
         manual:
@@ -687,14 +687,14 @@ accelerators:
         title: "Promote a skill through GitHub PR gates"
         outcome: "We can promote skills through a GitHub PR with lint, secret-scan, and eval gates."
         concept: |
-          Skills live in one Git repo — `/tier1`, `/tier2`, `/tier3`, and a `registry.yaml`
-          manifest — governed by the tools engineers already trust. Promotion is a pull request:
+          Skills live in one Git repo - `/tier1`, `/tier2`, `/tier3`, and a `registry.yaml`
+          manifest - governed by the tools engineers already trust. Promotion is a pull request:
           CI runs **lint**, **secret scan**, and the **eval suite**; CODEOWNERS routes the right
           steward; merge means published. Publishing and governance are the same act, so there is
           no path to users that skips the gates. A GitHub Action then syncs merged skills to
           workspaces (`databricks workspace import-dir`): Tier 2 to its domain workspace, Tier 3
           everywhere. This accelerator includes that framework repo in full at
-          `accelerators/skills/skills-collaboration-framework/` — copy it into your own repo and
+          `accelerators/skills/skills-collaboration-framework/` - copy it into your own repo and
           open a PR to see the gates fire.
       - id: acc_skills_eval
         title: "Add a minimal eval to a skill"
@@ -702,7 +702,7 @@ accelerators:
         concept: |
           A skill without an eval is a hope, not a control. Write 3–5 golden prompt/answer pairs
           and score the skill's output with an LLM-as-judge against a Databricks foundation-model
-          endpoint — the notebook does exactly this. Evals gate Tier 2/3 promotion and, run on a
+          endpoint - the notebook does exactly this. Evals gate Tier 2/3 promotion and, run on a
           schedule, catch drift over time rather than only at publish.
         manual:
           label: Run the eval cells in build_a_skill.py (golden Q&A + judge)
@@ -713,7 +713,7 @@ accelerators:
           Two gates every skill passes before it can touch anything sensitive: a **secret scan**
           over the skill text (no `sk-…`, `AKIA…`, `ghp_…` baked into instructions or examples)
           and a **declared data classification** the skill's data scope must not exceed. Auth
-          rides Unity Catalog, so a skill can only reach what its identity is granted — the same
+          rides Unity Catalog, so a skill can only reach what its identity is granted - the same
           governance surface as the rest of this workshop, not a parallel one. The notebook runs
           the secret scan for you.
         manual:
@@ -726,7 +726,7 @@ accelerators:
           allowlist, where Genie Code auto-loads it on relevant prompts. Retirement is what keeps
           the registry honest: a deprecation notice, a migration path, and removal from the
           allowlist so a stale skill stops being invokable. Propose → design → build → review →
-          publish → operate → **retire** — the last step is the one that makes this a living
+          publish → operate → **retire** - the last step is the one that makes this a living
           registry instead of a wiki page.
       - id: acc_skills_audit
         title: Audit skill usage
@@ -734,6 +734,6 @@ accelerators:
         concept: |
           A living registry needs usage visibility: which skills are actually invoked, by whom,
           and how often. Review skill invocation so unused skills can be retired and heavily used
-          ones can be hardened — governance informed by real usage, not guesswork.
+          ones can be hardened - governance informed by real usage, not guesswork.
         manual:
           label: Review which skills are invoked and by whom

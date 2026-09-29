@@ -1,8 +1,8 @@
-# AI Governance Workshop — Customer App
+# AI Governance Workshop - Customer App
 
 A customer-facing, guided workshop app for standing up a **governed AI control plane** on a
-Databricks workspace and proving it works live. It's organized around three pillars —
-**Choice · Cost · Control** — and every step has a **concept**, a **Try It** action that
+Databricks workspace and proving it works live. It's organized around three pillars -
+**Choice · Cost · Control** - and every step has a **concept**, a **Try It** action that
 exercises the control against the connected workspace, and a **Verify** step that proves it
 fired. Progress is tracked per team in a JSON file on a Unity Catalog volume, so a room can
 pause and resume with no database to provision.
@@ -29,14 +29,14 @@ workshop_app/
 
 ## What each pillar covers
 
-- **Choice** — open, multi-AI ecosystem: connect, discover the model surface, and register
+- **Choice** - open, multi-AI ecosystem: connect, discover the model surface, and register
   agents, tools, and MCP servers as first-class Unity Catalog assets.
-- **Cost** — intelligent cost controls: see the cost impact of routing between models (a
+- **Cost** - intelligent cost controls: see the cost impact of routing between models (a
   routing-agent example plugs in here), set budgets and hard spend caps, tag for cost
   attribution, and query usage/cost by project.
-- **Control** — agent-aware data + AI governance: create a governed endpoint, apply guardrails
+- **Control** - agent-aware data + AI governance: create a governed endpoint, apply guardrails
   on a model service, attach a contextual policy to an MCP service (allow reads, deny writes),
-  govern coding-agent traffic, and get end-to-end observability — scan the audit log for denied
+  govern coding-agent traffic, and get end-to-end observability - scan the audit log for denied
   calls and leaked secrets, and open traces.
 
 The governance tests run as FastAPI endpoints, so each step's **Try It** button runs a real
@@ -48,18 +48,18 @@ an MCP policy function, etc.).
 Beyond the core workshop, six optional **~3-hour accelerators** each get their own page (same
 concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
-Each accelerator is **additive** to the core — it only covers what the core does not. IDs are
+Each accelerator is **additive** to the core - it only covers what the core does not. IDs are
 stable (`acc_*`), so saved progress and the outcomes export resolve them across deploys.
 
-- **MCPs** — managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, telemetry.
-- **Agents** — register, version, own, trace, evaluate, and manage an agent's lifecycle.
-- **Coding** — route dev-agent traffic through the Gateway, add **smart routing** and
+- **MCPs** - managed vs external MCP, UC grants, on-behalf-of identity, tool poisoning, telemetry.
+- **Agents** - register, version, own, trace, evaluate, and manage an agent's lifecycle.
+- **Coding** - route dev-agent traffic through the Gateway, add **smart routing** and
   **Omnigent** above the harness, prove it lands there, and attribute per developer.
-- **Providers** — everything specific to an outside provider (Bedrock/OpenAI/Anthropic):
+- **Providers** - everything specific to an outside provider (Bedrock/OpenAI/Anthropic):
   add it, secure its credentials, bind it, migrate + attribute it, verify its cost, ban/fail it over.
-- **Policies** — mask vs block, block delivery, path coverage, effectiveness benchmarking,
+- **Policies** - mask vs block, block delivery, path coverage, effectiveness benchmarking,
   prompt-injection, groundedness, custom per-use-case policies.
-- **Skills** — build, govern, and deploy Agent Skills in Genie Code with registry control.
+- **Skills** - build, govern, and deploy Agent Skills in Genie Code with registry control.
 
 Run the one that matches the customer's priority (the accelerator overview and links live on
 the in-app **Walkthrough** page). Accelerator progress is tracked in the same volume-backed
@@ -67,15 +67,15 @@ store and included in the exported outcomes, so anything you run shows up in the
 
 ## Deploy on a customer workspace
 
-It's a plain Databricks Asset Bundle — **no shell script**. Two standard commands:
+It's a plain Databricks Asset Bundle - **no shell script**. Two standard commands:
 
 ```bash
 # 1. Deploy: builds the frontend, creates the schema + progress volume, creates the app, and
-#    grants the app's service principal on the schema/volume — all in one pass.
+#    grants the app's service principal on the schema/volume - all in one pass.
 databricks bundle deploy -t dev -p <profile> \
   --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
 
-# 2. Start (or restart) the app. Databricks requires a separate run to start app compute —
+# 2. Start (or restart) the app. Databricks requires a separate run to start app compute -
 #    a deploy alone does not start it.
 databricks bundle run ai_governance_workshop_app -t dev -p <profile>
 ```
@@ -85,23 +85,23 @@ existing Unity Catalog catalog, and Node (the bundle builds the frontend for you
 
 `warehouse_id` is **required** (no default), so a missing one fails immediately rather than
 deploying an app that fails every step in front of the customer. `catalog` and `schema` carry
-defaults (`uaigw_fe` / `workshop`) that point at our internal hosted instance — **on a customer
+defaults (`uaigw_fe` / `workshop`) that point at our internal hosted instance - **on a customer
 workspace always pass `--var="catalog=<your-catalog>"`**, since `uaigw_fe` will not exist there.
 Optional overrides: `--var="workshop_group=<group>"` (who gets `CAN_USE` on the app; default
 `users`), `--var="schema=<name>"`, `--var="progress_volume=<name>"`. Both commands are idempotent
-— re-run them any time.
+- re-run them any time.
 
 **How it's fully declarative.** The app receives its `catalog`/`schema`/`warehouse_id` as env
 straight from the bundle variables (`apps.*.config.env` in `databricks.yml`), so there's no
 config file to pin and the bundle is the single source of truth. The schema `grants` reference
 `${resources.apps.….service_principal_client_id}`, so Terraform creates the app, reads its
-service principal, and applies the grant in one `bundle deploy` — the old two-pass deploy is
+service principal, and applies the grant in one `bundle deploy` - the old two-pass deploy is
 gone. The frontend build runs as the bundle's `artifacts` step.
 
 App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.com`.
 `GET /api/health` returns `{"status":"ok"}`, or `misconfigured` naming exactly what is unset.
 
-> **Local development** points the app at a workspace without the bundle — set
+> **Local development** points the app at a workspace without the bundle - set
 > `DATABRICKS_WAREHOUSE_ID`, `WORKSHOP_CATALOG`, and `WORKSHOP_SCHEMA` in the environment (or
 > a `config/workshop.local.yaml` override). See the Local development section below.
 
@@ -114,7 +114,7 @@ App URL: `https://ai-governance-workshop-<workspace-id>.<region>.databricksapps.
 
 The bundle handles the warehouse, schema, and progress-volume grants (`READ/WRITE VOLUME`) to
 the app's service principal automatically. Unity Catalog `system` schemas are the one thing no
-bundle can grant — they need an account or metastore admin. Get the app's service principal
+bundle can grant - they need an account or metastore admin. Get the app's service principal
 with `databricks apps get ai-governance-workshop -p <profile> --output json` (field
 `service_principal_client_id`), then have your admin run:
 
@@ -127,7 +127,7 @@ GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;  -
 (The app's Walkthrough page also shows these grants, and `GET /api/health` reports whether the
 telemetry steps have what they need.)
 
-**Only these two schemas.** The app deliberately reads no other — `system.billing`,
+**Only these two schemas.** The app deliberately reads no other - `system.billing`,
 `system.serving`, and `system.information_schema` were all removed once each turned out to
 be avoidable (see `docs/APIS_AND_SETUP.md`).
 
@@ -138,7 +138,7 @@ UC APIs and need no `system` *data* access. Only the telemetry steps do, and the
 needed" rather than failing.
 
 (`default_access` reads the app identity's **effective permissions** on `system` / `system.ai`
-through the UC permissions API — a metadata read that does not need `SELECT` on any `system`
+through the UC permissions API - a metadata read that does not need `SELECT` on any `system`
 schema.)
 
 | Grant | Unlocks | Skippable? |
@@ -147,8 +147,8 @@ schema.)
 | `system.ai_gateway` | Spend by model, budgets, per-developer attribution, routing ROI context | Only if you drop the Cost pillar's telemetry steps |
 | `system.access` | Audit trail, secret-leak scan | Only if you drop `audit_scan` |
 
-Everything else — the model panel, the routing ROI, endpoint discovery, guardrail and policy
-tests — works with **no `system` grant at all**, because they use the serving and Unity
+Everything else - the model panel, the routing ROI, endpoint discovery, guardrail and policy
+tests - works with **no `system` grant at all**, because they use the serving and Unity
 Catalog APIs directly. If `system` access can't be arranged in time, the workshop still
 delivers; those two steps report `action_required` instead of failing.
 
@@ -156,19 +156,19 @@ See `docs/APIS_AND_SETUP.md` for the full dependency list.
 
 ### Known deployment caveats
 
-- **Progress store is best-effort** — progress lives in a JSON file on a UC volume. The app
+- **Progress store is best-effort** - progress lives in a JSON file on a UC volume. The app
   never dies if the volume is briefly unreachable: it starts without progress tracking, keeps
   the in-memory copy, and retries the write on the next update. The guidebook and every Try-It
   step still work regardless.
-- **Attendee access** — the bundle adds no `permissions:` block, so by default only the
+- **Attendee access** - the bundle adds no `permissions:` block, so by default only the
   deployer can open the app. Grant `CAN_USE` to the workshop group before the session.
-- **One deploy per workspace** — the app uses a literal name, so two people deploying to the
+- **One deploy per workspace** - the app uses a literal name, so two people deploying to the
   same workspace collide. Override the app `name:` (and `--var="schema=..."`) if that matters.
 
 ### Local development
 
 ```bash
-# Backend — local dev has no bundle, so pass the values the bundle would inject as env
+# Backend - local dev has no bundle, so pass the values the bundle would inject as env
 DATABRICKS_PROFILE=<profile> DATABRICKS_WAREHOUSE_ID=<id> \
   WORKSHOP_CATALOG=<catalog> WORKSHOP_SCHEMA=workshop \
   uv run uvicorn app:app --reload --port 8000
@@ -176,7 +176,7 @@ DATABRICKS_PROFILE=<profile> DATABRICKS_WAREHOUSE_ID=<id> \
 cd frontend && npm ci && npm run dev
 ```
 
-After changing anything in `frontend/src`, rebuild and commit `frontend/dist` — it is
+After changing anything in `frontend/src`, rebuild and commit `frontend/dist` - it is
 committed so the app deploys without Node:
 
 ```bash
@@ -189,7 +189,7 @@ Progress is stored in a single JSON file on the bundle's Unity Catalog volume
 (`/Volumes/<catalog>/<schema>/workshop_state/progress.json`), keyed by `step_id`: each entry
 carries `status` (not_started / in_progress / action_required / done / failed), the last
 Try-It/Verify `last_result` (JSON), notes, and a timestamp. The app reads the file into memory
-at startup (`server/store.py`) and rewrites it write-through on every update — there is no
+at startup (`server/store.py`) and rewrites it write-through on every update - there is no
 database to provision, wait on, or grant CONNECT to. The app is deployed once per workshop, so
 there is a single set of progress and no account identifier to set.
 
@@ -197,9 +197,9 @@ there is a single set of progress and no account identifier to set.
 
 The Intro page's **Export workshop outcomes** panel produces:
 
-- **`workshop_report.md`** — a per-step complete/incomplete report grouped by pillar, for the
+- **`workshop_report.md`** - a per-step complete/incomplete report grouped by pillar, for the
   customer leave-behind (`GET /api/export/report`).
-- **`workshop_outcomes.json`** — the machine-readable outcomes (`schema_version` 2), every step
+- **`workshop_outcomes.json`** - the machine-readable outcomes (`schema_version` 2), every step
   with its status plus the incomplete items as next steps (`GET /api/export/outcomes`).
 
 ## Extending
@@ -209,6 +209,6 @@ The Intro page's **Export workshop outcomes** panel produces:
 - **Routing agent (Cost):** `server/routing.py` runs a real custom router (cheap classifier →
   cheapest sufficient model) and reports live token cost per model. Retarget the three tiers
   with `cost.routing.endpoints` in `config/workshop.yaml`, and set `dbu_to_usd` to the
-  negotiated rate — until then the dollars are list-price illustrative.
+  negotiated rate - until then the dollars are list-price illustrative.
 - **Point at a different workspace:** edit `config/workshop.yaml` (or a `workshop.local.yaml`
-  override) — no code changes.
+  override) - no code changes.

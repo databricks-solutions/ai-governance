@@ -1,7 +1,7 @@
 -- Recent denied / failed calls from the audit log (then scanned in-app for secret-shaped args).
 --
 -- Source: system.access.audit. `response` is a STRUCT here, so status_code is read with dot
--- notation (response.status_code) — the VARIANT-path form response:status_code fails with a
+-- notation (response.status_code) - the VARIANT-path form response:status_code fails with a
 -- DATATYPE_MISMATCH. This surfaces the denials and 4xx/5xx failures a security reviewer wants:
 -- policy fires, blocked tool calls, guardrail refusals. The app additionally scans the returned
 -- rows for secret-shaped strings (sk-, AKIA, ghp_) in the arguments. No placeholders.

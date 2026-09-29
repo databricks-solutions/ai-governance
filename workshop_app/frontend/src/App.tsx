@@ -10,7 +10,7 @@ import Outcomes from "@/pages/Outcomes";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
 
-// Customer-facing (external) repo — for feedback links in the sidebar.
+// Customer-facing (external) repo - for feedback links in the sidebar.
 const REPO_URL = "https://github.com/databricks-solutions/ai-governance";
 
 export default function App() {
@@ -44,6 +44,13 @@ function Shell() {
     const { done, applicable } = groupCounts(steps, progress);
     return { done, total: applicable };
   }
+
+  // A step id -> title lookup spanning every pillar and accelerator, so a step's dependency
+  // banner can name a prerequisite that lives in a different pillar (e.g. a Control step that
+  // depends on the governed endpoint stood up in Cost).
+  const stepTitles: Record<string, string> = {};
+  for (const p of workshop?.pillars ?? []) for (const s of p.steps) stepTitles[s.id] = s.title;
+  for (const a of accel?.accelerators ?? []) for (const s of a.steps) stepTitles[s.id] = s.title;
 
   return (
     <div className="flex min-h-screen">
@@ -151,14 +158,14 @@ function Shell() {
           workshop.pillars.map(
             (p) =>
               route === p.id && (
-                <PillarPage key={p.id} pillar={p} progress={progress} onProgressChange={refreshProgress} />
+                <PillarPage key={p.id} pillar={p} progress={progress} stepTitles={stepTitles} onProgressChange={refreshProgress} />
               ),
           )}
         {accel &&
           accel.accelerators.map(
             (a) =>
               route === a.id && (
-                <PillarPage key={a.id} pillar={a} progress={progress} onProgressChange={refreshProgress} />
+                <PillarPage key={a.id} pillar={a} progress={progress} stepTitles={stepTitles} onProgressChange={refreshProgress} />
               ),
           )}
       </main>

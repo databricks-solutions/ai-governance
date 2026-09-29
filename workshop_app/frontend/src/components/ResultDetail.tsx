@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 // Renders a test result's `detail` payload.
 //
 // Most governance tests return {sql, rows, ...}. Dumping that as raw JSON buried the two things
-// the room actually wants — the query we ran against their workspace, and the answer — inside a
+// the room actually wants - the query we ran against their workspace, and the answer - inside a
 // wall of braces. So:
 //
 //   sql   -> its own labelled block. A platform team's first question is "what did you just run
@@ -20,7 +20,7 @@ function isRows(v: unknown): v is Row[] {
 }
 
 function fmt(v: unknown): string {
-  if (v === null || v === undefined) return "—";
+  if (v === null || v === undefined) return "-";
   if (typeof v === "number") {
     // Money-ish and rate-ish values need more precision than counts.
     if (Number.isInteger(v)) return v.toLocaleString();
@@ -84,7 +84,7 @@ function RowsTable({ rows }: { rows: Row[] }) {
 function RowsChart({ rows }: { rows: Row[] }) {
   const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   const labelCol = cols.find((c) => rows.every((r) => num(r[c]) === null));
-  // Fully-numeric, matching chartable()'s gate — a "some numeric" column can pick a
+  // Fully-numeric, matching chartable()'s gate - a "some numeric" column can pick a
   // half-text column the gate never approved, mislabelling the chart and drawing zero bars.
   const valueCol = cols.find((c) => rows.every((r) => num(r[c]) !== null));
   if (!labelCol || !valueCol) return null;

@@ -1,4 +1,4 @@
-# AI Governance Workshop — one-page brochure.
+# AI Governance Workshop - one-page brochure.
 #
 # The invite artifact an account team (or a customer) hands to people to bring them to the
 # workshop: what it covers, how long it runs, who should attend, and the optional accelerators.
@@ -6,7 +6,7 @@
 # by server/pdf.py (brochure_pdf) and downloaded from GET /api/export/brochure.pdf (the
 # "Download one-pager" callout on the Walkthrough page).
 #
-# Keep it to ONE page — it is a hand-out, not a spec.
+# Keep it to ONE page - it is a hand-out, not a spec.
 
 title: AI Governance Workshop
 subtitle: Work with Databricks to stand up Unity Gateway in your workshop and see it live.
@@ -17,13 +17,13 @@ lead: >-
   prove it works in your environment. We will set up model services, tools, and budgets and show
   how Databricks delivers choice, cost, and control to run AI at scale.
 
-# The three pillars — the spine of the workshop and of the brochure.
+# The three pillars - the spine of the workshop and of the brochure.
 pillars:
   - id: choice
     title: Choice
     blurb: >-
-      Put any model, tool, or agent behind one Unity Catalog name — proprietary and open-weight
-      alike — and choose which models each team can reach.
+      Put any model, tool, or agent behind one Unity Catalog name - proprietary and open-weight
+      alike - and choose which models each team can reach.
   - id: cost
     title: Cost
     blurb: >-
@@ -32,10 +32,10 @@ pillars:
   - id: control
     title: Control
     blurb: >-
-      Rate limits, guardrails, and MCP policies that deny the right calls — with the audit trail
+      Rate limits, guardrails, and MCP policies that deny the right calls - with the audit trail
       and telemetry that prove they fired.
 
-# Who should be in the room — role plus a short line on why they're there.
+# Who should be in the room - role plus a short line on why they're there.
 personas_intro: "A successful workshop will have the following attendees:"
 personas:
   - role: Platform Admins
@@ -43,7 +43,7 @@ personas:
   - role: Technical Champions
     value: Deploy the workshop app and drive governed-AI adoption across the platform team.
   - role: Business Champions
-    value: Own the AI budget and the case for governed AI — here for spend, budgets, and attribution.
+    value: Own the AI budget and the case for governed AI - here for spend, budgets, and attribution.
   - role: AI/ML Engineers
     value: Build the agents and apps that consume governed models, tools, and MCP servers.
   - role: Security, Risk & Compliance
@@ -56,9 +56,9 @@ accelerators:
   title: Go deeper with accelerators
   intro: "There are also six optional ~3-hour accelerators to explore concepts deeper:"
   items:
-    - "**MCP** — on-behalf-of identity, UC permissions, and service policies"
-    - "**Agents** — register, version, and own a representative agent"
-    - "**Coding** — govern dev-agent traffic with per-developer attribution and secret detection"
-    - "**Providers** — route Bedrock, OpenAI, and Anthropic through the Gateway"
-    - "**Policies** — safety filters and a custom PII-leakage judge"
-    - "**Skills** — build, govern, and deploy Agent Skills in Genie Code with a tiered registry and allowlist enforcement"
+    - "**MCP** - on-behalf-of identity, UC permissions, and service policies"
+    - "**Agents** - register, version, and own a representative agent"
+    - "**Coding** - govern dev-agent traffic with per-developer attribution and secret detection"
+    - "**Providers** - route Bedrock, OpenAI, and Anthropic through the Gateway"
+    - "**Policies** - safety filters and a custom PII-leakage judge"
+    - "**Skills** - build, govern, and deploy Agent Skills in Genie Code with a tiered registry and allowlist enforcement"

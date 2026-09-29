@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 
-/** Clear all workshop progress so the room can start fresh. Destructive — confirms first, and
+/** Clear all workshop progress so the room can start fresh. Destructive - confirms first, and
  *  points the presenter at the Outcomes export to keep a record before wiping. Lives at the
  *  bottom of the Walkthrough, Prerequisites, and Outcomes so it's easy to find from anywhere. */
 export default function ResetPanel({ onReset }: { onReset: () => void }) {
@@ -12,7 +12,7 @@ export default function ResetPanel({ onReset }: { onReset: () => void }) {
   async function reset() {
     if (!window.confirm(
       "Clear ALL workshop progress on this deployment? Every step returns to not-started. " +
-      "This cannot be undone — export the outcomes first if you need the record.",
+      "This cannot be undone - export the outcomes first if you need the record.",
     )) return;
     setBusy(true);
     setMsg("");
@@ -32,7 +32,7 @@ export default function ResetPanel({ onReset }: { onReset: () => void }) {
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-navy">Start over</div>
         <div className="mt-0.5 text-xs text-muted">
-          Clears all progress on this deployment — for re-running the workshop or resetting a demo.
+          Clears all progress on this deployment - for re-running the workshop or resetting a demo.
           Export from Outcomes first; this can't be undone.
         </div>
       </div>

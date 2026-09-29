@@ -1,8 +1,8 @@
--- 30-day external-model spend, by model and user — the basis for a budget.
+-- 30-day external-model spend, by model and user - the basis for a budget.
 --
 -- Source: system.ai_gateway.external_model_spend (usage_unit = 'USD', so no price-list join).
 -- Budgets themselves are created in the account console; alerts are GA, hard "block usage"
--- caps are rolling out — confirm hard enforcement on the account before promising it. This is
+-- caps are rolling out - confirm hard enforcement on the account before promising it. This is
 -- also the query a team lead or non-admin can run to see their own spend against a budget.
 -- No placeholders.
 

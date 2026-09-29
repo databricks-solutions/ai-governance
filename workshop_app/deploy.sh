@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Convenience deploy — picks the SQL warehouse for you so nobody has to hunt for an id.
+# Convenience deploy - picks the SQL warehouse for you so nobody has to hunt for an id.
 #
 # The documented two-command path still works and stays the source of truth:
 #   databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<cat>"
@@ -15,7 +15,7 @@
 #
 #   -w  override the auto-pick with a specific warehouse id.
 #   -y  pass --auto-approve to `bundle deploy` (needed only when the deploy plans a destructive
-#       change, e.g. recreating a schema/volume). Use deliberately — it can drop data.
+#       change, e.g. recreating a schema/volume). Use deliberately - it can drop data.
 set -euo pipefail
 
 PROFILE=""; CATALOG=""; SCHEMA=""; GROUP=""; TARGET="dev"; WID=""; AUTO=""

@@ -1,11 +1,11 @@
 """Workshop content, test execution, and progress tracking."""
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel
 
-from .. import deep_links, pdf, routing, store
+from .. import config, deep_links, pdf, routing, store
 from ..config import get_accelerators, get_brochure, get_prerequisites, get_steps
 from ..tests_registry import run_test
 
@@ -84,7 +84,7 @@ class RoutingPrompt(BaseModel):
 
 @router.post("/routing/compare")
 def routing_compare(body: RoutingPrompt):
-    """One prompt against every model — cost, latency, and answers side by side."""
+    """One prompt against every model - cost, latency, and answers side by side."""
     return routing.compare(body.prompt)
 
 
@@ -103,8 +103,16 @@ class RunTest(BaseModel):
 
 
 @router.post("/test")
-def run_and_record(body: RunTest):
-    result = run_test(body.test)
+def run_and_record(body: RunTest, request: Request):
+    # Databricks Apps forwards the signed-in user's token here (user authorization enabled via
+    # user_api_scopes). Scope it to THIS request so tests that must run on-behalf-of the user
+    # (MCP tool calls) can pick it up, and clear it afterwards - user tokens are per-request.
+    token = request.headers.get("x-forwarded-access-token")
+    handle = config.set_forwarded_token(token)
+    try:
+        result = run_test(body.test)
+    finally:
+        config.reset_forwarded_token(handle)
     # A test can come back three ways, and collapsing them would overstate progress:
     # ok + action_required means "ran fine, but nothing is proven yet" (a guided step, or
     # telemetry with no data). Recording that as `done` would inflate the progress bar and
@@ -145,7 +153,7 @@ class Outcome(BaseModel):
 def set_outcome(body: Outcome):
     """Record the hand-marked outcome flags (Done / N/A / Add-to-POC) for one step.
 
-    Separate from /progress: these are set by hand — on a step card or the outcomes checklist —
+    Separate from /progress: these are set by hand - on a step card or the outcomes checklist -
     so the workshop can guide activities even when the interactive Try-It tests aren't run. The
     client sends the full desired state each time. A step is achieved if the test ran `done` OR
     outcome == "done".
@@ -169,7 +177,7 @@ def get_progress():
 @router.post("/progress/reset")
 def reset_progress():
     """Clear all workshop progress so the room can start fresh (re-running the workshop, or
-    clearing a demo deployment). Export outcomes.json first if you need to keep the record —
+    clearing a demo deployment). Export outcomes.json first if you need to keep the record -
     this cannot be undone. Returns how many steps were cleared."""
     cleared = store.reset()
     return {"ok": True, "cleared": cleared}
@@ -185,7 +193,7 @@ def _build_outcomes() -> dict:
 
     A versioned JSON document (schema_version) that merges the workshop definition (so every
     step appears, even untouched ones) with saved progress. It carries no account or Salesforce
-    identifier — the app is deployed once per workshop.
+    identifier - the app is deployed once per workshop.
     """
     progress = get_progress()  # {step_id: {status, last_result, notes, outcome, poc, ...}}
     totals = {"total": 0, "applicable": 0, "done": 0, "na": 0}
@@ -199,17 +207,11 @@ def _build_outcomes() -> dict:
             outcome = saved.get("outcome")            # "done" | "na" | None (hand-marked)
             poc = bool(saved.get("poc", False))
             na = outcome == "na"
-            # Achieved = the interactive test passed OR the outcome was marked done by hand, so a
-            # workshop run without the app's Try-It buttons still reflects real outcomes. N/A wins:
-            # a step marked N/A is never "achieved", even if its Try-It had passed earlier —
-            # otherwise it would show complete while being excluded from the applicable count.
-            achieved = (not na) and ((raw_status == "done") or (outcome == "done"))
-            if na:
-                disp = "n/a"
-            elif achieved and raw_status != "done":
-                disp = "done (marked)"
-            else:
-                disp = raw_status
+            # Achieved = the outcome was marked done BY HAND. A passing Try-It is shown by the
+            # result badge but never auto-marks a step done, so the recorded outcomes reflect what
+            # the room deliberately confirmed, not just which tests happened to run green.
+            achieved = (not na) and (outcome == "done")
+            disp = "n/a" if na else ("done (marked)" if achieved else raw_status)
             totals["total"] += 1
             if na:
                 totals["na"] += 1
@@ -272,7 +274,7 @@ def export_report():
     """A human-readable per-step report (complete / incomplete) as Markdown."""
     o = _build_outcomes()
     lines = [
-        "# AI Governance Workshop — Outcomes Report",
+        "# AI Governance Workshop - Outcomes Report",
         "",
         f"**Generated:** {o['generated_at']}  ",
         f"**Progress:** {o['summary']['done']}/{o['summary']['applicable']} applicable steps "
@@ -287,11 +289,11 @@ def export_report():
         for p in groups:
             applicable = [s for s in p["steps"] if not s.get("na")]
             done = sum(1 for s in applicable if s["complete"])
-            lines.append(f"## {p['title']} — {done}/{len(applicable)}")
+            lines.append(f"## {p['title']} - {done}/{len(applicable)}")
             lines.append("")
             for s in p["steps"]:
                 mark = "x" if s["complete"] else ("-" if s.get("na") else " ")
-                line = f"- [{mark}] {s['title']} — **{s['status']}**"
+                line = f"- [{mark}] {s['title']} - **{s['status']}**"
                 if s.get("poc"):
                     line += "  ·  _POC_"
                 if s.get("notes"):
@@ -305,15 +307,15 @@ def export_report():
         lines.append("## Next steps (incomplete items)")
         lines.append("")
         for n in o["next_steps"]:
-            lines.append(f"- {n['title']} ({n['pillar_id']}) — {n['status']}")
+            lines.append(f"- {n['title']} ({n['pillar_id']}) - {n['status']}")
         lines.append("")
     if o.get("poc_items"):
         lines.append("## Flagged for POC follow-up")
         lines.append("")
         for p in o["poc_items"]:
-            line = f"- {p['title']} ({p['pillar_id']}) — {p['status']}"
+            line = f"- {p['title']} ({p['pillar_id']}) - {p['status']}"
             if p.get("notes"):
-                line += f" — _{p['notes']}_"
+                line += f" - _{p['notes']}_"
             lines.append(line)
         lines.append("")
     return "\n".join(lines)
@@ -346,7 +348,7 @@ def _require_pdf() -> None:
 
 @router.get("/export/brochure.pdf")
 def export_brochure_pdf(customer_name: str | None = None):
-    """The one-page workshop brochure as a PDF — the leave-ahead an account team sends to book
+    """The one-page workshop brochure as a PDF - the leave-ahead an account team sends to book
     the session (cost/choice/control, 3h hands-on + 1h slides, target personas, accelerators).
 
     Exists before any workshop does, so it needs no progress.
@@ -374,7 +376,7 @@ def export_prerequisites_pdf(customer_name: str | None = None):
 
 @router.get("/export/report.pdf")
 def export_report_pdf():
-    """The outcomes report as a PDF — the leave-behind that replaced the POC DOC."""
+    """The outcomes report as a PDF - the leave-behind that replaced the POC DOC."""
     _require_pdf()
     o = _build_outcomes()
     return _pdf_response(pdf.report_pdf(o), "ai-governance-workshop-outcomes.pdf")

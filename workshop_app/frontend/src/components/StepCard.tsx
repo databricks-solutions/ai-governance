@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Play, ExternalLink, CheckCircle2, XCircle, AlertCircle, Loader2, Check, Circle, Ban, ChevronDown } from "lucide-react";
-import { api, stepOutcome, type Step, type TestResult, type ProgressMap } from "@/lib/api";
+import { api, stepOutcome, unmetDependencies, type Step, type TestResult, type ProgressMap } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { shortTitle } from "@/lib/text";
 import McpDiagram from "@/components/McpDiagram";
@@ -12,7 +12,7 @@ type Saved = ProgressMap[string] | null;
 
 // Diagrams a step can opt into with `visual: <key>` in config/steps.yaml or
 // config/accelerators.yaml. Keeping the registry here means content stays in YAML while the
-// rendering stays typed — an unknown key renders nothing rather than breaking the page.
+// rendering stays typed - an unknown key renders nothing rather than breaking the page.
 const VISUALS: Record<string, ReactNode> = {
   mcp_planes: <McpDiagram />,
 };
@@ -36,6 +36,8 @@ export default function StepCard({
   groupTitle,
   step,
   saved,
+  progress,
+  stepTitles,
   onProgressChange,
 }: {
   index: number;
@@ -44,6 +46,9 @@ export default function StepCard({
   groupTitle?: string;
   step: Step;
   saved: Saved;
+  /** Full progress map + a cross-pillar id->title lookup, for the dependency banner. */
+  progress: ProgressMap;
+  stepTitles: Record<string, string>;
   onProgressChange: () => void;
 }) {
   const [running, setRunning] = useState<null | "action" | "verify">(null);
@@ -69,13 +74,18 @@ export default function StepCard({
   }
 
   // A step that ran but proved nothing (a guided UI action, or telemetry with no data yet)
-  // must not look complete — that is the difference between an honest workshop record and
+  // must not look complete - that is the difference between an honest workshop record and
   // a green wall of checks.
   const actionRequired = status === "action_required";
 
+  // Prerequisites not yet done. Surfaced as a warn-but-allow banner: the room may have set the
+  // dependency up out-of-band, so Try-It stays live - we flag the likely cause of a failure
+  // before it happens rather than blocking. Suppressed once this step is itself achieved.
+  const blockedBy = achieved ? [] : unmetDependencies(step, progress, stepTitles);
+
   return (
     <div className={cn("rounded-2xl border bg-white", achieved ? "border-navy/25" : "border-navy/10")}>
-      {/* Collapsed header — one line per step: status · title · Done/N/A · expand. The title and
+      {/* Collapsed header - one line per step: status · title · Done/N/A · expand. The title and
           chevron toggle the disclosure; the outcome chips act on their own and never toggle. */}
       <div className="flex items-center gap-3 p-4">
         <span
@@ -83,7 +93,7 @@ export default function StepCard({
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border",
             achieved ? "border-navy bg-navy text-white" : "border-navy/20 bg-navy/[0.02] text-navy-300",
           )}
-          title={achieved ? "Achieved" : na ? "Marked N/A" : "Not done yet — set the outcome"}
+          title={achieved ? "Achieved" : na ? "Marked N/A" : "Not done yet - set the outcome"}
         >
           {achieved ? (
             <Check className="h-4 w-4" strokeWidth={3} />
@@ -112,6 +122,14 @@ export default function StepCard({
               Coming soon
             </span>
           )}
+          {blockedBy.length > 0 && (
+            <span
+              className="shrink-0 rounded bg-[#FDF3E0] px-1.5 py-0.5 text-[10px] font-semibold text-[#B7791F]"
+              title={`Needs first: ${blockedBy.map((d) => d.title).join(", ")}`}
+            >
+              NEEDS SETUP
+            </span>
+          )}
         </button>
 
         <div className="hidden shrink-0 sm:block">
@@ -129,7 +147,7 @@ export default function StepCard({
         </button>
       </div>
 
-      {/* Detail — revealed on expand. Everything that used to be always-on lives here now. */}
+      {/* Detail - revealed on expand. Everything that used to be always-on lives here now. */}
       {open && (
         <div className="border-t border-navy/[0.07] px-4 pb-5 pt-4">
           {step.outcome && (
@@ -155,6 +173,19 @@ export default function StepCard({
           {/* Optional diagram, named by `visual:` in the step config. Some concepts are
               structural and a paragraph cannot carry them. */}
           {step.visual && <div className="mb-4">{VISUALS[step.visual] ?? null}</div>}
+
+          {/* Dependency warning: this step reads something an earlier step sets up. Warn, don't
+              block - the Try-It below stays enabled in case it was arranged out-of-band. */}
+          {blockedBy.length > 0 && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-[#B7791F]/30 bg-[#FDF3E0]/60 p-3 text-xs leading-relaxed text-navy">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#B7791F]" />
+              <span>
+                <span className="font-semibold">Do this first:</span>{" "}
+                {blockedBy.map((d) => d.title).join(", ")}. You can still run the step below if it
+                is already set up.
+              </span>
+            </div>
+          )}
 
           {/* Actions row: manual deep-link, Try-It, Verify */}
           <div className="flex flex-wrap items-center gap-2">
@@ -190,7 +221,7 @@ export default function StepCard({
             )}
           </div>
 
-          {/* Result — three states, not two: passed, action needed, failed. */}
+          {/* Result - three states, not two: passed, action needed, failed. */}
           {result && (
             <div
               className={cn(
@@ -213,7 +244,7 @@ export default function StepCard({
                 <span className="text-navy">{result.summary}</span>
               </div>
               {/* What this step actually called. Shown so the room can see exactly what the app
-                  does to their workspace — the first question a platform team asks. */}
+                  does to their workspace - the first question a platform team asks. */}
               {result.api && (
                 <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted">
                   <span className="font-semibold uppercase tracking-wider text-[10px]">API</span>

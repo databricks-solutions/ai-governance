@@ -1,13 +1,13 @@
 """Loader for the workshop's plain-SQL queries.
 
 The analytical queries the workshop runs live in `workshop_app/queries/*.sql` as plain,
-copy-runnable SQL rather than buried in Python strings — so a customer can open the repo,
+copy-runnable SQL rather than buried in Python strings - so a customer can open the repo,
 read exactly what the app asks their workspace, and paste any query straight into a SQL
 editor. This module reads those files and fills in the few placeholders the app needs.
 
 Placeholders use the `${name}` form. The app substitutes an already-safe value (a quoted
 string literal via tests_registry._sql_str, or a validated integer). When you run a `.sql`
-file by hand, replace each `${name}` with a literal — every file's header comment says what
+file by hand, replace each `${name}` with a literal - every file's header comment says what
 goes where.
 """
 import re
@@ -30,7 +30,7 @@ def _read(name: str) -> str:
 def load_query(name: str, **subs: str) -> str:
     """Return the SQL in queries/<name>.sql with ${key} placeholders replaced.
 
-    Values must already be SQL-safe (a quoted literal or a validated integer) — this does a
+    Values must already be SQL-safe (a quoted literal or a validated integer) - this does a
     literal string replace and applies no quoting of its own. Every `${key}` in the file must
     be supplied, and every supplied key must appear in the file, so a rename can't silently
     leave a placeholder unfilled.

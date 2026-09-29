@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Databricks design system — Navy / Oat / White surfaces; Lava is the spark only. */
+/* Databricks design system - Navy / Oat / White surfaces; Lava is the spark only. */
 @theme {
   --color-navy: #1b3139;
   --color-navy-700: #24424c;

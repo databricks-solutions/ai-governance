@@ -9,9 +9,9 @@ import { cn } from "@/lib/cn";
  * leave-behind.
  *
  * Content follows the three-plane MCP governance model:
- *   Plane 1 Authenticate — OAuth scope picks the endpoint FAMILY
- *   Plane 2 Authorize    — UC grants pick the OBJECT
- *   Plane 3 Behavior     — service policies inspect the CALL (MCP Services only)
+ *   Plane 1 Authenticate - OAuth scope picks the endpoint FAMILY
+ *   Plane 2 Authorize    - UC grants pick the OBJECT
+ *   Plane 3 Behavior     - service policies inspect the CALL (MCP Services only)
  */
 
 const NAVY = "#1B3139";
@@ -61,7 +61,7 @@ export default function McpDiagram() {
       <figcaption className="border-b border-navy/10 bg-white px-6 py-4">
         <h4 className="text-sm font-semibold text-navy">How an MCP tool call is governed</h4>
         <p className="mt-0.5 text-xs leading-relaxed text-muted">
-          Both routes are called “MCP”. They are governed differently — and only one of them can
+          Both routes are called “MCP”. They are governed differently - and only one of them can
           carry a service policy.
         </p>
       </figcaption>
@@ -87,7 +87,7 @@ export default function McpDiagram() {
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <PlaneBadge n={1} label="Authenticate" applies />
             <span className="text-xs text-muted">
-              The scope picks the endpoint <strong className="text-navy">family</strong> —{" "}
+              The scope picks the endpoint <strong className="text-navy">family</strong> -{" "}
               <code className="rounded bg-navy/5 px-1 text-[11px] text-navy">unity-catalog</code>,{" "}
               <code className="rounded bg-navy/5 px-1 text-[11px] text-navy">genie</code>,{" "}
               <code className="rounded bg-navy/5 px-1 text-[11px] text-navy">ai-search</code>,{" "}
@@ -112,8 +112,8 @@ export default function McpDiagram() {
             </code>
 
             <div className="mb-3 space-y-1.5">
-              <PlaneBadge n={2} label="Authorize — UC grants" applies />
-              <PlaneBadge n={3} label="Behavior — service policy" applies={false} />
+              <PlaneBadge n={2} label="Authorize - UC grants" applies />
+              <PlaneBadge n={3} label="Behavior - service policy" applies={false} />
             </div>
 
             <div className="mt-auto space-y-2 text-xs leading-relaxed text-muted">
@@ -121,7 +121,7 @@ export default function McpDiagram() {
                 <strong className="text-navy">Deny by absence.</strong> Without{" "}
                 <code className="rounded bg-navy/5 px-1 text-[11px] text-navy">USE CATALOG</code> +{" "}
                 <code className="rounded bg-navy/5 px-1 text-[11px] text-navy">USE SCHEMA</code> the tool
-                is simply <em>missing</em> from the list — not an error. So an empty list is ambiguous.
+                is simply <em>missing</em> from the list - not an error. So an empty list is ambiguous.
               </p>
               <p>
                 Content risk is handled by column masks / ABAC on the underlying data, not guardrails.
@@ -148,8 +148,8 @@ export default function McpDiagram() {
             </code>
 
             <div className="mb-3 space-y-1.5">
-              <PlaneBadge n={2} label="Authorize — UC grants" applies />
-              <PlaneBadge n={3} label="Behavior — service policy" applies />
+              <PlaneBadge n={2} label="Authorize - UC grants" applies />
+              <PlaneBadge n={3} label="Behavior - service policy" applies />
             </div>
 
             <div className="mt-auto space-y-2 text-xs leading-relaxed text-muted">
@@ -168,7 +168,7 @@ export default function McpDiagram() {
                 on request and on response. Fail-closed.
               </p>
               <p className="rounded-lg bg-navy/[0.03] px-2.5 py-1.5 text-[11px]">
-                Telemetry: usage row + <code className="text-navy">mcpCall</code> audit —{" "}
+                Telemetry: usage row + <code className="text-navy">mcpCall</code> audit -{" "}
                 <strong className="text-navy">no payloads</strong>.
               </p>
             </div>
@@ -190,7 +190,7 @@ export default function McpDiagram() {
         <div className="rounded-xl border-l-2 bg-white px-4 py-3" style={{ borderLeftColor: LAVA }}>
           <p className="text-xs leading-relaxed text-muted">
             <strong className="text-navy">On-behalf-of, in one line:</strong> the tool runs as the{" "}
-            <strong className="text-navy">calling user</strong>, never a shared service account — so if a
+            <strong className="text-navy">calling user</strong>, never a shared service account - so if a
             person cannot see a record, neither can their agent. The honest limit: nothing today expresses
             “the analyst may, but her agent may not”. Separating them means giving the agent its own
             identity, usually a service principal.
@@ -205,7 +205,7 @@ export default function McpDiagram() {
           <ul className="mt-2.5 space-y-1.5 text-xs leading-relaxed text-muted">
             <li>
               <strong className="text-navy">JSON-RPC errors ride inside HTTP 200.</strong> Never infer
-              success from the status code — look for a <code className="text-navy">result</code> key.
+              success from the status code - look for a <code className="text-navy">result</code> key.
             </li>
             <li>
               <strong className="text-navy">Plane 1:</strong> consent never completed, or the wrong scope
@@ -224,14 +224,14 @@ export default function McpDiagram() {
             </li>
             <li>
               <strong className="text-navy">Self-hosted:</strong> the server must be{" "}
-              <strong className="text-navy">stateless</strong> — a stateful one behind the replicated proxy
+              <strong className="text-navy">stateless</strong> - a stateful one behind the replicated proxy
               can fail the first call even after list succeeded.
             </li>
           </ul>
         </details>
 
         <p className="text-[11px] leading-relaxed" style={{ color: MUTED }}>
-          Service policies are Beta and attach from the AI Gateway UI only — there is no DDL or
+          Service policies are Beta and attach from the AI Gateway UI only - there is no DDL or
           control-API path yet. MCP payload logging is not in Beta.
         </p>
       </div>
