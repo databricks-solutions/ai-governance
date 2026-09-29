@@ -168,8 +168,12 @@ API_DOCS: dict[str, dict[str, str]] = {
         "note": "Sends a small burst of max_tokens=1 requests to try to trip the rate limit."},
     "mcp_telemetry": {"api": "SQL: system.ai_gateway.usage (service_type = 'MCP_SERVICE')"},
     "telemetry_readiness": {"api": "SQL: system.ai_gateway.usage, system.access.audit"},
-    "gateway_spend_by_model": {"api": "SQL: system.ai_gateway.external_model_spend"},
-    "budget_status": {"api": "SQL: system.ai_gateway.external_model_spend"},
+    "gateway_spend_by_model": {
+        "api": "SQL: system.ai_gateway.external_model_spend (+ optional system.billing.usage x list_prices)",
+        "note": "External spend is USD-direct; internal DBU-billed spend needs an optional system.billing grant."},
+    "budget_status": {
+        "api": "SQL: system.ai_gateway.external_model_spend (+ optional system.billing.usage x list_prices)",
+        "note": "External spend is USD-direct; internal DBU-billed spend needs an optional system.billing grant."},
     "audit_scan": {"api": "SQL: system.access.audit"},
     "guardrail_activity": {"api": "SQL: <catalog>.<schema>.<prefix>_payload (inference table)"},
     "pii_safety_readiness": {"api": "SQL: inference table + system.access.audit"},
@@ -253,7 +257,7 @@ def t_model_services() -> TestResult:
     """Model services as UC securables - the object the client contract should point at.
 
     The migration story in one step. Legacy Model Serving addressed an ENDPOINT NAME on
-    /serving-endpoints/<name>/invocations, with workspace ACLs. Unity AI Gateway addresses a
+    /serving-endpoints/<name>/invocations, with workspace ACLs. Unity Gateway addresses a
     UC **service FQN** on /ai-gateway/mlflow/v1, with UC privileges - so the runtime can
     change behind a stable application contract.
 
@@ -266,7 +270,7 @@ def t_model_services() -> TestResult:
     try:
         resp = w.api_client.do("GET", "/api/2.1/unity-catalog/model-services")
     except Exception as e:
-        return _fail("Could not list model services - Unity AI Gateway may not be enabled "
+        return _fail("Could not list model services - Unity Gateway may not be enabled "
                      "on this workspace.", error=str(e)[:400])
     services = [s.get("name", "").split("/", 1)[-1]
                 for s in (resp or {}).get("model_services", [])]
@@ -582,26 +586,146 @@ def t_rate_limits() -> TestResult:
                service=fqn, rate_limits=limits, configured_target=want)
 
 
-def t_gateway_spend_by_model() -> TestResult:
-    """Real dollars per model from system.ai_gateway.external_model_spend.
+# The dollar side of the Cost pillar reads two tables, because no single one covers both
+# kinds of spend:
+#   - system.ai_gateway.external_model_spend - USD directly (no price join), but EXTERNAL
+#     providers only. Needs only the system.ai_gateway grant the workshop already has.
+#   - system.billing.usage x list_prices    - INTERNAL, DBU-billed foundation models
+#     (system.ai.*, FMAPI). This is what the workshop's OWN routing tiers use, so without it
+#     the dollar view is $0 even on a working reference workspace. Needs an OPTIONAL
+#     system.billing grant the base workshop does not require.
+# The internal query therefore runs opportunistically: present it when the grant exists,
+# degrade to guidance (never a crash) when it does not.
+_GRANT_ERROR_SIGNALS = ("permission_denied", "permission denied", "does not have",
+                        "not authorized", "unauthorized", "insufficient", "access denied",
+                        "requires", "table_or_view_not_found")
 
-    That table reports estimated USD directly (usage_unit = 'USD'), so it needs no join to
-    a price list - which is why the workshop reads it instead of the billing tables, and
-    why the app needs no grant on system.billing. It covers external-provider models routed
-    through the Gateway: the spend a router actually shifts.
+
+def _is_grant_error(msg: str) -> bool:
+    """Whether a SQL error reads as a missing grant (vs. a real failure) - best-effort."""
+    low = (msg or "").lower()
+    return any(s in low for s in _GRANT_ERROR_SIGNALS)
+
+
+def _internal_dbu_spend() -> dict:
+    """30-day internal (DBU-billed) foundation-model spend in USD, or why it is unavailable.
+
+    Reads queries/internal_dbu_spend.sql (system.billing.usage x list_prices). Returns
+    {rows, total_usd, grant_missing, error, sql}. `grant_missing` True (not `error`) means the
+    OPTIONAL system.billing grant is absent, so the dollar steps can explain internal spend
+    instead of failing.
     """
-    sql = load_query("spend_by_model")  # queries/spend_by_model.sql
+    sql = load_query("internal_dbu_spend")  # queries/internal_dbu_spend.sql
     try:
         rows = fetchall(sql)
-        if not rows:
-            return _todo("No external-model spend recorded in the last 30 days. Route an "
-                         "external provider through the Gateway, then re-run.", sql=sql)
         total = sum(float(r.get("usd") or 0) for r in rows)
-        return _ok(f"${total:,.2f} of external-model spend across {len(rows)} model(s) (30d).",
-                   rows=rows, total_usd=round(total, 2), sql=sql)
-    except Exception as e:
-        return _fail("Spend query failed - system.ai_gateway.external_model_spend may not be "
-                     "enabled on this account (Beta).", error=str(e)[:600], sql=sql)
+        return {"rows": rows, "total_usd": round(total, 2),
+                "grant_missing": False, "error": None, "sql": sql}
+    except Exception as e:  # noqa: BLE001 - classify, never crash the dollar step
+        msg = str(e)
+        grant = _is_grant_error(msg)
+        return {"rows": [], "total_usd": 0.0, "grant_missing": grant,
+                "error": None if grant else msg[:300], "sql": sql}
+
+
+def _combined_spend_rows(ext_rows: list[dict], int_rows: list[dict]) -> list[dict]:
+    """One table spanning both spend sources, tagged by `source` so the split is visible.
+
+    external_model_spend rows carry provider/model (and run_by, for the budget step); internal
+    rows carry a billing SKU. Both collapse to {item, source, usd}. `item` is first so
+    ResultDetail's chart labels each bar distinctly.
+    """
+    out: list[dict] = []
+    for r in ext_rows:
+        item = r.get("model") or "?"
+        if r.get("provider"):
+            item = f"{r['provider']}/{item}"
+        if r.get("run_by"):
+            item = f"{item} · {r['run_by']}"
+        out.append({"item": item, "source": "external", "usd": r.get("usd")})
+    for r in int_rows:
+        out.append({"item": r.get("sku"), "source": "internal (DBU)", "usd": r.get("usd")})
+    return out
+
+
+def _spend_sql_shown(ext_sql: str, internal: dict) -> str:
+    """Both queries the step can run, shown together for transparency.
+
+    The internal query is included even when its grant is absent - it is exactly what the
+    optional system.billing grant unlocks, so the room can see what to ask an admin for.
+    """
+    return (ext_sql.rstrip()
+            + "\n\n-- Optional (needs a SELECT grant on system.billing): internal DBU spend\n"
+            + internal["sql"].rstrip())
+
+
+def _no_dollars_msg(internal: dict) -> str:
+    """Empty-state for the dollar steps that is correct on an internal-only workspace.
+
+    The old copy said "route an external provider", which misleads: the workshop's own routing
+    tiers are internal system.ai.* models whose spend is DBU-billed and never lands in
+    external_model_spend. So point at the real sources instead.
+    """
+    base = ("No external-provider spend in the last 30 days. external_model_spend covers "
+            "external providers only, and the workshop's own routing traffic is internal "
+            "(system.ai.*), which bills in DBUs - not here.")
+    if internal["grant_missing"]:
+        return (base + " Internal foundation-model dollars need an OPTIONAL SELECT grant on "
+                "system.billing; grant it to show them here, or read the same internal usage in "
+                "tokens via the 'Attribute usage by team/tag' step (no billing grant needed).")
+    return (base + " The optional internal (system.billing) query ran but found no model-serving "
+            "spend in the window either - run the Cost routing steps, then re-run.")
+
+
+def t_gateway_spend_by_model() -> TestResult:
+    """30-day AI spend in USD: external-provider spend, plus internal DBU-billed foundation
+    model spend when the optional system.billing grant is present.
+
+    system.ai_gateway.external_model_spend reports USD directly (usage_unit = 'USD', no
+    price-list join) but covers ONLY external providers routed through the Gateway. The
+    workshop's own routing tiers are internal system.ai.* models, so their spend bills in DBUs
+    and lands in system.billing.usage instead - queried here opportunistically so the dollar
+    view is not blank on an internal-only workspace. Token attribution for the same traffic is
+    in usage_by_project regardless of the billing grant.
+    """
+    ext_sql = load_query("spend_by_model")  # queries/spend_by_model.sql
+    ext_rows, ext_err = [], None
+    try:
+        ext_rows = fetchall(ext_sql)
+    except Exception as e:  # noqa: BLE001 - fold into the combined result, don't crash
+        ext_err = str(e)[:600]
+    internal = _internal_dbu_spend()
+
+    ext_total = sum(float(r.get("usd") or 0) for r in ext_rows)
+    shown_sql = _spend_sql_shown(ext_sql, internal)
+    combined = _combined_spend_rows(ext_rows, internal["rows"])
+
+    if not combined:
+        if ext_err and internal["grant_missing"]:
+            return _fail(
+                "Spend query failed - system.ai_gateway.external_model_spend may not be enabled "
+                "(Beta), and there is no system.billing grant to fall back on.",
+                error=ext_err, sql=shown_sql)
+        return _todo(_no_dollars_msg(internal), sql=shown_sql,
+                     internal_grant_missing=internal["grant_missing"], external_error=ext_err,
+                     next="Internal usage in tokens is in the 'Attribute usage by team/tag' "
+                          "step (usage_by_project) - it needs no billing grant.")
+
+    total = ext_total + internal["total_usd"]
+    parts = []
+    if ext_rows:
+        parts.append(f"${ext_total:,.2f} external across {len(ext_rows)} model(s)")
+    if internal["rows"]:
+        parts.append(f"${internal['total_usd']:,.2f} internal DBU-billed across "
+                     f"{len(internal['rows'])} SKU(s)")
+    summary = " + ".join(parts) + f" over 30 days = ${total:,.2f} total AI spend (30d)."
+    if not internal["rows"] and internal["grant_missing"]:
+        summary += (" Internal DBU spend is not included - grant SELECT on system.billing "
+                    "(optional) to add it.")
+    return _ok(summary, rows=combined, external_rows=ext_rows or None,
+               internal_rows=internal["rows"] or None, external_usd=round(ext_total, 2),
+               internal_usd=internal["total_usd"], total_usd=round(total, 2),
+               internal_grant_missing=internal["grant_missing"], sql=shown_sql)
 
 
 # --------------------------------------------------------------------------- Control
@@ -766,7 +890,7 @@ def t_test_guardrail() -> TestResult:
 def t_guardrail_activity() -> TestResult:
     """Look for blocked/filtered requests in the endpoint's inference table.
 
-    Unity AI Gateway inference tables do NOT expose a dedicated guardrail-decision column -
+    Unity Gateway inference tables do NOT expose a dedicated guardrail-decision column -
     the decision has to be read out of the raw request/response payloads and the status
     code. We select the audit-relevant columns and flag non-2xx rows rather than inventing a
     `guardrail_decision` column that does not exist.
@@ -795,7 +919,7 @@ def t_guardrail_activity() -> TestResult:
 def t_create_mcp_policy() -> TestResult:
     """Create the UC SQL function that denies write tools on the MCP service.
 
-    Service-policy shape per the Unity AI Gateway docs: takes `event VARIANT`, returns a
+    Service-policy shape per the Unity Gateway docs: takes `event VARIANT`, returns a
     VARIANT object with `result` (ALLOW / DENY / ASK) and `reason`. VARIANT path access
     yields VARIANT, so `event:context.tool.name` must be cast before comparing.
 
@@ -1025,30 +1149,55 @@ def t_list_registered_assets() -> TestResult:
 
 
 def t_budget_status() -> TestResult:
-    """30-day AI spend in real dollars, plus the account-level budgets configured.
+    """30-day AI spend in USD as the basis for a budget: external-provider spend, plus internal
+    DBU-billed foundation-model spend when the optional system.billing grant is present.
 
-    Uses system.ai_gateway.external_model_spend (usage_unit = 'USD'), so no join to
-    list_prices is needed. Budgets themselves are created in the account console; hard
-    "block usage" caps are rolling out, so alert-only budgets are the safe assumption.
+    Same two sources as gateway_spend_by_model. external_model_spend is external-only, so on an
+    internal-only workspace (the common early-POC case) the dollars a budget governs read $0
+    until the optional system.billing grant lets internal DBU spend in. Budgets themselves are
+    created in the account console; alerts are GA, hard "block usage" caps are rolling out.
     """
-    sql = load_query("budget_status")  # queries/budget_status.sql
+    ext_sql = load_query("budget_status")  # queries/budget_status.sql
+    ext_rows, ext_err = [], None
     try:
-        rows = fetchall(sql)
-        total = sum(float(r.get("usd") or 0) for r in rows)
-        if not rows:
-            return _todo("No external-model spend in the last 30 days - send traffic through "
-                         "a governed external-model endpoint, then re-run.", sql=sql,
-                         next="Create the budget + threshold in the account console.")
-        return _ok(f"${total:,.2f} external-model spend over 30 days, across "
-                   f"{len(rows)} model/user pair(s).",
-                   rows=rows, total_usd=round(total, 2), sql=sql,
-                   note="Create the budget and its thresholds in the account console. Alerts "
-                        "are GA; hard 'block usage' caps are rolling out, so confirm "
-                        "availability on this account before promising hard enforcement.")
-    except Exception as e:
-        return _fail("Budget/spend query failed - system.ai_gateway.external_model_spend is "
-                     "Beta and may not be enabled on this account.",
-                     error=str(e)[:600], sql=sql)
+        ext_rows = fetchall(ext_sql)
+    except Exception as e:  # noqa: BLE001 - fold into the combined result, don't crash
+        ext_err = str(e)[:600]
+    internal = _internal_dbu_spend()
+
+    ext_total = sum(float(r.get("usd") or 0) for r in ext_rows)
+    shown_sql = _spend_sql_shown(ext_sql, internal)
+    combined = _combined_spend_rows(ext_rows, internal["rows"])
+    console_note = ("Create the budget and its thresholds in the account console. Alerts are "
+                    "GA; hard 'block usage' caps are rolling out, so confirm availability on "
+                    "this account before promising hard enforcement.")
+
+    if not combined:
+        if ext_err and internal["grant_missing"]:
+            return _fail(
+                "Budget/spend query failed - system.ai_gateway.external_model_spend is Beta and "
+                "may not be enabled, with no system.billing grant to fall back on.",
+                error=ext_err, sql=shown_sql)
+        return _todo(_no_dollars_msg(internal), sql=shown_sql,
+                     internal_grant_missing=internal["grant_missing"], external_error=ext_err,
+                     next=console_note)
+
+    total = ext_total + internal["total_usd"]
+    parts = []
+    if ext_rows:
+        parts.append(f"${ext_total:,.2f} external")
+    if internal["rows"]:
+        parts.append(f"${internal['total_usd']:,.2f} internal DBU-billed")
+    summary = (" + ".join(parts) + f" over 30 days = ${total:,.2f} the budget governs, across "
+               f"{len(combined)} model/SKU row(s).")
+    if not internal["rows"] and internal["grant_missing"]:
+        summary += (" Internal DBU spend is not included - grant SELECT on system.billing "
+                    "(optional) to add it.")
+    return _ok(summary, rows=combined, external_rows=ext_rows or None,
+               internal_rows=internal["rows"] or None, external_usd=round(ext_total, 2),
+               internal_usd=internal["total_usd"], total_usd=round(total, 2),
+               internal_grant_missing=internal["grant_missing"], sql=shown_sql,
+               note=console_note)
 
 
 def t_coding_agent_usage() -> TestResult:
@@ -2060,7 +2209,6 @@ def t_pii_mask_vs_block() -> TestResult:
     MASK is the more common production choice - it lets a benign request through with PII removed
     rather than failing it. Never raises.
     """
-    cfg = get_config().get("governed_endpoint", {})
     name = governed_service_fqn()
     if not name:
         return _fail("No governed_endpoint.service configured.")

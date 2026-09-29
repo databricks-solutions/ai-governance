@@ -120,16 +120,22 @@ with `databricks apps get ai-governance-workshop -p <profile> --output json` (fi
 
 ```sql
 GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
-GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;  -- usage, spend
+GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;  -- usage, external spend
 GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;  -- audit trail
+
+-- Optional: only if you want INTERNAL DBU-billed foundation-model spend shown in dollars.
+-- The workshop's own routing tiers are internal system.ai.* models, so without this the
+-- spend/budget steps show external spend only (which is $0 on an internal-only workspace).
+GRANT USE SCHEMA, SELECT ON SCHEMA system.billing    TO `<app-sp-client-id>`;  -- internal DBU spend
 ```
 
 (The app's Walkthrough page also shows these grants, and `GET /api/health` reports whether the
 telemetry steps have what they need.)
 
-**Only these two schemas.** The app deliberately reads no other - `system.billing`,
-`system.serving`, and `system.information_schema` were all removed once each turned out to
-be avoidable (see `docs/APIS_AND_SETUP.md`).
+**Two required schemas, one optional.** Beyond `system.ai_gateway` and `system.access`, the app
+reads `system.billing` **only if granted**, to price internal DBU-billed spend; `system.serving`
+and `system.information_schema` were removed once each turned out to be avoidable (see
+`docs/APIS_AND_SETUP.md`).
 
 **If the grants aren't ready, the workshop still runs.** The model panel, full routing ROI,
 endpoint discovery, asset inventory, rate limits, guardrail tests, the model-reach check
@@ -144,8 +150,9 @@ schema.)
 | Grant | Unlocks | Skippable? |
 |---|---|---|
 | `<catalog>.<schema>` | MCP policy function, inference-table reads, asset inventory | No |
-| `system.ai_gateway` | Spend by model, budgets, per-developer attribution, routing ROI context | Only if you drop the Cost pillar's telemetry steps |
+| `system.ai_gateway` | External spend by model, budgets, per-developer attribution, routing ROI context | Only if you drop the Cost pillar's telemetry steps |
 | `system.access` | Audit trail, secret-leak scan | Only if you drop `audit_scan` |
+| `system.billing` *(optional)* | **Internal** DBU-billed FM spend in dollars on the spend/budget steps | Yes - without it those steps show external spend only |
 
 Everything else - the model panel, the routing ROI, endpoint discovery, guardrail and policy
 tests - works with **no `system` grant at all**, because they use the serving and Unity

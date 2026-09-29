@@ -32,12 +32,12 @@ full migration sequence (run in parallel over weeks - there is no in-place renam
 configuration like PrivateLink and egress policies (account-level infrastructure), and
 passthrough mode (an escape hatch that loses cost tracking, rate limits, and policies).
 
-None of that is lost - it's in the detailed field guides for adopting Unity AI Gateway fresh,
+None of that is lost - it's in the detailed field guides for adopting Unity Gateway fresh,
 or migrating from a previous Databricks or external gateway:
 
-- **Unity AI Gateway Adoption Guide** - target state, object model, Unity Catalog layout,
+- **Unity Gateway Adoption Guide** - target state, object model, Unity Catalog layout,
   telemetry, budgets, network.
-- **Unity AI Gateway Migration Guide** - the phase-by-phase sequence off legacy Model Serving
+- **Unity Gateway Migration Guide** - the phase-by-phase sequence off legacy Model Serving
   or a third-party gateway (LiteLLM, Portkey, Kong, APIM), plus production-readiness and
   rollback checklists.
 
@@ -51,7 +51,7 @@ them before the day so the room isn't blocked.
 
 ## What are the prerequisites?
 
-- Unity AI Gateway (Beta) enabled
+- Unity Gateway (Beta) enabled
 - Workspace Unity Catalog enabled with foundation models
 - Serverless compute enabled
 - A SQL warehouse the app can use
