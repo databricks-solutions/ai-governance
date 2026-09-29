@@ -450,7 +450,7 @@ def report_pdf(o: dict) -> bytes:
 
     story.append(Spacer(1, 10))
     story.append(Paragraph(
-        "For adopting Unity AI Gateway fresh, or migrating from a previous Databricks or "
+        "For adopting Unity Gateway fresh, or migrating from a previous Databricks or "
         "external gateway, see the detailed field guides: the <b>Adoption Guide</b> and the "
         "<b>Migration Guide</b>.", S["note"]))
 

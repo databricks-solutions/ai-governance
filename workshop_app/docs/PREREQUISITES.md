@@ -16,7 +16,7 @@ These cannot be fixed on the day. Nothing else matters if these are missing.
 
 | # | Item | Why it's needed | Who |
 |---|---|---|---|
-| 1 | **Unity AI Gateway enabled** on the account and the workshop workspace | Nothing in the workshop works without it | Account admin |
+| 1 | **Unity Gateway enabled** on the account and the workshop workspace | Nothing in the workshop works without it | Account admin |
 | 2 | **`USE CATALOG` on `system` + `USE SCHEMA, SELECT` on `system.ai_gateway`** for the app's service principal | **6 steps** read this: spend by model, budget status, usage by project, coding-agent attribution, MCP telemetry, telemetry readiness | Account or metastore admin |
 | 3 | **`USE SCHEMA, SELECT` on `system.access`** for the app's service principal | **2 steps**: the audit trail and the secret-leak scan | Account or metastore admin |
 | 4 | **Service policies (Beta) enabled** - only if MCP policy steps are in scope | Attaching an ALLOW/DENY policy | Account admin |
@@ -40,11 +40,17 @@ Get the app's service principal with `databricks apps get ai-governance-workshop
 GRANT USE CATALOG ON CATALOG system TO `<app-sp-client-id>`;
 GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO `<app-sp-client-id>`;
 GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO `<app-sp-client-id>`;
+
+-- Optional: internal DBU-billed foundation-model spend in dollars. The workshop's own routing
+-- tiers are internal system.ai.* models, so without this the spend/budget steps show external
+-- spend only (which is $0 on an internal-only workspace).
+GRANT USE SCHEMA, SELECT ON SCHEMA system.billing    TO `<app-sp-client-id>`;
 ```
 
-**Only these two schemas.** The app deliberately reads no others - `system.billing`,
-`system.serving`, and `system.information_schema` were each removed once they proved
-avoidable, precisely to keep this ask small.
+**Two required schemas, one optional.** Beyond `system.ai_gateway` and `system.access`, the app
+reads `system.billing` **only if granted**, to price internal DBU-billed spend. `system.serving`
+and `system.information_schema` were each removed once they proved avoidable, precisely to keep
+this ask small.
 
 ### Why these grants, exactly
 

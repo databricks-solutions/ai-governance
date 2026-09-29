@@ -55,7 +55,7 @@ groups:
           session so anything missing can be fixed in the room.
         who: Account admin
       - id: uaig_enabled
-        item: Turn on Unity AI Gateway for the account and this workspace
+        item: Turn on Unity Gateway for the account and this workspace
         why: >-
           This is the control plane the whole workshop is built on. Nothing else works until it
           is enabled, so it is the first thing to confirm. It is enabled at the **account** level
@@ -65,7 +65,7 @@ groups:
       - id: beta_readiness
         item: Confirm your org can use Beta features - and flag CSP
         why: >-
-          Unity AI Gateway and several of the system tables the telemetry steps read are still
+          Unity Gateway and several of the system tables the telemetry steps read are still
           **Beta**. If your organization cannot run Beta features in production, tell us before
           the session - we will scope the workshop to what is GA on your account and skip the
           rest, rather than discover it live. If this workspace is on **CSP** (Compliance
@@ -73,13 +73,17 @@ groups:
           there, and we would rather plan around it than hit it in the room.
         who: Account admin
       - id: system_grants
-        item: Grant the app read access to two `system` schemas (`system.ai_gateway` and `system.access`)
+        item: Grant the app read access to two `system` schemas (`system.ai_gateway` and `system.access`), plus optionally `system.billing`
         why: >-
           These let the app read the telemetry that proves cost and control actually fired - spend
           by model, budgets, per-team attribution, and the audit trail. The exact GRANT statements
           are on this page; fill in the app's service principal (get it with
           `databricks apps get ai-governance-workshop`). If they are not ready in time the workshop
           still runs; those specific steps simply show "action needed" instead of a result.
+          Optionally also grant `system.billing`: the workshop's own routing tiers are internal
+          `system.ai.*` models billed in DBUs, so without it the spend and budget steps show
+          external-provider spend only (which is $0 on an internal-only workspace); internal usage
+          still shows in tokens regardless.
         who: Account admin
       - id: catalog_and_warehouse
         item: Provide a Unity Catalog catalog and a running SQL warehouse the app can use

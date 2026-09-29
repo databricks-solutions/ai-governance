@@ -182,7 +182,7 @@ targets:
     #
     # `dev` serves BOTH customer self-deploys (their own workspace + --var warehouse_id/catalog,
     # see README / PREREQUISITES.md) AND our single internal hosted instance on the shared Unity
-    # AI Gateway stable FEVM. catalog=uaigw_fe and schema=workshop are the variable defaults now,
+    # Gateway stable FEVM. catalog=uaigw_fe and schema=workshop are the variable defaults now,
     # so refreshing the hosted instance only needs the warehouse_id:
     #   databricks bundle deploy -t dev -p fevm-uaigw-stable --var="warehouse_id=9ac8efcd98a76929"
     #   databricks bundle run ai_governance_workshop_app -t dev -p fevm-uaigw-stable --var="warehouse_id=9ac8efcd98a76929"

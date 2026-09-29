@@ -76,7 +76,7 @@ export default function McpDiagram() {
           <Arrow className="min-w-16 flex-1" label="OAuth token" />
           <div className="rounded-xl border-2 px-4 py-2.5" style={{ borderColor: LAVA }}>
             <div className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: LAVA }}>
-              Unity AI Gateway
+              Unity Gateway
             </div>
             <div className="text-sm font-semibold text-navy">One governed entry point</div>
           </div>

@@ -3,8 +3,8 @@
 Everything the workshop app touches, what it needs, and - importantly - what is **GA** vs
 **Beta/Preview**. Read this before promising a capability to a customer.
 
-Verified against a live AWS workspace on **2026-08-05**. Unity AI
-Gateway went GA on **2026-08-04**, so several adjacent pieces are still Beta; those are
+Verified against a live AWS workspace on **2026-08-05**. Unity Gateway
+went GA on **2026-08-04**, so several adjacent pieces are still Beta; those are
 called out per row rather than glossed.
 
 ---
@@ -13,18 +13,18 @@ called out per row rather than glossed.
 
 | Capability | Status | Consequence for the workshop |
 |---|---|---|
-| Unity AI Gateway (core) | **GA** (2026-08-04) | Safe to demo and promise. |
+| Unity Gateway (core) | **GA** (2026-08-04) | Safe to demo and promise. |
 | Model services, MCP services | **GA** | Safe. UC securables, `GRANT EXECUTE`. |
 | Rate limits (QPM / TPM) | **GA** | Safe. Service, user, and group scopes. |
 | Inference tables (model services) | **GA** | Needs an **external-storage catalog**; rows lag up to ~1h. |
 | Budget tracking + **alerts** | **GA** | Safe. |
 | Budget **hard blocking** ("block usage") | **Rolling out** | Do **not** promise hard caps - confirm per account. |
 | Service policies (ALLOW/DENY) | **Beta** | Function creation is scriptable; **attaching is UI-only**. |
-| Guardrails on Unity AI Gateway | **Beta** (via service policies) | Legacy model-serving guardrails are separately Public Preview. |
+| Guardrails on Unity Gateway | **Beta** (via service policies) | Legacy model-serving guardrails are separately Public Preview. |
 | `system.ai_gateway.usage` | **Beta** | Works; schema is additive, so `DESCRIBE` before relying on a column. |
 | `system.ai_gateway.external_model_spend` | **Beta** | Gives **USD directly** - no price join. |
 | `system.serving.endpoint_usage` | Public Preview | **Not used** - 90-day retention, empty tag map, misses Gateway routes. |
-| `system.billing.usage` | **GA** | **Not used** - `external_model_spend` already gives USD. |
+| `system.billing.usage` + `list_prices` | **GA** | **Optional** - the *only* source of **internal** DBU-billed FM spend in USD. External spend uses `external_model_spend` (no billing grant); internal spend needs a `system.billing` grant. |
 | MCP payload logging | **Not available** | Do not claim it. |
 | Smart routing (Databricks-managed) | **Beta** | Position as roadmap; the app does not demo it. |
 | Omnigent (managed) | **Beta** (OSS available) | Partner/meta-harness layer; positioned, not demoed. |
@@ -112,12 +112,15 @@ user_identity.email, response.status_code, request_params
 `response:status_code` fails with `DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE`. This bug was
 present in the app and is fixed.
 
-### `system.billing.usage` + `list_prices` *(GA)* - **not used**
-The app does not read these, so it needs no `system.billing` grant.
-`system.ai_gateway.external_model_spend` already reports USD, which covers the workshop's
-need. Recorded here because it is the right tool for *total platform* AI spend (including
-serverless inference DBUs, which `external_model_spend` excludes) - useful for a follow-up
-FinOps conversation, not for the workshop:
+### `system.billing.usage` + `list_prices` *(GA)* - **optional (internal DBU spend)**
+`external_model_spend` gives USD for **external** providers only. Internal Databricks-hosted
+models (`system.ai.*`, FMAPI - what the workshop's own routing tiers use) bill in **DBUs** and
+never appear there; converting them to USD is the *only* thing that needs these tables. So the
+two dollar steps (`gateway_spend_by_model`, `budget_status`) query this **opportunistically**:
+with an optional `system.billing` grant they add internal spend, and without it they degrade to
+guidance (they never require the grant). `queries/internal_dbu_spend.sql` filters to the
+model-serving / real-time-inference SKUs; the broader form below prices *total platform* AI
+spend for a follow-up FinOps conversation:
 
 ```sql
 SELECT u.sku_name,
@@ -265,7 +268,7 @@ service principal's permissions, **not** the individual participant's.
 
 This matters for the on-behalf-of claim. The workshop can legitimately say:
 
-- Unity AI Gateway propagates the **caller's** identity to model and MCP services, and
+- Unity Gateway propagates the **caller's** identity to model and MCP services, and
   `system.ai_gateway.usage.requester` records it per user (verified live: 19 distinct
   developers attributed across `claude-cli`, `codex-tui`, `ucode`, `omnigent-probe`).
 - Service policies see the caller via `event:context.actor`.
@@ -363,20 +366,19 @@ workshop schema `USE SCHEMA`/`CREATE FUNCTION`/`EXECUTE`/`SELECT`/`MODIFY` plus
 `READ VOLUME`/`WRITE VOLUME` (for the progress file). The two `system`-schema grants
 (`USE SCHEMA` + `SELECT`) are manual - an account admin runs them (see the README grant block).
 
-### Keeping the `system` grant surface to two schemas
+### Keeping the required `system` grant surface to two schemas
 
-Granting on `system` needs an account or metastore admin, so the app minimizes what it asks
-for. It reads **only** `system.ai_gateway` and `system.access`:
+Granting on `system` needs an account or metastore admin, so the app minimizes what it
+*requires*. It reads only two schemas by default, plus one **optional** schema:
 
-| Schema | Why | Alternative considered |
-|---|---|---|
-| `system.ai_gateway` | `usage` (attribution, coding agents, telemetry) and `external_model_spend` (USD) | None - this is the only source of Gateway-native traffic and direct USD |
-| `system.access` | `audit` - denied calls, secret-shaped args | None - no API equivalent |
+| Schema | Required? | Why | Alternative considered |
+|---|---|---|---|
+| `system.ai_gateway` | **Yes** | `usage` (attribution, coding agents, telemetry) and `external_model_spend` (external USD) | None - the only source of Gateway-native traffic and direct USD |
+| `system.access` | **Yes** | `audit` - denied calls, secret-shaped args | None - no API equivalent |
+| `system.billing` | **Optional** | `usage` + `list_prices` - the *only* source of **internal** DBU-billed FM spend in USD. Without it, `gateway_spend_by_model`/`budget_status` show external spend only and degrade to guidance | None - internal spend is DBU-billed and never in `external_model_spend` |
 
-Three schemas were **removed** after checking each was avoidable:
+Two schemas were **removed** after checking each was avoidable:
 
-- **`system.billing`** - never actually queried. `system.ai_gateway.external_model_spend`
-  reports USD directly, so the `list_prices` join was unnecessary.
 - **`system.information_schema`** - replaced with the UC Functions API
   (`w.functions.list(catalog_name=..., schema_name=...)`), which reads the same inventory
   from the schema the app already has `USE SCHEMA` on. Verified live: returns the policy
@@ -393,18 +395,29 @@ Unity Catalog APIs. Only the telemetry steps need `system` - `usage_by_project`,
 `telemetry_readiness`, and `pii_safety_readiness` - and they degrade to `action_required`,
 not a crash.
 
-**Account admin still needed for:** the two `system` grants, creating budgets, and enabling
-the service-policies Beta. Line these up before the workshop.
+On an **internal-only workspace** (no external-provider traffic - common early in a POC) the
+dollar steps read `$0` from `external_model_spend` unless the optional `system.billing` grant is
+in place, because the workshop's own routing tiers are internal `system.ai.*` models billed in
+DBUs. Grant `system.billing` to show internal dollars; either way, internal usage still shows in
+**tokens** via `usage_by_project` with no billing grant.
+
+**Account admin still needed for:** the two required `system` grants (and the optional
+`system.billing` grant if internal dollars are in scope), creating budgets, and enabling the
+service-policies Beta. Line these up before the workshop.
 
 ---
 
 ## 9. Pre-flight check
 
-- [ ] Unity AI Gateway enabled on the account/workspace
+- [ ] Unity Gateway enabled on the account/workspace
 - [ ] Target catalog exists; deployer can create a schema in it
 - [ ] SQL warehouse running; app SP has `CAN_USE`
-- [ ] App SP granted `SELECT` on `system.ai_gateway` and `system.access` - just these two
+- [ ] App SP granted `SELECT` on `system.ai_gateway` and `system.access` - the two required
       *(account admin; without them 7 telemetry steps report `action_required`, the rest work)*
+- [ ] *(Optional)* App SP granted `SELECT` on `system.billing` if **internal** DBU-billed spend
+      should show in dollars - without it, the spend/budget steps show external spend only
+      *(account admin; the workshop's own routing traffic is internal, so this is what makes the
+      dollar steps non-zero on an internal-only workspace)*
 - [ ] `GET /api/health` returns `{"status":"ok"}`
 - [ ] Governed endpoint created, with an inference table if guardrail steps are in scope
       *(external-storage catalog required)*

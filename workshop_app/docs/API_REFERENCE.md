@@ -19,7 +19,7 @@ returned, not what a doc implied.
 
 ---
 
-## 1. Unity AI Gateway - the governed objects
+## 1. Unity Gateway - the governed objects
 
 | Operation | Method + path | Used by | Verified |
 |---|---|---|---|
@@ -64,7 +64,7 @@ Other managed families (same shape, different scope): `/api/2.0/mcp/genie/{space
 
 | Contract | Method + path | Model selector | Used by |
 |---|---|---|---|
-| **Unity AI Gateway** | `POST /ai-gateway/mlflow/v1/chat/completions` | service FQN *or* endpoint name | all routing steps, `model_services` |
+| **Unity Gateway** | `POST /ai-gateway/mlflow/v1/chat/completions` | service FQN *or* endpoint name | all routing steps, `model_services` |
 | Legacy Model Serving | `POST /api/2.0/serving-endpoints/{name}/invocations` | endpoint name | `test_guardrail` |
 
 Both were verified to return **200** on the same workspace. That is exactly why
@@ -177,9 +177,12 @@ Read through the Statement Execution API. Exact columns in `APIS_AND_SETUP.md` Â
 | Table | Status | Used by |
 |---|---|---|
 | `system.ai_gateway.usage` | Beta | `usage_by_project`, `coding_agent_usage`, `mcp_telemetry`, `telemetry_readiness` |
-| `system.ai_gateway.external_model_spend` | Beta | `gateway_spend_by_model`, `budget_status` |
+| `system.ai_gateway.external_model_spend` | Beta | `gateway_spend_by_model`, `budget_status` (external USD) |
+| `system.billing.usage` + `list_prices` | GA | `gateway_spend_by_model`, `budget_status` (**optional** - internal DBU spend) |
 | `system.access.audit` | GA | `audit_scan`, `pii_safety_readiness`, `telemetry_readiness` |
 
-Only `system.ai_gateway` and `system.access` are needed. `system.billing`, `system.serving`,
+`system.ai_gateway` and `system.access` are the two **required** schemas. `system.billing` is
+**optional**: it is the only source of internal (DBU-billed) foundation-model spend in USD, so
+the two dollar steps read it when granted and degrade to guidance otherwise. `system.serving`
 and `system.information_schema` were each removed once they proved avoidable, to keep the
 account-admin ask as small as possible.

@@ -9,7 +9,7 @@ Gap-check of the core workshop steps against three sources of truth:
 - **Adoption Guide** - target state: model services, provider services, service policies,
   MCP, UC layout, telemetry, budgets, network.
 - **Migration Guide** - the 10-phase sequence from legacy Model Serving AI Gateway to Unity
-  AI Gateway.
+  Gateway.
 
 All three are marked IN PROGRESS (GA launch edition, 2026-08-04).
 
@@ -91,7 +91,8 @@ Two POC DOC items we do **not** cover, deliberately:
 | Server-side vs. request tags | `cost_tags` | ⚠️ **Partial** - see §4 |
 | `system.ai_gateway.usage` telemetry | `cost_usage`, `control_coding_agents` | ✅ |
 | Cost per task - most efficient model per unit of work | `cost_task_usage` | ✅ **Added** |
-| External-model spend in USD | `cost_spend_by_model` | ✅ |
+| External-provider spend in USD | `cost_spend_by_model`, `cost_budgets` | ✅ |
+| Internal (DBU-billed) FM spend in USD | `cost_spend_by_model`, `cost_budgets` | ✅ **Added** - optional `system.billing` grant |
 | Inference tables / payload logging | `control_guardrails` verify, `acc_pg_readiness` | ✅ |
 | Audit trail | `control_audit` | ✅ |
 | MCP: managed vs. external, 3 planes, OBO | MCP accelerator (9 steps) | ✅ |
@@ -153,11 +154,11 @@ The Confluence page for part 04 documents what those exports contain.
 Everything in this section is covered by the two field guides. Point customers there rather
 than expanding the workshop:
 
-> **These are the detailed field guides for adopting Unity AI Gateway fresh, or migrating
+> **These are the detailed field guides for adopting Unity Gateway fresh, or migrating
 > from a previous Databricks or external gateway.**
 >
-> - [Unity AI Gateway **Adoption Guide**](https://docs.google.com/document/d/1Pbe3c5rj2xoOPve-bK6kdjmAJx8Yaz3tAQPQk7F7KaM/edit) - target state, object model, UC layout, telemetry, budgets, network.
-> - [Unity AI Gateway **Migration Guide**](https://docs.google.com/document/d/1N656ptJw-PG2rYTKY6d74cY0LYDl7oKnNUjbYwBSVaU/edit) - the 10-phase sequence off legacy Model Serving or a third-party gateway.
+> - [Unity Gateway **Adoption Guide**](https://docs.google.com/document/d/1Pbe3c5rj2xoOPve-bK6kdjmAJx8Yaz3tAQPQk7F7KaM/edit) - target state, object model, UC layout, telemetry, budgets, network.
+> - [Unity Gateway **Migration Guide**](https://docs.google.com/document/d/1N656ptJw-PG2rYTKY6d74cY0LYDl7oKnNUjbYwBSVaU/edit) - the 10-phase sequence off legacy Model Serving or a third-party gateway.
 
 **Inventory the current estate.** The guides' first phase, and the right first phase - but a
 discovery exercise over the customer's own endpoints, ACLs, clients, and spend. Pre-work, not

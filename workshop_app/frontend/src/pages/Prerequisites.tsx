@@ -167,6 +167,7 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
       <div className="mb-8 rounded-2xl border border-navy/10 bg-oat p-5">
         <h2 className="text-sm font-semibold text-navy">
           The two <code className="rounded bg-navy/5 px-1">system</code> grants
+          {" "}(plus one optional)
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
           Let the app read Gateway telemetry (the cost and audit steps). An account or metastore
@@ -177,6 +178,13 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
         <pre className="mt-3 overflow-x-auto rounded-xl bg-navy/[0.03] p-3.5 text-[11.5px] leading-relaxed text-navy/80">{`GRANT USE CATALOG ON CATALOG system TO \`<app-service-principal>\`;
 GRANT USE SCHEMA, SELECT ON SCHEMA system.ai_gateway TO \`<app-service-principal>\`;
 GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO \`<app-service-principal>\`;`}</pre>
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          Optional - only for <strong>internal</strong> DBU-billed spend in dollars. The workshop's
+          own routing tiers are internal <code className="rounded bg-navy/5 px-1">system.ai.*</code>{" "}
+          models, so without this the spend and budget steps show external spend only (which is $0
+          on an internal-only workspace). Internal usage still shows in tokens without it.
+        </p>
+        <pre className="mt-3 overflow-x-auto rounded-xl bg-navy/[0.03] p-3.5 text-[11.5px] leading-relaxed text-navy/80">{`GRANT USE SCHEMA, SELECT ON SCHEMA system.billing     TO \`<app-service-principal>\`;`}</pre>
       </div>
 
       <div className="flex flex-col gap-8">

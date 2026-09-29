@@ -1,7 +1,7 @@
-# Gap analysis: workshop vs. the Unity AI Gateway Enablement doc
+# Gap analysis: workshop vs. the Unity Gateway Enablement doc
 
 Feature-by-feature check of the core workshop steps + 21 accelerator steps against
-*Unity AI Gateway Enablement* (July 2026), which is a **customer-enablement** document -
+*Unity Gateway Enablement* (July 2026), which is a **customer-enablement** document -
 i.e. what one specific customer needs to stand this up, not what the product can do.
 
 That distinction drives every call below. The enablement doc is broader than a 4-hour

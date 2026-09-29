@@ -276,12 +276,22 @@ pillars:
 
       - id: cost_spend_by_model
         title: "Cost: Read 30-day spend by model"
-        outcome: "We can read 30-day estimated USD spend per model to see where the money actually goes - and where a routing policy has the most leverage."
+        outcome: "We can read 30-day AI spend in USD - external-provider spend directly, plus internal DBU-billed foundation-model spend when the optional system.billing grant is present - to see where the money goes and where a routing policy has the most leverage."
         concept: |
-          `system.ai_gateway.external_model_spend` reports **estimated USD directly** (no
-          price-list join needed) for external-provider traffic through the Gateway. Break it
-          down by model to see which models dominate spend - that is where a routing policy
-          has leverage, and it grounds the ROI estimate in this account's real mix.
+          AI spend comes from two places, and this step reads both:
+
+          - **External providers** - `system.ai_gateway.external_model_spend` reports estimated
+            USD **directly** (no price-list join), for external models routed through the Gateway.
+          - **Internal Databricks-hosted models** (`system.ai.*`, FMAPI) - these bill in **DBUs**
+            and never land in `external_model_spend`, so their dollars come from
+            `system.billing.usage` priced with `list_prices`. This is exactly what the workshop's
+            own routing tiers use, so without it the dollar view reads **$0** even after you run
+            the routing steps. It needs an **optional** `system.billing` grant; without the grant
+            the step still runs and points you at token attribution instead of failing.
+
+          Broken down by model/SKU, this shows which models dominate spend - where a routing
+          policy has leverage - and grounds the ROI estimate in this account's real mix. Dollars
+          are estimated (list price) until you apply a negotiated rate; token counts are real.
         action:
           label: Show 30-day spend by model
           test: gateway_spend_by_model
@@ -339,6 +349,11 @@ pillars:
           Budgets are scoped to the account and configured in the account console, with
           shared and per-user thresholds. **Alerts are GA; hard blocking is rolling out** -
           confirm on this account before telling a FinOps owner that spend is hard-capped.
+
+          The spend this step reads spans both sources: external-provider USD, plus - with the
+          optional `system.billing` grant - internal DBU-billed foundation-model spend. That
+          matters here, because an internal-only workspace bills entirely in DBUs, so without
+          that grant a budget would be sized against **$0** of visible spend.
 
           Enforcement is based on near-real-time estimates, so thresholds are approximate in
           both directions. Pair budgets with the rate limit above: the budget tells you when
