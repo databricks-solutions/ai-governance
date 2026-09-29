@@ -46,7 +46,7 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
       try {
         localStorage.setItem(LS_KEY, JSON.stringify(next));
       } catch {
-        // Private browsing or a full quota — ticking still works for this session.
+        // Private browsing or a full quota - ticking still works for this session.
       }
       return next;
     });
@@ -81,7 +81,7 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
       <PageHeader
         eyebrow="Before the workshop"
         title="Prerequisites"
-        lead="What to have in place before the workshop, tagged by persona. The session needs as few as three people — an account admin, a business champion, and a technical champion. Long-lead items need an admin and take days, so start those about a week out."
+        lead="What to have in place before the workshop, tagged by persona. The session needs as few as three people - an account admin, a business champion, and a technical champion. Long-lead items need an admin and take days, so start those about a week out."
       />
       <div className="mx-auto max-w-4xl px-8 py-12 lg:px-14">
 
@@ -93,7 +93,7 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
             {doneRequired} of {required.length} required items checked
           </div>
           <div className="mt-0.5 text-xs text-muted">
-            Ticks are saved in this browser only — they are the customer's platform tasks, not
+            Ticks are saved in this browser only - they are the customer's platform tasks, not
             workshop progress, so they stay out of the exported outcomes.
           </div>
         </div>
@@ -140,8 +140,8 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
           <div className="mb-8 flex items-start gap-3 rounded-2xl border border-[#1E7E34]/30 bg-[#E6F4EA]/60 p-4">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#1E7E34]" />
             <div className="text-sm leading-relaxed text-navy">
-              <span className="font-semibold">Hard blockers — all {blockers.length} confirmed.</span>{" "}
-              Unity Catalog and Unity Gateway are in place — you're clear to schedule the workshop.
+              <span className="font-semibold">Hard blockers - all {blockers.length} confirmed.</span>{" "}
+              Unity Catalog and Unity Gateway are in place - you're clear to schedule the workshop.
             </div>
           </div>
         ) : (
@@ -149,7 +149,7 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-lava" />
             <div className="text-sm leading-relaxed text-navy">
               <span className="font-semibold">
-                Hard blockers — {blockersUnmet.length} of {blockers.length} still open.
+                Hard blockers - {blockersUnmet.length} of {blockers.length} still open.
               </span>{" "}
               The workshop cannot run until these are met: without Unity Catalog and Unity Gateway
               there is nothing to govern. Confirm them (checked below) before scheduling.
@@ -162,7 +162,7 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
         <p className="mb-8 whitespace-pre-line text-sm leading-relaxed text-muted">{data.lead_time_note}</p>
       )}
 
-      {/* The two `system` grants — moved here from the Walkthrough. An account/metastore admin
+      {/* The two `system` grants - moved here from the Walkthrough. An account/metastore admin
           runs these once; kept short on purpose (the checklist item above tracks it). */}
       <div className="mb-8 rounded-2xl border border-navy/10 bg-oat p-5">
         <h2 className="text-sm font-semibold text-navy">
@@ -170,7 +170,7 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
           Let the app read Gateway telemetry (the cost and audit steps). An account or metastore
-          admin runs these once — get the app's service principal with{" "}
+          admin runs these once - get the app's service principal with{" "}
           <code className="rounded bg-navy/5 px-1">databricks apps get ai-governance-workshop</code>.
           The workshop still runs without them; those steps just show “action needed”.
         </p>
@@ -220,7 +220,7 @@ GRANT USE SCHEMA, SELECT ON SCHEMA system.access     TO \`<app-service-principal
 }
 
 /** One prerequisite: a collapsed one-liner (checkbox · item · badges · expand) that opens to
- *  reveal the "why" and the persona. The checkbox and the expander are separate actions — ticking
+ *  reveal the "why" and the persona. The checkbox and the expander are separate actions - ticking
  *  never expands, and expanding never ticks. The chevron only appears when there is detail to show. */
 function PrereqRow({
   item,

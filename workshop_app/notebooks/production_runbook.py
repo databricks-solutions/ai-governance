@@ -1,16 +1,16 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Unity Gateway Workshop — Production Runbook
+# MAGIC # Unity Gateway Workshop - Production Runbook
 # MAGIC
 # MAGIC The workshop app proves governance interactively. This notebook is the **production
 # MAGIC hand-off**: every SQL statement and CI/CD command the app relies on, gathered so a
-# MAGIC platform team can stand the same controls up **outside** the app — in a job, a pipeline,
-# MAGIC or by hand — as part of a real rollout.
+# MAGIC platform team can stand the same controls up **outside** the app - in a job, a pipeline,
+# MAGIC or by hand - as part of a real rollout.
 # MAGIC
 # MAGIC Nothing here is magic the app does secretly: each cell mirrors what a workshop step runs.
-# MAGIC The app addresses the governed model on the **v3 Unity Catalog plane** — a model service
+# MAGIC The app addresses the governed model on the **Unity Gateway model-service plane** - a model service
 # MAGIC `catalog.schema.service` on `/ai-gateway/mlflow/v1`, **never** a legacy v1 serving
-# MAGIC endpoint by flat name (the only v1 read left is the Choice "flag v1 vs v3" inventory).
+# MAGIC endpoint by flat name (the only v1 read left is the Choice "flag legacy endpoints vs model services" inventory).
 # MAGIC
 # MAGIC Set the widgets, then run top to bottom. Grants and service creation need an
 # MAGIC **account/metastore admin**; the read queries need `SELECT` on the `system` schemas.
@@ -25,14 +25,14 @@ dbutils.widgets.text("app_service_principal", "<app-service-principal>", "App SP
 CATALOG = dbutils.widgets.get("catalog")
 SCHEMA = dbutils.widgets.get("schema")
 SERVICE = dbutils.widgets.get("service")
-FQN = f"{CATALOG}.{SCHEMA}.{SERVICE}"          # the governed model service, v3 UC securable
+FQN = f"{CATALOG}.{SCHEMA}.{SERVICE}"          # the governed model service, Unity Catalog securable
 APP_SP = dbutils.widgets.get("app_service_principal")
 print("Governed model service FQN:", FQN)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. CI/CD — deploy the app (Databricks Asset Bundle)
+# MAGIC ## 1. CI/CD - deploy the app (Databricks Asset Bundle)
 # MAGIC
 # MAGIC Run these in a shell (CI runner or laptop) from `workshop_app/`, not in the notebook.
 # MAGIC The bundle is the single source of truth: catalog/schema/warehouse reach the app as env,
@@ -45,12 +45,12 @@ print("Governed model service FQN:", FQN)
 # MAGIC # 1. Validate (catches config/schema errors before touching the workspace)
 # MAGIC databricks bundle validate -t dev -p <profile> --var="warehouse_id=<id>"
 # MAGIC
-# MAGIC # 2. Deploy — builds the UI, creates the schema + progress volume + app, grants the app SP.
+# MAGIC # 2. Deploy - builds the UI, creates the schema + progress volume + app, grants the app SP.
 # MAGIC #    On a CUSTOMER workspace ALWAYS pass --var="catalog=<uc-catalog>" (uaigw_fe is internal).
 # MAGIC databricks bundle deploy -t dev -p <profile> \
 # MAGIC   --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
 # MAGIC
-# MAGIC # 3. Start app compute (a deploy alone does NOT start it — this second command is required)
+# MAGIC # 3. Start app compute (a deploy alone does NOT start it - this second command is required)
 # MAGIC databricks bundle run ai_governance_workshop_app -t dev -p <profile> \
 # MAGIC   --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
 # MAGIC
@@ -70,8 +70,8 @@ print("Governed model service FQN:", FQN)
 # MAGIC ## 2. Access grants (account/metastore admin)
 # MAGIC
 # MAGIC Two `system` grants let the app read Gateway telemetry (the cost/audit steps), and one
-# MAGIC grant on the governed model service is how you scope **who can call it** on the v3 plane:
-# MAGIC `EXECUTE` = can call, `MANAGE` = can reconfigure (keep with admins — the shadow-service
+# MAGIC grant on the governed model service is how you scope **who can call it** on the Unity Gateway plane:
+# MAGIC `EXECUTE` = can call, `MANAGE` = can reconfigure (keep with admins - the shadow-service
 # MAGIC risk). Replace `<app-service-principal>` via the widget.
 
 # COMMAND ----------
@@ -98,7 +98,7 @@ print("Governed model service FQN:", FQN)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Stand up the governed model service (v3)
+# MAGIC ## 3. Stand up the governed model service
 # MAGIC
 # MAGIC The app never creates this unattended on a customer workspace (guided UI step). Its
 # MAGIC create/verify Try-It reads `GET /api/2.1/unity-catalog/model-services/{fqn}`. For a
@@ -116,7 +116,7 @@ try:
     print("  rate_limits configured:", bool(conf.get("rate_limits")))
     print("  inference table:", bool(conf.get("inference_table_config") or conf.get("auto_capture_config")))
 except Exception as e:
-    print(f"✗ {FQN} not found — create it in the AI Gateway UI in front of the base model, "
+    print(f"✗ {FQN} not found - create it in the AI Gateway UI in front of the base model, "
           f"attach an inference table + rate limits, then re-run.\n  {str(e)[:300]}")
 
 # COMMAND ----------
@@ -126,7 +126,7 @@ except Exception as e:
 # MAGIC
 # MAGIC A service policy is a UC SQL function returning `to_variant_object(...)` with `result`
 # MAGIC (ALLOW/DENY/ASK). **Creating the function is automatable; ATTACHING it to the service is
-# MAGIC UI-only in Beta** (AI Gateway > Policies). Two policies the workshop uses — model-service
+# MAGIC UI-only in Beta** (AI Gateway > Policies). Two policies the workshop uses - model-service
 # MAGIC keyword blocklist, and MCP-service write-tool deny. The app ships these as
 # MAGIC `queries/keyword_blocklist_policy.sql` and `queries/mcp_service_policy.sql`.
 
@@ -186,7 +186,7 @@ except Exception as e:
 # MAGIC %md
 # MAGIC ## 6. The telemetry queries the app runs
 # MAGIC
-# MAGIC These read `system.ai_gateway.*` and `system.access.audit` — the proof that cost and
+# MAGIC These read `system.ai_gateway.*` and `system.access.audit` - the proof that cost and
 # MAGIC control fired. Run them directly for a dashboard or a scheduled job. Each mirrors a
 # MAGIC workshop step (source: `workshop_app/queries/*.sql`).
 
@@ -203,10 +203,10 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Choice > flag v1 vs v3 traffic (queries/endpoint_inventory_v1_v3.sql). service_name
+# MAGIC -- Choice > flag legacy endpoints vs model services traffic (queries/endpoint_inventory_v1_v3.sql). service_name
 # MAGIC -- NULL = a call that named a plain endpoint (v1); service_name set = a model-service FQN
-# MAGIC -- (v3). This split is the migration-backlog signal — the ONE place v1 is read on purpose.
-# MAGIC SELECT CASE WHEN service_name IS NULL THEN 'v1 (endpoint name)' ELSE 'v3 (model service)' END AS plane,
+# MAGIC --. This split is the migration-backlog signal - the ONE place v1 is read on purpose.
+# MAGIC SELECT CASE WHEN service_name IS NULL THEN 'legacy (endpoint name)' ELSE 'Unity Gateway (model service)' END AS plane,
 # MAGIC        COUNT(*) AS requests, SUM(total_tokens) AS tokens
 # MAGIC FROM system.ai_gateway.usage
 # MAGIC WHERE event_time > current_timestamp() - INTERVAL 7 DAYS
@@ -226,6 +226,6 @@ except Exception as e:
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC **Full query sources** live in `workshop_app/queries/` — this notebook shows the
+# MAGIC **Full query sources** live in `workshop_app/queries/` - this notebook shows the
 # MAGIC production-critical ones with concrete values. The app runs them with the same SQL,
 # MAGIC filling `${...}` placeholders from `config/workshop.yaml`.

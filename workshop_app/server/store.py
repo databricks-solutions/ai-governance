@@ -1,4 +1,4 @@
-"""Progress store — a static JSON file on a Unity Catalog volume.
+"""Progress store - a static JSON file on a Unity Catalog volume.
 
 Replaces the old Lakebase (Postgres) store. The app is deployed once per workshop and tracks a
 handful of steps for that one deployment; that does not need a database. Progress lives in a
@@ -6,15 +6,15 @@ single JSON file on a UC volume (created by the asset bundle), read into memory 
 rewritten on every update.
 
 Why a volume, not a database: the customer ships this in their OWN workspace to try the
-platform out, and a Postgres instance to provision — wait for AVAILABLE, grant CONNECT on,
-keep running — is a barrier that buys nothing here. A volume is created by the same bundle,
+platform out, and a Postgres instance to provision - wait for AVAILABLE, grant CONNECT on,
+keep running - is a barrier that buys nothing here. A volume is created by the same bundle,
 carries the same Unity Catalog grants as the workshop schema, and has no separate lifecycle.
 
 Durability model: single-writer, write-through. A Databricks App runs as one process, so an
 in-memory dict is the source of truth for reads; every write updates it and rewrites the whole
-file (it is tiny — one object per step). If the volume is briefly unreachable the
+file (it is tiny - one object per step). If the volume is briefly unreachable the
 workshop keeps running on the in-memory copy and the next write retries the persist. Losing
-saved progress is recoverable; losing the app is not — so nothing here ever raises to a caller.
+saved progress is recoverable; losing the app is not - so nothing here ever raises to a caller.
 """
 from __future__ import annotations
 
@@ -47,10 +47,10 @@ def _vol_cfg() -> dict:
 
 
 def _file_path() -> str:
-    """`/Volumes/<catalog>/<schema>/<volume>/<file>` — same catalog/schema the bundle uses.
+    """`/Volumes/<catalog>/<schema>/<volume>/<file>` - same catalog/schema the bundle uses.
 
     Catalog/schema come from config (which the bundle pins via env), so the file always lands
-    in the schema the bundle created the volume in — the two cannot drift apart.
+    in the schema the bundle created the volume in - the two cannot drift apart.
     """
     cat = get_config().get("catalog", {}) or {}
     catalog, schema = cat.get("name"), cat.get("schema")
@@ -66,8 +66,8 @@ def _file_path() -> str:
 def load() -> None:
     """Read the progress file into memory. Best-effort: a missing/unreachable file starts empty.
 
-    Called once at startup. A NOT_FOUND on the very first deploy is the normal case — the file
-    is created lazily on the first save — so it is logged at info, not warning.
+    Called once at startup. A NOT_FOUND on the very first deploy is the normal case - the file
+    is created lazily on the first save - so it is logged at info, not warning.
     """
     with _LOCK:
         try:
@@ -90,12 +90,12 @@ def load() -> None:
                                 if isinstance(rec, dict):
                                     _MEM[step_id] = rec
             log.info("Progress store loaded from %s (%d step(s)).", path, len(_MEM))
-        except Exception as e:  # noqa: BLE001 — any failure just means we start empty
+        except Exception as e:  # noqa: BLE001 - any failure just means we start empty
             log.info("Progress store starting empty (%s).", str(e)[:200])
 
 
 def _persist() -> None:
-    """Rewrite the whole file. Caller must hold _LOCK. Never raises — a failed write is logged
+    """Rewrite the whole file. Caller must hold _LOCK. Never raises - a failed write is logged
     and the in-memory copy stays authoritative so the workshop continues uninterrupted."""
     try:
         path = _file_path()
@@ -132,7 +132,7 @@ def save(
             "last_result": result if result is not None else prev.get("last_result"),
             "notes": notes if notes is not None else prev.get("notes"),
             "updated_by": updated_by if updated_by is not None else prev.get("updated_by"),
-            # Manual outcome flags are never touched by a test run / status update — preserve them.
+            # Manual outcome flags are never touched by a test run / status update - preserve them.
             "outcome": prev.get("outcome"),
             "poc": prev.get("poc", False),
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -149,11 +149,11 @@ def set_outcome(
 ) -> None:
     """Set the hand-marked outcome flags for a step, independent of the interactive test.
 
-    `outcome` is "done" | "na" | None — Done and N/A are mutually exclusive, and None clears
-    both. `poc` flags the step for the POC follow-up. Either arg left unset is preserved
-    (COALESCE), so toggling one control never clears the other, and the interactive
-    `status`/`last_result` are left untouched. A step counts as achieved if EITHER the test ran
-    `done` OR `outcome == "done"`.
+    `outcome` is "done" | "na" | None. `poc` flags the step for the POC follow-up. The UI
+    presents Done / N/A / POC as a single mutually-exclusive choice, but this store keeps
+    `outcome` and `poc` as independent columns; each call sends the full desired state. The
+    interactive `status`/`last_result` are left untouched. A step counts as achieved only when
+    `outcome == "done"` (hand-marked) - a passing Try-It never auto-marks it done.
     """
     with _LOCK:
         prev = _MEM.get(step_id, {})
@@ -171,7 +171,7 @@ def set_outcome(
 
 
 def reset() -> int:
-    """Clear all workshop progress and rewrite the (now empty) file — used to start the room
+    """Clear all workshop progress and rewrite the (now empty) file - used to start the room
     fresh, e.g. re-running the workshop or clearing a demo deployment. Returns how many steps
     were cleared. Write-through like every other mutation; never raises (a failed persist keeps
     the cleared in-memory state and is logged)."""

@@ -45,7 +45,7 @@ def _sql_str(value: Any) -> str:
 
     Config is customer-edited and endpoint/tool names round-trip through these queries, so
     a stray apostrophe should be a no-match rather than a syntax error or an injected
-    predicate. Use for VALUES only — identifiers go through _sql_ident.
+    predicate. Use for VALUES only - identifiers go through _sql_ident.
     """
     return "'" + str(value).replace("\\", "\\\\").replace("'", "\\'") + "'"
 
@@ -77,10 +77,10 @@ def _fq_schema() -> tuple[str, str]:
 
 
 def _get_model_service(w, fqn: str) -> dict:
-    """GET a v3 Unity Catalog model service by FQN (`catalog.schema.service`).
+    """GET a Unity Gateway model service by FQN (`catalog.schema.service`).
 
     The governed steps read the service's `config` (rate limits, inference table, guardrails)
-    from here — the v3 replacement for `serving_endpoints.get(name)` on the legacy plane.
+    from here - the Unity Gateway replacement for `serving_endpoints.get(name)` on the legacy plane.
     Raises on transport/permission/not-found so callers classify the failure themselves.
     """
     return w.api_client.do("GET", f"/api/2.1/unity-catalog/model-services/{fqn}") or {}
@@ -99,18 +99,18 @@ API_DOCS: dict[str, dict[str, str]] = {
     "connection": {"api": "POST /api/2.0/sql/statements (SELECT 1)"},
     "default_access": {
         "api": "GET /api/2.1/unity-catalog/effective-permissions/{catalog|schema}/{name}?principal=<app-sp>",
-        "note": "Read-only — reports this identity's effective reach, never changes a grant."},
+        "note": "Read-only - reports this identity's effective reach, never changes a grant."},
     "endpoint_acl": {
         "api": "GET /api/2.1/unity-catalog/permissions/model_service/{catalog.schema.service}",
-        "note": "UC grants on the v3 model-service securable — EXECUTE = can call, MANAGE = can reconfigure."},
+        "note": "UC grants on the Unity Gateway model-service securable - EXECUTE = can call, MANAGE = can reconfigure."},
     "workspace_context": {"api": "local config + GET /api/2.0/preview/scim/v2/Me"},
-    "routing_panel": {"api": "none — reads config/workshop.yaml",
+    "routing_panel": {"api": "none - reads config/workshop.yaml",
                       "note": "Prices are config, not a live API."},
     "test_mcp_policy": {"api": "POST /api/2.0/sql/statements (evaluate the policy function)"},
     "external_provider_routing": {"api": "GET /api/2.0/serving-endpoints"},
     "provider_secret_readiness": {
         "api": "GET /api/2.0/secrets/scopes/list + GET /api/2.0/serving-endpoints/{name}",
-        "note": "Read-only; never reads a secret value — checks for {{secrets/...}} references."},
+        "note": "Read-only; never reads a secret value - checks for {{secrets/...}} references."},
     "workspace_binding_check": {
         "api": "GET /api/2.1/unity-catalog/catalogs/{name} + /api/2.1/unity-catalog/bindings/catalog/{name}"},
     "agent_versions": {
@@ -119,8 +119,8 @@ API_DOCS: dict[str, dict[str, str]] = {
         "api": "GET /api/2.0/serving-endpoints/{name} (ai_gateway config on agent-like endpoints)"},
     "list_endpoints": {"api": "GET /api/2.0/serving-endpoints"},
     "use_open_weight_model": {
-        "api": "POST /ai-gateway/mlflow/v1/chat/completions with model=<catalog.schema.service> (a v3 open-weight model service)",
-        "note": "Same governed v3 path, grants, and request-tag attribution as a proprietary model."},
+        "api": "POST /ai-gateway/mlflow/v1/chat/completions with model=<catalog.schema.service> (an open-weight model service)",
+        "note": "Same governed Unity Gateway path, grants, and request-tag attribution as a proprietary model."},
     "endpoint_inventory_v1_v3": {"api": "SQL: system.ai_gateway.usage (service_name NULL = v1)"},
     "model_services": {"api": "GET /api/2.1/unity-catalog/model-services"},
     "list_registered_assets": {
@@ -129,7 +129,7 @@ API_DOCS: dict[str, dict[str, str]] = {
     "rate_limits": {"api": "GET /api/2.1/unity-catalog/model-services/{catalog.schema.service} (config.rate_limits)"},
     "test_guardrail": {
         "api": "POST /ai-gateway/mlflow/v1/chat/completions with model=<catalog.schema.service>",
-        "note": "v3 Gateway path — never the legacy /serving-endpoints/{name}/invocations."},
+        "note": "Unity Gateway path - never the legacy /serving-endpoints/{name}/invocations."},
     "routing_compare": {
         "api": "POST /ai-gateway/mlflow/v1/chat/completions (each model per prompt + a classifier)",
         "note": "Per-request cost × the configured monthly request volume; smart-routing row is an estimate."},
@@ -140,16 +140,16 @@ API_DOCS: dict[str, dict[str, str]] = {
     "mcp_policy_target": {"api": "GET /api/2.1/unity-catalog/mcp-services"},
     "mcp_grants": {"api": "GET /api/2.1/unity-catalog/permissions/mcp_service/{name}"},
     "mcp_service_tools": {
-        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)"},
-    "mcp_obo": {"api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/call (not REST)"},
+        "api": "POST /ai-gateway/mcp-services/{fqn} - JSON-RPC tools/list (not REST)"},
+    "mcp_obo": {"api": "POST /ai-gateway/mcp-services/{fqn} - JSON-RPC tools/call (not REST)"},
     "mcp_managed_tools": {
-        "api": "POST /api/2.0/mcp/functions/{catalog}/{schema} — JSON-RPC (not REST)"},
+        "api": "POST /api/2.0/mcp/functions/{catalog}/{schema} - JSON-RPC (not REST)"},
     "mcp_external_readiness": {"api": "GET /api/2.1/unity-catalog/connections"},
     "mcp_readonly_enforcement": {
-        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)",
+        "api": "POST /ai-gateway/mcp-services/{fqn} - JSON-RPC tools/list (not REST)",
         "note": "Classifies tools read vs write from each tool's readOnlyHint."},
     "mcp_tool_metadata_scan": {
-        "api": "POST /ai-gateway/mcp-services/{fqn} — JSON-RPC tools/list (not REST)",
+        "api": "POST /ai-gateway/mcp-services/{fqn} - JSON-RPC tools/list (not REST)",
         "note": "Heuristic scan of tool name/description for prompt-injection ('tool poisoning')."},
     # SQL-only tests: name the table rather than a REST path, which is the useful detail.
     "usage_by_project": {"api": "SQL: system.ai_gateway.usage"},
@@ -179,10 +179,10 @@ API_DOCS: dict[str, dict[str, str]] = {
     "guardrail_block_shape": {
         "api": "POST /ai-gateway/mlflow/v1/chat/completions",
         "note": "Sends a blocked prompt and reports whether the block is a 4xx error or HTTP 200 + reason."},
-    # Deliberately not automated — say so, and say why.
+    # Deliberately not automated - say so, and say why.
     "create_governed_endpoint": {"api": "read-only: GET /api/2.1/unity-catalog/model-services/{fqn}",
                                  "note": "Creation is a guided UI step, never automated."},
-    "apply_tags": {"api": "none — guided UI step",
+    "apply_tags": {"api": "none - guided UI step",
                    "note": "The app does not write tags to a customer endpoint."},
 }
 
@@ -212,49 +212,49 @@ def t_list_endpoints() -> TestResult:
 
 
 def t_endpoint_inventory_v1_v3() -> TestResult:
-    """Inventory Gateway traffic split by v1 (legacy endpoint) vs v3 (model service).
+    """Inventory Gateway traffic split by legacy endpoint vs Unity Gateway model service.
 
     The migration backlog, read straight from usage. A call naming a legacy endpoint lands with
-    service_name NULL (the v1 /serving-endpoints path); a call naming a model-service FQN lands
-    with service_name set (the v3 /ai-gateway path). Any v1 row is traffic that breaks when the
-    v1 killswitch flips and needs to move to a model service first. SQL in
-    queries/endpoint_inventory_v1_v3.sql — copy-runnable so a customer can re-check on their own.
+    service_name NULL (the /serving-endpoints path); a call naming a model-service FQN lands with
+    service_name set (the /ai-gateway path). Any legacy row is traffic that breaks when the legacy
+    killswitch flips and needs to move to a model service first. SQL in
+    queries/endpoint_inventory_v1_v3.sql, copy-runnable so a customer can re-check on their own.
     """
     sql = load_query("endpoint_inventory_v1_v3", days="30")
     try:
         rows = fetchall(sql)
     except Exception as e:
-        return _fail("Endpoint-inventory query failed — system.ai_gateway.usage may not be "
+        return _fail("Endpoint-inventory query failed. system.ai_gateway.usage may not be "
                      "enabled on this account (Beta).", error=str(e)[:600], sql=sql)
     if not rows:
         return _todo("No Gateway traffic recorded in the last 30 days, so there is nothing to "
                      "classify yet. Send a request through the Gateway, then re-run.", sql=sql)
-    v1 = [r for r in rows if str(r.get("gateway_path", "")).startswith("v1")]
-    v3 = [r for r in rows if str(r.get("gateway_path", "")).startswith("v3")]
-    v1_requests = sum(int(r.get("requests") or 0) for r in v1)
-    v3_requests = sum(int(r.get("requests") or 0) for r in v3)
-    if v1:
+    legacy = [r for r in rows if str(r.get("gateway_path", "")).startswith("legacy")]
+    governed = [r for r in rows if str(r.get("gateway_path", "")).startswith("model")]
+    legacy_requests = sum(int(r.get("requests") or 0) for r in legacy)
+    governed_requests = sum(int(r.get("requests") or 0) for r in governed)
+    if legacy:
         return _fail(
-            f"{len(v1)} target(s) still on the v1 (legacy endpoint) path — {v1_requests} "
-            f"request(s) in 30 days that break when the v1 killswitch flips. "
-            f"{len(v3)} target(s) already on v3 ({v3_requests} request(s)).",
-            v1_targets=[r.get("target") for r in v1][:25],
-            v3_targets=[r.get("target") for r in v3][:25],
+            f"{len(legacy)} target(s) still on the legacy endpoint path, {legacy_requests} "
+            f"request(s) in 30 days that break when the legacy killswitch flips. "
+            f"{len(governed)} target(s) already on model services ({governed_requests} request(s)).",
+            legacy_targets=[r.get("target") for r in legacy][:25],
+            model_service_targets=[r.get("target") for r in governed][:25],
             rows=rows, sql=sql,
-            next="Stand up a model service in front of each v1 target, move clients to its FQN "
+            next="Stand up a model service in front of each legacy target, move clients to its FQN "
                  "on the /ai-gateway/mlflow/v1 path, then revoke the legacy path.")
     return _ok(
-        f"All {len(v3)} target(s) with recent traffic are on the v3 (model service) path — "
-        f"no v1 legacy-endpoint traffic in the last 30 days.",
-        v3_targets=[r.get("target") for r in v3][:25], rows=rows, sql=sql)
+        f"All {len(governed)} target(s) with recent traffic are on the Unity Gateway model-service "
+        f"path, no legacy-endpoint traffic in the last 30 days.",
+        model_service_targets=[r.get("target") for r in governed][:25], rows=rows, sql=sql)
 
 
 def t_model_services() -> TestResult:
-    """Model services as UC securables — the object the client contract should point at.
+    """Model services as UC securables - the object the client contract should point at.
 
     The migration story in one step. Legacy Model Serving addressed an ENDPOINT NAME on
     /serving-endpoints/<name>/invocations, with workspace ACLs. Unity AI Gateway addresses a
-    UC **service FQN** on /ai-gateway/mlflow/v1, with UC privileges — so the runtime can
+    UC **service FQN** on /ai-gateway/mlflow/v1, with UC privileges - so the runtime can
     change behind a stable application contract.
 
     There is no in-place rename: the new service is created alongside the old endpoint,
@@ -266,7 +266,7 @@ def t_model_services() -> TestResult:
     try:
         resp = w.api_client.do("GET", "/api/2.1/unity-catalog/model-services")
     except Exception as e:
-        return _fail("Could not list model services — Unity AI Gateway may not be enabled "
+        return _fail("Could not list model services - Unity AI Gateway may not be enabled "
                      "on this workspace.", error=str(e)[:400])
     services = [s.get("name", "").split("/", 1)[-1]
                 for s in (resp or {}).get("model_services", [])]
@@ -285,7 +285,7 @@ def t_model_services() -> TestResult:
             "model": "<catalog>.<schema>.<service>   (the FQN)",
             "authz": "USE CATALOG + USE SCHEMA + EXECUTE on the service",
         },
-        "note": "Change the base URL and the model selector TOGETHER — a new base URL with "
+        "note": "Change the base URL and the model selector TOGETHER - a new base URL with "
                 "an old endpoint name, or an FQN against the legacy path, both fail.",
     }
     if not services:
@@ -322,14 +322,14 @@ def _me_identity(w) -> str:
 def t_default_access() -> TestResult:
     """What can THIS identity reach on the provided model surface?
 
-    Provided model services are closed by default now — a model in `system.ai` is callable
+    Provided model services are closed by default now - a model in `system.ai` is callable
     only by an identity explicitly granted EXECUTE (directly, or inherited from the `system`
     catalog). So the useful question in Choice is no longer "what is everyone exposed to?" but
     "what can this caller actually reach?"
 
     Reports the EFFECTIVE permissions of the app's own service principal on `system` and
-    `system.ai` — the privileges it really holds and whether they let it call the provided
-    models — so the room sees the reach of a real, governed identity rather than a default
+    `system.ai` - the privileges it really holds and whether they let it call the provided
+    models - so the room sees the reach of a real, governed identity rather than a default
     that no longer exists. Read-only: it grants and revokes nothing.
     """
     w = get_workspace_client()
@@ -343,7 +343,7 @@ def t_default_access() -> TestResult:
             resp = w.api_client.do(
                 "GET", f"/api/2.1/unity-catalog/effective-permissions/{securable_type}/{name}",
                 query={"principal": identity})
-        except Exception as e:  # noqa: BLE001 — one unreadable securable shouldn't fail the step
+        except Exception as e:  # noqa: BLE001 - one unreadable securable shouldn't fail the step
             errors[f"{securable_type}:{name}"] = str(e)[:300]
             continue
         # effective-permissions returns privilege_assignments[].privileges[] as objects
@@ -379,7 +379,7 @@ def t_default_access() -> TestResult:
         "findings": findings,
         "errors": errors or None,
         "why_this_matters": (
-            "Provided model services are governed by EXECUTE grants — an identity can call "
+            "Provided model services are governed by EXECUTE grants - an identity can call "
             "only what it holds EXECUTE on, directly or inherited. This is exactly what this "
             "identity can reach today; anything not listed is denied to it."),
         "note": (f"Read-only. Shows the effective reach of the app's own identity ({identity}) "
@@ -392,18 +392,18 @@ def t_default_access() -> TestResult:
         if denied:
             return _todo(
                 f"Could not read effective permissions on `system` / `system.ai` for {identity} "
-                "— that read itself needs a grant. Ask an admin to confirm what this identity "
+                "- that read itself needs a grant. Ask an admin to confirm what this identity "
                 f"may call, e.g. `SHOW GRANTS TO `{identity}``.",
                 **detail)
         return _fail("Could not read effective permissions on `system` / `system.ai`.", **detail)
     if reachable:
         names = ", ".join(f["securable"] for f in reachable)
         return _ok(
-            f"This identity ({identity}) can call the provided model services in {names} — it "
+            f"This identity ({identity}) can call the provided model services in {names} - it "
             "holds EXECUTE. That is the model surface reachable by this identity today.",
             **detail)
     return _ok(
-        f"This identity ({identity}) cannot call any provided model service by default — no "
+        f"This identity ({identity}) cannot call any provided model service by default - no "
         "EXECUTE on `system` or `system.ai`. The surface is closed to it until access is "
         "explicitly granted, which is the posture you want before rollout.",
         **detail)
@@ -415,16 +415,16 @@ _BROAD_PRINCIPALS = {"users", "account users", "all users"}
 
 # UC privileges that let a principal actually CALL the model service (vs merely see it).
 _MS_CALL_PRIVILEGES = {"EXECUTE", "ALL_PRIVILEGES"}
-# The privilege that can reconfigure the service / strip its controls — the shadow risk.
+# The privilege that can reconfigure the service / strip its controls - the shadow risk.
 _MS_MANAGE_PRIVILEGES = {"MANAGE", "ALL_PRIVILEGES"}
 
 
 def t_endpoint_acl() -> TestResult:
-    """Who can call the governed model service — access control on the v3 UC plane.
+    """Who can call the governed model service - access control on the Unity Gateway model-service plane.
 
-    A v3 model service is a Unity Catalog securable, so "who may use this model?" is answered
+    A Unity Gateway model service is a Unity Catalog securable, so "who may use this model?" is answered
     by UC GRANTS on it, not a workspace endpoint ACL: EXECUTE lets a principal call it, MANAGE
-    lets them reconfigure it (the shadow-service risk — keep it with platform admins). Reads
+    lets them reconfigure it (the shadow-service risk - keep it with platform admins). Reads
     the grants on the `model_service` securable and flags a broad group holding EXECUTE/MANAGE.
     Read-only: it reports grants, it changes none.
     """
@@ -437,7 +437,7 @@ def t_endpoint_acl() -> TestResult:
             "GET", f"/api/2.1/unity-catalog/permissions/model_service/{fqn}")
     except Exception as e:
         return _todo(
-            f"Could not read grants on model service `{fqn}` — it may not exist yet, or this "
+            f"Could not read grants on model service `{fqn}` - it may not exist yet, or this "
             "identity may lack permission to read its grants. Create it (previous step), then "
             "re-run.", service=fqn, error=str(e)[:300])
 
@@ -462,7 +462,7 @@ def t_endpoint_acl() -> TestResult:
     }
     if broad:
         return _todo(
-            f"`{broad[0]['principal']}` holds {'/'.join(broad[0]['privileges'])} on `{fqn}` — "
+            f"`{broad[0]['principal']}` holds {'/'.join(broad[0]['privileges'])} on `{fqn}` - "
             "the governed model service is callable by everyone. Scope it to the pilot group.",
             **detail)
     return _ok(f"`{fqn}` grants are scoped: {len(grants)} principal(s), "
@@ -484,13 +484,13 @@ def t_routing_compare() -> TestResult:
     Runs the sample prompts against all three models, averages each model's per-request cost,
     and scales it by the configured monthly request volume. The prompts and per-model answers
     are returned so the room can read the answers, not only the prices. The smart-routing row
-    is a labelled placeholder estimate — see routing.evaluate.
+    is a labelled placeholder estimate - see routing.evaluate.
     """
     out = routing.evaluate()
     priced = [r for r in out["results"] if r.get("monthly_cost_usd") is not None]
     if not priced:
         return _fail(
-            "No model endpoint answered — check `cost.routing.endpoints` in config/workshop.yaml.",
+            "No model endpoint answered - check `cost.routing.endpoints` in config/workshop.yaml.",
             **out)
     n = out["requests_per_month"]
     fm = out.get("frontier_monthly_usd")
@@ -501,14 +501,14 @@ def t_routing_compare() -> TestResult:
     if fm is not None and sr.get("monthly_cost_usd") is not None:
         summary += f", smart routing (estimated) about ${sr['monthly_cost_usd']:,.2f}"
         if sr.get("saving_vs_frontier_pct") is not None:
-            summary += f" — roughly {sr['saving_vs_frontier_pct']}% lower"
+            summary += f" - roughly {sr['saving_vs_frontier_pct']}% lower"
     return _ok(summary + ".", **out)
 
 
 def t_routing_roi() -> TestResult:
     """Run the custom router end to end and report the measured saving vs always-frontier.
 
-    Option (c) of the three cost-routing approaches — the only one a customer can stand up
+    Option (c) of the three cost-routing approaches - the only one a customer can stand up
     today. Smart Routing (a) is Databricks-managed and in Beta; Omnigent (b) is a partner
     layer. Both are positioned in the step concept rather than executed here.
     """
@@ -520,11 +520,11 @@ def t_routing_roi() -> TestResult:
     summary = (
         f"Classified complexity {cls['complexity']}/3 → routed to {chosen['label']}. "
         f"Cost ${r['routed_cost_usd']:.6f} vs ${r['always_frontier_cost_usd']:.6f} "
-        f"always-frontier — saved {r['savings_pct']}%."
+        f"always-frontier - saved {r['savings_pct']}%."
     )
     if cls["classifier_error"]:
         summary = ("Classifier unavailable, so the router failed SAFE to the frontier model. "
-                   "No saving on this request — that is the correct behavior.")
+                   "No saving on this request - that is the correct behavior.")
     return _ok(summary, prompt=prompt, **r)
 
 
@@ -537,9 +537,9 @@ def _routing_prompt() -> str:
 
 
 def _read_service_rate_limits(w, fqn: str) -> list[dict]:
-    """Rate limits configured on a v3 model service, from its `config.rate_limits`.
+    """Rate limits configured on a Unity Gateway model service, from its `config.rate_limits`.
 
-    v3 keeps limits in the service config (no separate endpoint), each as
+    Model services keep limits in the service config (no separate endpoint), each as
     {key, renewal_period, requests?, tokens?}. Normalized here so callers render one shape.
     """
     svc = _get_model_service(w, fqn)
@@ -554,9 +554,9 @@ def _read_service_rate_limits(w, fqn: str) -> list[dict]:
 
 
 def t_rate_limits() -> TestResult:
-    """Report the rate limits configured on the governed model service (v3).
+    """Report the rate limits configured on the governed model service.
 
-    Rate limits are the *hard* cost control — budgets alert (hard blocking is still rolling
+    Rate limits are the *hard* cost control - budgets alert (hard blocking is still rolling
     out), whereas an exceeded rate limit returns HTTP 429 immediately. Read-only: limits live
     in the service's `config.rate_limits`; set them in the AI Gateway UI so the app never
     changes throughput on a customer service.
@@ -569,14 +569,14 @@ def t_rate_limits() -> TestResult:
     try:
         limits = _read_service_rate_limits(w, fqn)
     except Exception as e:
-        return _todo(f"Model service `{fqn}` not found — create it, set a rate limit, then "
+        return _todo(f"Model service `{fqn}` not found - create it, set a rate limit, then "
                      "re-run.", service=fqn, error=str(e)[:300])
     if not limits:
         return _todo(
             f"No rate limits on `{fqn}` yet. Add one in the AI Gateway UI "
             f"(config suggests {want}/user/min), then re-run.",
             service=fqn, configured_target=want,
-            note="An exceeded rate limit returns HTTP 429 — this is the hard throughput "
+            note="An exceeded rate limit returns HTTP 429 - this is the hard throughput "
                  "control, distinct from budget alerts.")
     return _ok(f"{len(limits)} rate limit(s) enforced on `{fqn}`.",
                service=fqn, rate_limits=limits, configured_target=want)
@@ -586,7 +586,7 @@ def t_gateway_spend_by_model() -> TestResult:
     """Real dollars per model from system.ai_gateway.external_model_spend.
 
     That table reports estimated USD directly (usage_unit = 'USD'), so it needs no join to
-    a price list — which is why the workshop reads it instead of the billing tables, and
+    a price list - which is why the workshop reads it instead of the billing tables, and
     why the app needs no grant on system.billing. It covers external-provider models routed
     through the Gateway: the spend a router actually shifts.
     """
@@ -600,17 +600,17 @@ def t_gateway_spend_by_model() -> TestResult:
         return _ok(f"${total:,.2f} of external-model spend across {len(rows)} model(s) (30d).",
                    rows=rows, total_usd=round(total, 2), sql=sql)
     except Exception as e:
-        return _fail("Spend query failed — system.ai_gateway.external_model_spend may not be "
+        return _fail("Spend query failed - system.ai_gateway.external_model_spend may not be "
                      "enabled on this account (Beta).", error=str(e)[:600], sql=sql)
 
 
 # --------------------------------------------------------------------------- Control
 def t_create_governed_endpoint() -> TestResult:
-    """Confirm the governed v3 model service exists (read-only; guided creation).
+    """Confirm the governed Unity Gateway model service exists (read-only; guided creation).
 
-    Checks for the model service by FQN on the v3 UC plane. The app never creates it
-    unattended on a customer workspace — creation with a base model + inference table is a
-    guided UI step — so a missing service is an action-required to-do, not a pass.
+    Checks for the model service by FQN on the Unity Gateway model-service plane. The app never creates it
+    unattended on a customer workspace - creation with a base model + inference table is a
+    guided UI step - so a missing service is an action-required to-do, not a pass.
     """
     fqn = governed_service_fqn()
     if not fqn:
@@ -621,7 +621,7 @@ def t_create_governed_endpoint() -> TestResult:
         _get_model_service(w, fqn)
     except Exception as e:
         return _todo(
-            f"Model service `{fqn}` does not exist yet — create it in front of the base model, "
+            f"Model service `{fqn}` does not exist yet - create it in front of the base model, "
             "then re-run.",
             service=fqn,
             base_model=cfg.get("base_model"),
@@ -643,7 +643,7 @@ def t_verify_governed_endpoint() -> TestResult:
     try:
         svc = _get_model_service(w, fqn)
     except Exception as e:
-        return _todo(f"Model service `{fqn}` not found — create it, then re-run.",
+        return _todo(f"Model service `{fqn}` not found - create it, then re-run.",
                      service=fqn, error=str(e)[:300])
     conf = svc.get("config", {}) or {}
     return _ok(
@@ -680,7 +680,7 @@ def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
 
     Returns {outcome, blocked, via, text, finish_reason} where outcome is one of
     'blocked' | 'answered' | 'error' | 'not_found'. A block is recognized ONLY from a 4xx
-    exception carrying guardrail wording, or a 200 whose finish_reason marks a filter — never by
+    exception carrying guardrail wording, or a 200 whose finish_reason marks a filter - never by
     guessing from refusal-sounding words in the answer text, which yields false positives.
     """
     if exc is not None:
@@ -697,7 +697,7 @@ def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
                 "text": str(exc)[:300], "finish_reason": None}
     resp = resp or {}
     # Two response shapes reach this: the OpenAI chat shape (choices[].message.content,
-    # finish_reason) and the Anthropic Messages shape (content[] blocks, stop_reason) — the
+    # finish_reason) and the Anthropic Messages shape (content[] blocks, stop_reason) - the
     # latter arrives from the provider-native path the coding-agent/path-coverage probes hit.
     # Read whichever is present; treating the anthropic shape as an empty OpenAI body would
     # misread a 200 structured refusal as "answered" and invert the path-coverage verdict.
@@ -726,9 +726,9 @@ def _classify_call(exc: Exception | None, resp: dict | None) -> dict:
 def t_test_guardrail() -> TestResult:
     """Send a prompt containing a blocked keyword to the governed model service; expect a block.
 
-    Invokes the v3 model service by FQN on the Gateway path (never the legacy
+    Invokes the Unity Gateway model service by FQN on the Gateway path (never the legacy
     `serving_endpoints.query()` invocations path), and classifies the outcome with the SAME
-    shared classifier every probe uses — a BLOCK (4xx with guardrail wording, or a 200 whose
+    shared classifier every probe uses - a BLOCK (4xx with guardrail wording, or a 200 whose
     finish_reason marks a content filter) is the pass condition; a plain answer is a real
     negative (the guardrail is not attached), and a missing service is a to-do.
     """
@@ -750,14 +750,14 @@ def t_test_guardrail() -> TestResult:
     except Exception as e:
         c = _classify_call(e, None)
     if c["outcome"] == "blocked":
-        return _ok("Guardrail fired — the request was blocked as expected.",
+        return _ok("Guardrail fired - the request was blocked as expected.",
                    service=fqn, prompt=prompt, via=c["via"], detail_text=c["text"])
     if c["outcome"] == "not_found":
-        return _todo(f"Model service `{fqn}` does not exist yet — create it, attach the "
+        return _todo(f"Model service `{fqn}` does not exist yet - create it, attach the "
                      "guardrail, then re-run.", service=fqn, error=c["text"])
     if c["outcome"] == "answered":
         return _fail(
-            "The prompt was NOT blocked — the service answered. Attach the PII/keyword "
+            "The prompt was NOT blocked - the service answered. Attach the PII/keyword "
             "guardrail policy on this service (manual step above), then re-run.",
             service=fqn, prompt=prompt, response=c["text"])
     return _fail("Could not run the guardrail test.", service=fqn, error=c["text"])
@@ -766,7 +766,7 @@ def t_test_guardrail() -> TestResult:
 def t_guardrail_activity() -> TestResult:
     """Look for blocked/filtered requests in the endpoint's inference table.
 
-    Unity AI Gateway inference tables do NOT expose a dedicated guardrail-decision column —
+    Unity AI Gateway inference tables do NOT expose a dedicated guardrail-decision column -
     the decision has to be read out of the raw request/response payloads and the status
     code. We select the audit-relevant columns and flag non-2xx rows rather than inventing a
     `guardrail_decision` column that does not exist.
@@ -787,7 +787,7 @@ def t_guardrail_activity() -> TestResult:
         return _ok(f"{len(rows)} blocked/failed request(s) logged in the inference table.",
                    rows=rows, table=table, sql=sql)
     except Exception as e:
-        return _fail("Inference table not available yet — enable payload logging on the "
+        return _fail("Inference table not available yet - enable payload logging on the "
                      "endpoint (needs an external-storage catalog) and allow up to an hour.",
                      table=table, error=str(e)[:600], sql=sql)
 
@@ -800,7 +800,7 @@ def t_create_mcp_policy() -> TestResult:
     yields VARIANT, so `event:context.tool.name` must be cast before comparing.
 
     NOTE: service policies are in Beta and can currently only be ATTACHED from the AI
-    Gateway UI — creating the function is the automatable half, attaching it is the manual
+    Gateway UI - creating the function is the automatable half, attaching it is the manual
     step that follows.
     """
     cfg = get_config()
@@ -809,7 +809,7 @@ def t_create_mcp_policy() -> TestResult:
     fn = _sql_ident(pol.get("function_name", "confluence_mcp_policy"),
                     "mcp.service_policy.function_name")
     deny = pol.get("deny_tools", []) or []
-    # Tool names are values, not identifiers — quote and escape them.
+    # Tool names are values, not identifiers - quote and escape them.
     deny_sql = ", ".join(_sql_str(d) for d in deny) or "''"
     reason = _sql_str(pol.get("deny_reason")
                       or "This tool is blocked by workshop policy.")
@@ -857,7 +857,7 @@ def t_test_mcp_policy() -> TestResult:
         deny_decision = _probe(deny_tool)
         allow_decision = _probe(allow_tool)
     except Exception as e:
-        return _fail("Could not evaluate the policy function — create it first (previous step).",
+        return _fail("Could not evaluate the policy function - create it first (previous step).",
                      function=fqn, error=str(e)[:600])
 
     detail = {
@@ -895,7 +895,7 @@ def t_apply_tags() -> TestResult:
         request_tags_header=routing.REQUEST_TAGS_HEADER,
         trust_boundary=(
             "Server-side tags are set by the platform owner on the service and apply to every "
-            "request — the only kind safe to use as a budget or chargeback filter. Request "
+            "request - the only kind safe to use as a budget or chargeback filter. Request "
             "tags are supplied by the caller and can be omitted or forged, so they are for "
             "attribution and analytics only."),
         note="Tag application is a guided step to avoid unattended writes on a customer "
@@ -913,7 +913,7 @@ def t_usage_by_project() -> TestResult:
     proj = get_config().get("project", {}).get("name", "")
     p = _sql_str(proj)
     # SQL in queries/usage_by_project.sql. It breaks out WHICH tag matched rather than OR-ing
-    # them together — the teaching point: request_tags rows are the ones this app produced by
+    # them together - the teaching point: request_tags rows are the ones this app produced by
     # sending a header, endpoint_tags rows come from the server-side tags the platform owner set;
     # a single combined count hides which mechanism is actually working. COALESCE(service_name,
     # endpoint_name) is required, not defensive: a Gateway call that names a plain ENDPOINT (what
@@ -921,7 +921,7 @@ def t_usage_by_project() -> TestResult:
     # service_name alone shows the workshop's own traffic as an unnamed bucket. Verified live.
     sql = load_query("usage_by_project", project=p)
     # How far behind real time the table is. Reported on the empty result because otherwise an
-    # ingestion lag is indistinguishable from broken tagging — observed 13-21 minutes on a
+    # ingestion lag is indistinguishable from broken tagging - observed 13-21 minutes on a
     # reference workspace, which is long enough for a room to start debugging a working control.
     watermark_sql = ("SELECT max(event_time) AS latest_event, "
                      "current_timestamp() AS now_ts FROM system.ai_gateway.usage")
@@ -934,7 +934,7 @@ def t_usage_by_project() -> TestResult:
             people = len({r.get("requester") for r in rows})
             return _ok(
                 f"Usage attributed to project `{proj}`: {people} requester(s) across "
-                f"{len(rows)} requester/target pair(s) — "
+                f"{len(rows)} requester/target pair(s) - "
                 f"{by_request} request-tagged, {by_endpoint} endpoint-tagged.",
                 rows=rows, request_tagged_calls=by_request,
                 endpoint_tagged_calls=by_endpoint,
@@ -952,7 +952,7 @@ def t_usage_by_project() -> TestResult:
             if wm:
                 freshness = {"latest_event_in_table": str(wm[0].get("latest_event")),
                              "queried_at": str(wm[0].get("now_ts"))}
-        except Exception as e:  # noqa: BLE001 — freshness is a diagnostic, not the test
+        except Exception as e:  # noqa: BLE001 - freshness is a diagnostic, not the test
             freshness = {"error": str(e)[:200]}
         return _todo(
             f"No usage tagged `project={proj}` in the last 7 days. Run the Cost routing steps "
@@ -980,7 +980,7 @@ def t_audit_scan() -> TestResult:
         rows = fetchall(sql)
         leaks = [r for r in rows if _looks_like_secret(json.dumps(r, default=str))]
         if not rows:
-            return _todo("No denied or failed calls in the last 24 hours — nothing to review "
+            return _todo("No denied or failed calls in the last 24 hours - nothing to review "
                          "yet. Trigger a blocked request, then re-run.", sql=sql)
         return _ok(f"{len(rows)} recent denied/failed call(s); {len(leaks)} with "
                    f"secret-shaped arguments.",
@@ -995,7 +995,7 @@ def _looks_like_secret(text: str) -> bool:
 
 # --------------------------------------------------------------------------- Added: 5x4-matrix coverage
 def t_list_registered_assets() -> TestResult:
-    """Inventory of agents (registered models) and UC functions (tools) — the Choice surface."""
+    """Inventory of agents (registered models) and UC functions (tools) - the Choice surface."""
     cat, sch = _fq_schema()
     w = get_workspace_client()
     agents, tools = [], []
@@ -1012,10 +1012,10 @@ def t_list_registered_assets() -> TestResult:
         tools = [f.name for f in w.functions.list(catalog_name=cat, schema_name=sch)]
     except Exception as e:
         errors["functions"] = str(e)[:300]
-    # Surface why an inventory is empty — a missing schema or a missing grant reads very
+    # Surface why an inventory is empty - a missing schema or a missing grant reads very
     # differently from "nothing registered yet", and the room needs to know which it is.
     if errors and not agents and not tools:
-        return _fail(f"Could not inventory `{cat}.{sch}` — check the schema exists and the "
+        return _fail(f"Could not inventory `{cat}.{sch}` - check the schema exists and the "
                      f"app's service principal has USE SCHEMA on it.", errors=errors)
     return _ok(
         f"{len(agents)} registered agent(s)/model(s), {len(tools)} tool function(s) "
@@ -1036,7 +1036,7 @@ def t_budget_status() -> TestResult:
         rows = fetchall(sql)
         total = sum(float(r.get("usd") or 0) for r in rows)
         if not rows:
-            return _todo("No external-model spend in the last 30 days — send traffic through "
+            return _todo("No external-model spend in the last 30 days - send traffic through "
                          "a governed external-model endpoint, then re-run.", sql=sql,
                          next="Create the budget + threshold in the account console.")
         return _ok(f"${total:,.2f} external-model spend over 30 days, across "
@@ -1046,7 +1046,7 @@ def t_budget_status() -> TestResult:
                         "are GA; hard 'block usage' caps are rolling out, so confirm "
                         "availability on this account before promising hard enforcement.")
     except Exception as e:
-        return _fail("Budget/spend query failed — system.ai_gateway.external_model_spend is "
+        return _fail("Budget/spend query failed - system.ai_gateway.external_model_spend is "
                      "Beta and may not be enabled on this account.",
                      error=str(e)[:600], sql=sql)
 
@@ -1055,7 +1055,7 @@ def t_coding_agent_usage() -> TestResult:
     """Per-developer coding-agent traffic, identified by user_agent in the Gateway log.
 
     Coding agents identify themselves in `user_agent` (claude-cli/..., ucode/... codex/...,
-    cursor/...), which works with no tagging required — the earlier tag-based approach
+    cursor/...), which works with no tagging required - the earlier tag-based approach
     returned nothing until someone remembered to tag. `requester` gives per-developer
     attribution, which is the actual governance win for this surface.
     """
@@ -1081,7 +1081,7 @@ def t_coding_agent_usage() -> TestResult:
         devs = len({r.get("requester") for r in rows})
         agents = sorted({r.get("agent") for r in rows if r.get("agent")})
         return _ok(f"{devs} developer(s) across {len(agents)} agent(s) "
-                   f"({', '.join(agents[:5])}) — all attributable per user.",
+                   f"({', '.join(agents[:5])}) - all attributable per user.",
                    rows=rows, developers=devs, agents=agents, sql=sql)
     except Exception as e:
         return _fail("Coding-agent usage query failed.", error=str(e)[:600], sql=sql)
@@ -1092,7 +1092,7 @@ def t_coding_agent_route_check() -> TestResult:
 
     The common silent failure: a client is "pointed at the gateway" but still resolves a
     legacy/provided endpoint name, so the rate limits and guardrails configured on the new UC
-    model service never apply — and nothing errors to say so. A Gateway call that names a plain
+    model service never apply - and nothing errors to say so. A Gateway call that names a plain
     ENDPOINT lands with service_name NULL; a call that names a model-service FQN lands with
     service_name set. That split between the two columns is exactly the drift signal.
     """
@@ -1111,7 +1111,7 @@ def t_coding_agent_route_check() -> TestResult:
     try:
         rows = fetchall(sql)
     except Exception as e:
-        return _fail("Route-check query failed — needs SELECT on system.ai_gateway.usage.",
+        return _fail("Route-check query failed - needs SELECT on system.ai_gateway.usage.",
                      error=str(e)[:600], sql=sql)
     if not rows:
         return _todo("No coding-agent traffic in the last 7 days. Point a coding agent at the "
@@ -1131,7 +1131,7 @@ def t_coding_agent_route_check() -> TestResult:
         "why_this_matters": (
             "Rate limits and guardrails are configured on the governed MODEL SERVICE. Traffic "
             "that resolves a plain endpoint name is on the legacy contract, so those controls "
-            "never apply to it — and nothing errors to tell you."),
+            "never apply to it - and nothing errors to tell you."),
         "sql": sql,
     }
     if on_endpoint:
@@ -1141,7 +1141,7 @@ def t_coding_agent_route_check() -> TestResult:
             "client at the model-service FQN so the governed controls apply.", **detail)
     return _ok(
         f"All coding-agent traffic is on a governed model service "
-        f"({', '.join(detail['on_model_service']['targets']) or 'model service'}) — the "
+        f"({', '.join(detail['on_model_service']['targets']) or 'model service'}) - the "
         "governed controls apply to it.", **detail)
 
 
@@ -1156,7 +1156,7 @@ def t_path_coverage_check() -> TestResult:
     Guardrails and rate limits are reliably enforced on the OpenAI-compatible chat path
     (`/ai-gateway/mlflow/v1/chat/completions`). Coding agents like Claude Code and ucode call the
     provider-native path (`/ai-gateway/anthropic/v1/messages`). Whether the same controls fire
-    there is account- and version-dependent — and a control that silently does NOT fire on the
+    there is account- and version-dependent - and a control that silently does NOT fire on the
     path a client actually uses is the most dangerous kind of gap.
 
     Probes both paths with the same guardrail-triggering prompt and compares. A diagnostic, not a
@@ -1177,7 +1177,7 @@ def t_path_coverage_check() -> TestResult:
                    **(extra_headers or {})}
         try:
             return _classify_call(None, w.api_client.do("POST", path, headers=headers, body=body))
-        except Exception as e:  # noqa: BLE001 — classify the failure, never propagate it
+        except Exception as e:  # noqa: BLE001 - classify the failure, never propagate it
             return _classify_call(e, None)
 
     chat = _probe(routing.GATEWAY_CHAT_PATH,
@@ -1193,17 +1193,17 @@ def t_path_coverage_check() -> TestResult:
         "anthropic_path": {"path": ANTHROPIC_MESSAGES_PATH, **anthropic},
         "why_this_matters": (
             "If the guardrail blocks on the chat path but the provider-native path answers, the "
-            "control does not cover the path coding agents use — a silent gap. Verify both paths "
+            "control does not cover the path coding agents use - a silent gap. Verify both paths "
             "on this account before relying on a guardrail for coding-agent traffic."),
     }
     if chat["blocked"] and anthropic["outcome"] == "answered":
         return _todo(
             "Possible silent gap: the guardrail BLOCKED on the chat path, but the "
             "provider-native (anthropic) path returned an ANSWER (no filter finish_reason). That "
-            "suggests the control does not cover the path coding agents use — confirm on this "
+            "suggests the control does not cover the path coding agents use - confirm on this "
             "account before relying on it.", **detail)
     if chat["blocked"] and anthropic["blocked"]:
-        return _ok("Guardrail fired on BOTH the chat path and the provider-native path — "
+        return _ok("Guardrail fired on BOTH the chat path and the provider-native path - "
                    "coverage is consistent.", **detail)
     if chat["outcome"] == "answered":
         return _todo(
@@ -1233,7 +1233,7 @@ def t_rate_limit_429_demo() -> TestResult:
     try:
         limits = _read_service_rate_limits(w, name)
     except Exception as e:
-        return _todo(f"Model service `{name}` not found — create it, set a low per-user rate "
+        return _todo(f"Model service `{name}` not found - create it, set a low per-user rate "
                      "limit, then re-run.", service=name, error=str(e)[:300])
 
     try:
@@ -1260,17 +1260,17 @@ def t_rate_limit_429_demo() -> TestResult:
         "service": name, "burst": burst,
         "responses": {"ok": ok, "throttled_429": throttled, "other": other},
         "configured_rate_limits": limits,
-        "deep_link": deep_links.serving_endpoint(name),
+        "deep_link": deep_links.model_service(name),
     }
     if throttled:
-        return _ok(f"Rate limit enforced — {throttled}/{burst} request(s) returned HTTP 429. "
+        return _ok(f"Rate limit enforced - {throttled}/{burst} request(s) returned HTTP 429. "
                    "This is the hard throughput control (a budget alert does not block).",
                    **detail)
     return _todo(
         f"Sent {burst} request(s) to `{name}` with no 429. Set a low per-user rate limit in the "
         "AI Gateway UI and re-run. Two things to check: rate-limit changes can take up to ~1-2 "
         "hours to take effect, and the limit must apply to THIS app's identity (its service "
-        "principal) or be endpoint-wide — a per-user limit on a different user will not trip "
+        "principal) or be endpoint-wide - a per-user limit on a different user will not trip "
         "from here.", **detail,
         note="An exceeded rate limit returns HTTP 429 immediately, distinct from a budget alert.")
 
@@ -1302,7 +1302,7 @@ def t_telemetry_readiness() -> TestResult:
     reachable = [c for c in checks if c["available"]]
     flowing = [c for c in reachable if c.get("rows_last_24h", 0) > 0]
     if not reachable:
-        return _fail("No AI telemetry tables are reachable — the app's service principal "
+        return _fail("No AI telemetry tables are reachable - the app's service principal "
                      "likely needs SELECT on the `system` schemas.", checks=checks)
     if not flowing:
         return _todo(f"{len(reachable)}/{len(checks)} telemetry table(s) reachable but none "
@@ -1314,13 +1314,13 @@ def t_telemetry_readiness() -> TestResult:
 
 # --------------------------------------------------------------------------- MCP accelerator
 # Structured on the three planes of MCP governance:
-#   Plane 1 Authenticate — the OAuth scope decides which endpoint FAMILY you reach.
-#   Plane 2 Authorize    — UC grants decide whether you can see/call a specific tool.
-#   Plane 3 Behavior     — service policies (ALLOW/DENY/ASK) on an MCP_SERVICE securable.
+#   Plane 1 Authenticate - the OAuth scope decides which endpoint FAMILY you reach.
+#   Plane 2 Authorize    - UC grants decide whether you can see/call a specific tool.
+#   Plane 3 Behavior     - service policies (ALLOW/DENY/ASK) on an MCP_SERVICE securable.
 # The managed UC-native endpoints have planes 1+2 only; MCP Services have all three. Every
 # test below says which plane it is exercising, because that distinction is the whole point.
 def t_mcp_inventory() -> TestResult:
-    """Plane 2 — every MCP_SERVICE securable on the metastore, provided and external.
+    """Plane 2 - every MCP_SERVICE securable on the metastore, provided and external.
 
     Replaces an earlier placeholder that listed serving endpoints (i.e. models), which is a
     different surface entirely and the thing reviewers rightly flagged.
@@ -1343,12 +1343,12 @@ def t_mcp_inventory() -> TestResult:
     return _ok(summary, provided=provided, external=external,
                note="Provided and external services are both MCP_SERVICE securables, so "
                     "both support service policies. The managed UC-native endpoints "
-                    "(/api/2.0/mcp/functions/...) do NOT — see the next steps.",
+                    "(/api/2.0/mcp/functions/...) do NOT - see the next steps.",
                services=svcs)
 
 
 def t_mcp_managed_tools() -> TestResult:
-    """Planes 1+2 — the managed UC-native endpoint: UC functions exposed as MCP tools.
+    """Planes 1+2 - the managed UC-native endpoint: UC functions exposed as MCP tools.
 
     Deny-by-absence at object grain: a caller without USE CATALOG + USE SCHEMA gets an
     EMPTY list, not an error. An empty result is therefore ambiguous and is reported as a
@@ -1366,19 +1366,19 @@ def t_mcp_managed_tools() -> TestResult:
     if not tools:
         return _todo(
             f"Endpoint reachable, but no tools visible in `{cat}.{sch}`. Either the schema "
-            "has no UC functions yet, or the caller lacks USE CATALOG + USE SCHEMA — "
+            "has no UC functions yet, or the caller lacks USE CATALOG + USE SCHEMA - "
             "managed MCP hides ungranted objects instead of erroring, so both look "
             "identical here. Create a UC function (the MCP policy step makes one), then re-run.",
             url=url, plane="1+2 (authenticate + authorize)")
     return _ok(f"{len(tools)} UC function(s) exposed as MCP tools from `{cat}.{sch}`.",
                url=url, tools=tools, plane="1+2 (authenticate + authorize)",
-               note="These are raw UC-native endpoints, NOT MCP_SERVICE securables — no "
+               note="These are raw UC-native endpoints, NOT MCP_SERVICE securables - no "
                     "service policy can attach here. Governance is UC grants + column "
                     "masks/ABAC on the underlying data.")
 
 
 def t_mcp_service_tools() -> TestResult:
-    """Planes 1+2 — live tools/list against the configured MCP Service.
+    """Planes 1+2 - live tools/list against the configured MCP Service.
 
     Proves the tool surface is real rather than described. Also reports whether the service
     is already filtered to read-only tools, which changes how the policy step should be
@@ -1386,7 +1386,7 @@ def t_mcp_service_tools() -> TestResult:
     """
     svc = mcp.configured_service()
     if not svc:
-        return _fail("No MCP service configured — set `mcp.builtin_service` in "
+        return _fail("No MCP service configured - set `mcp.builtin_service` in "
                      "config/workshop.yaml (e.g. system.ai.github).")
     url = mcp.service_url(svc)
     out = mcp.list_tools(url)
@@ -1394,7 +1394,7 @@ def t_mcp_service_tools() -> TestResult:
         status = out.get("http_status")
         if status == 403:
             return _todo(
-                f"`{svc}` returned 403 — the service exists but this caller is not "
+                f"`{svc}` returned 403 - the service exists but this caller is not "
                 "entitled, or per-user OAuth consent has not been completed. Open the "
                 "service in the AI Gateway UI and use Login, then re-run.",
                 service=svc, url=url, error=out["error"], plane="1 (authenticate)")
@@ -1402,7 +1402,7 @@ def t_mcp_service_tools() -> TestResult:
                      error=out["error"], plane="1+2")
     tools = out["tools"]
     if not tools:
-        return _todo(f"`{svc}` is reachable but exposed 0 tools — tool selection may "
+        return _todo(f"`{svc}` is reachable but exposed 0 tools - tool selection may "
                      "exclude everything, or consent is incomplete for this identity.",
                      service=svc, url=url, plane="1+2")
     read_only = [t["name"] for t in tools if t["read_only"]]
@@ -1412,19 +1412,19 @@ def t_mcp_service_tools() -> TestResult:
                service=svc, url=url, tools=tools, read_only=read_only,
                write_capable=writes, plane="1+2 (authenticate + authorize)",
                note=("This service is already filtered to read-only tools, so there is no "
-                     "write tool here to deny — the policy step below denies a READ tool "
+                     "write tool here to deny - the policy step below denies a READ tool "
                      "instead, which still proves enforcement."
                      if not writes else
-                     "Write-capable tools are exposed — a service policy denying them is "
+                     "Write-capable tools are exposed - a service policy denying them is "
                      "the highest-value control to demonstrate."))
 
 
 def t_mcp_grants() -> TestResult:
-    """Plane 2 — who is entitled to call the configured MCP Service.
+    """Plane 2 - who is entitled to call the configured MCP Service.
 
     The finding that matters: `system.ai` grants EXECUTE to *all account users* by default,
     so a provided service is open to the whole account until scoped. Recommended posture is
-    deny-by-absence — grant inside a customer-owned catalog rather than revoking in
+    deny-by-absence - grant inside a customer-owned catalog rather than revoking in
     `system.ai`, where a schema-level revoke may not cascade.
     """
     svc = mcp.configured_service()
@@ -1442,19 +1442,19 @@ def t_mcp_grants() -> TestResult:
               "required_to_call": "EXECUTE"}
     if broad:
         return _todo(
-            f"`{svc}` grants EXECUTE to `{broad[0]['principal']}` — every account user can "
+            f"`{svc}` grants EXECUTE to `{broad[0]['principal']}` - every account user can "
             "call it. That is the default for `system.ai`, and it is the finding to show a "
             "security team. Scope it to the pilot group before rollout.",
             **detail,
             recommendation="Prefer deny-by-absence: register the service in a "
                            "customer-owned catalog and grant EXECUTE explicitly. A "
                            "schema-level REVOKE inside system.ai may not cascade.")
-    return _ok(f"`{svc}` has {len(assignments)} scoped grant(s) — not open to all account "
+    return _ok(f"`{svc}` has {len(assignments)} scoped grant(s) - not open to all account "
                "users.", **detail)
 
 
 def t_mcp_policy_target() -> TestResult:
-    """Plane 3 — confirm the policy target is a securable a policy can actually attach to.
+    """Plane 3 - confirm the policy target is a securable a policy can actually attach to.
 
     The step that prevents the most common wasted hour: service policies attach ONLY to
     MCP_SERVICE securables. Point one at a managed UC-native endpoint and there is nothing
@@ -1471,21 +1471,21 @@ def t_mcp_policy_target() -> TestResult:
         return _fail(
             f"`{svc}` is not a registered MCP_SERVICE securable, so no service policy can "
             "attach to it. Service policies require an MCP Service (provided `system.ai.*` "
-            "or an external one you register) — the managed /api/2.0/mcp/... endpoints are "
+            "or an external one you register) - the managed /api/2.0/mcp/... endpoints are "
             "not securables.",
             configured=svc,
             available=[s["name"] for s in inv["services"]],
             plane="3 (behavior)")
-    return _ok(f"`{svc}` is an MCP_SERVICE securable — a service policy can attach to it.",
+    return _ok(f"`{svc}` is an MCP_SERVICE securable - a service policy can attach to it.",
                service=svc, securable_type=match["securable_type"],
                owner=match["owner"], plane="3 (behavior)",
                requires="EXECUTE on the policy function + MANAGE on the service",
-               note="Attachment is UI-only in the current Beta — there is no "
+               note="Attachment is UI-only in the current Beta - there is no "
                     "ALTER ... SET SERVICE POLICY DDL or control-API path yet.")
 
 
 def t_mcp_obo() -> TestResult:
-    """Plane 2 — prove on-behalf-of: the tool runs as the CALLER, not a shared account.
+    """Plane 2 - prove on-behalf-of: the tool runs as the CALLER, not a shared account.
 
     Calls a read tool that echoes the upstream identity, so the room sees a real name come
     back rather than taking OBO on faith. This is the single most persuasive MCP demo: if
@@ -1494,7 +1494,7 @@ def t_mcp_obo() -> TestResult:
     OBO is real only when the app has the signed-in user's forwarded token for this request
     (Databricks Apps user authorization, `user_api_scopes` in databricks.yml). When it does,
     the MCP call authenticates AS the user; when it does not (local dev, or scopes not
-    consented), it falls back to the app service principal — and this step says which, rather
+    consented), it falls back to the app service principal - and this step says which, rather
     than claiming OBO it did not perform.
     """
     obo = has_user_token()
@@ -1504,7 +1504,7 @@ def t_mcp_obo() -> TestResult:
              or {}).get("identity_probe_tool")
     listed = mcp.list_tools(url)
     if not listed["ok"]:
-        return _todo(f"Cannot reach `{svc}` to prove OBO — resolve the previous step first.",
+        return _todo(f"Cannot reach `{svc}` to prove OBO - resolve the previous step first.",
                      service=svc, error=listed["error"])
     names = [t["name"] for t in listed["tools"]]
     # Prefer a configured probe; otherwise any "who am I" style read tool.
@@ -1520,20 +1520,20 @@ def t_mcp_obo() -> TestResult:
             service=svc, available_tools=names[:20], ran_as="user" if obo else "app service principal")
     out = mcp.call_tool(url, tool)
     if not out["ok"]:
-        return _fail(f"`{tool}` failed — cannot demonstrate OBO.", service=svc,
+        return _fail(f"`{tool}` failed - cannot demonstrate OBO.", service=svc,
                      tool=tool, error=out["error"])
     text = json.dumps(out["result"])[:600]
     if not obo:
         # Honest fallback: the call succeeded but ran as the app SP, so it does NOT prove OBO.
         # Aligns with docs/APIS_AND_SETUP.md: a green check here must not be read as OBO.
         return _todo(
-            f"`{tool}` ran as the app service principal, NOT the signed-in user — this "
+            f"`{tool}` ran as the app service principal, NOT the signed-in user - this "
             "deployment has no forwarded user token (enable user authorization / "
             "`user_api_scopes`, or run `accelerators/mcp-servers/managed_mcp.py`, which runs "
             "as the user). So this is not yet proof of on-behalf-of.",
             service=svc, tool=tool, ran_as="app service principal",
             upstream_identity_excerpt=text)
-    return _ok(f"`{tool}` executed as the calling user (forwarded user token) — identity "
+    return _ok(f"`{tool}` executed as the calling user (forwarded user token) - identity "
                "propagated to the upstream provider, no shared service account.",
                service=svc, tool=tool, plane="2 (authorize, on-behalf-of)", ran_as="user",
                upstream_identity_excerpt=text,
@@ -1543,10 +1543,10 @@ def t_mcp_obo() -> TestResult:
 
 
 def t_mcp_policy_enforcement() -> TestResult:
-    """Plane 3 — evaluate the policy function against synthetic events, then explain scope.
+    """Plane 3 - evaluate the policy function against synthetic events, then explain scope.
 
     Policy LOGIC is verifiable here (the function is a UC SQL UDF we can call directly).
-    ENFORCEMENT requires the policy to be attached, which is UI-only in Beta — so this
+    ENFORCEMENT requires the policy to be attached, which is UI-only in Beta - so this
     reports logic plus the exact remaining manual step rather than implying end-to-end proof.
     """
     cfg = get_config()
@@ -1575,7 +1575,7 @@ def t_mcp_policy_enforcement() -> TestResult:
     try:
         denied, allowed = probe(deny_tool), probe(allow_tool)
     except Exception as e:
-        return _todo("Policy function does not exist yet — create it in the previous step.",
+        return _todo("Policy function does not exist yet - create it in the previous step.",
                      function=fqn, error=str(e)[:400])
 
     svc = mcp.configured_service()
@@ -1599,7 +1599,7 @@ def t_mcp_policy_enforcement() -> TestResult:
 
 
 def t_mcp_external_readiness() -> TestResult:
-    """Plane 1 — prerequisites for registering an EXTERNAL/custom MCP server.
+    """Plane 1 - prerequisites for registering an EXTERNAL/custom MCP server.
 
     Reports the HTTP connections that exist (external MCP is registered behind one) and the
     registration sequence. Read-only: creating a connection needs customer-specific
@@ -1623,7 +1623,7 @@ def t_mcp_external_readiness() -> TestResult:
         "Register MCP Server) and select which tools to expose.",
         "3. Complete per-user OAuth consent on the service page (Login).",
         "4. GRANT EXECUTE on the mcp_service to the pilot group. Do NOT grant "
-        "USE CONNECTION to end users — it bypasses tool selection and auditing.",
+        "USE CONNECTION to end users - it bypasses tool selection and auditing.",
         "5. Invoke at /ai-gateway/mcp-services/{catalog}.{schema}.{name}.",
     ]
     if external:
@@ -1631,7 +1631,7 @@ def t_mcp_external_readiness() -> TestResult:
                    external_services=external, http_connections=conns,
                    plane="1 (authenticate)", registration_steps=steps)
     return _todo(
-        "No external MCP services registered yet — this is the step that unlocks service "
+        "No external MCP services registered yet - this is the step that unlocks service "
         "policies for a customer not yet using Databricks-hosted MCP.",
         http_connections=conns, registration_steps=steps, plane="1 (authenticate)",
         gotcha="Self-hosted servers must be STATELESS (e.g. FastMCP stateless_http=True). "
@@ -1641,11 +1641,11 @@ def t_mcp_external_readiness() -> TestResult:
 
 
 def t_mcp_telemetry() -> TestResult:
-    """Telemetry — MCP call records in the Gateway usage table.
+    """Telemetry - MCP call records in the Gateway usage table.
 
     Sits across the planes rather than in one. Managed UC-native endpoints write NO
     MCP-specific telemetry; MCP Services write a usage row and an mcpCall audit row (no
-    payloads — MCP payload logging is not in Beta).
+    payloads - MCP payload logging is not in Beta).
     """
     sql = """
       SELECT service_name, requester,
@@ -1660,23 +1660,23 @@ def t_mcp_telemetry() -> TestResult:
     try:
         rows = fetchall(sql)
     except Exception as e:
-        return _fail("MCP telemetry query failed — needs SELECT on system.ai_gateway.",
+        return _fail("MCP telemetry query failed - needs SELECT on system.ai_gateway.",
                      error=str(e)[:500], sql=sql)
     if not rows:
         return _todo(
             "No MCP_SERVICE calls in the last 7 days. Call a tool (previous steps), then "
-            "re-run — records can lag a few minutes.", sql=sql,
+            "re-run - records can lag a few minutes.", sql=sql,
             note="Managed UC-native endpoints (/api/2.0/mcp/...) write no MCP-specific "
                  "telemetry at all, so only MCP Service traffic appears here.")
     return _ok(f"{len(rows)} requester/service pair(s) with MCP calls in the last 7 days.",
                rows=rows, sql=sql,
                note="Identity, service, and tool are recorded; ARGUMENTS AND RESULTS ARE "
-                    "NOT — MCP payload logging is not in the current Beta. Say this "
+                    "NOT - MCP payload logging is not in the current Beta. Say this "
                     "plainly if a customer asks about full request/response capture.")
 
 
 def t_mcp_readonly_enforcement() -> TestResult:
-    """Read-only enforcement — keep coding-agent users to read tools while humans keep write.
+    """Read-only enforcement - keep coding-agent users to read tools while humans keep write.
 
     The most-requested MCP control. How it is enforced depends on the MCP kind, and that
     distinction is the whole point:
@@ -1684,7 +1684,7 @@ def t_mcp_readonly_enforcement() -> TestResult:
         that DENIES the write tools, and never grant `USE CONNECTION` to end users (it bypasses
         tool selection, so a user could call a denied tool directly).
       - **Managed UC-native endpoint** (DBSQL / Genie functions): NOT a securable, so no service
-        policy can attach — read-only is enforced by exposing only read functions and by the UC
+        policy can attach - read-only is enforced by exposing only read functions and by the UC
         grants on them.
 
     This classifies the configured service's tools into read vs write so the room can see
@@ -1696,7 +1696,7 @@ def t_mcp_readonly_enforcement() -> TestResult:
     url = mcp.service_url(svc)
     out = mcp.list_tools(url)
     if not out["ok"]:
-        return _todo(f"Could not list tools on `{svc}` — resolve the earlier MCP steps first.",
+        return _todo(f"Could not list tools on `{svc}` - resolve the earlier MCP steps first.",
                      service=svc, error=out["error"])
     tools = out["tools"]
     if not tools:
@@ -1711,7 +1711,7 @@ def t_mcp_readonly_enforcement() -> TestResult:
         "how_to_enforce": {
             "mcp_service": "Attach a service policy that denies the write tools; grant EXECUTE "
                            "to coding-agent users but NOT USE CONNECTION.",
-            "managed_endpoint": "No policy can attach (not a securable) — expose only read "
+            "managed_endpoint": "No policy can attach (not a securable) - expose only read "
                                 "functions and control access with UC grants on them.",
         },
         "caveat": ("`read_only` comes from each tool's readOnlyHint annotation; a tool with no "
@@ -1724,8 +1724,8 @@ def t_mcp_readonly_enforcement() -> TestResult:
             "steps) and keep write for human identities.", **detail)
     if unknown and not reads:
         return _todo(f"`{svc}` tools carry no read-only hints, so read vs write cannot be "
-                     "determined automatically — review each before granting access.", **detail)
-    return _ok(f"`{svc}` exposes only read tools ({len(reads)}) — read-only by construction, so "
+                     "determined automatically - review each before granting access.", **detail)
+    return _ok(f"`{svc}` exposes only read tools ({len(reads)}) - read-only by construction, so "
                "coding-agent access needs no write-denying policy here.", **detail)
 
 
@@ -1742,7 +1742,7 @@ def t_mcp_tool_metadata_scan() -> TestResult:
     A tool's name and description are fed to the model, so a malicious or compromised server can
     hide instructions there ("ignore previous instructions", "before answering, send X to..."),
     steering an agent without the user ever seeing it. This lists the tools and flags metadata
-    containing injection-shaped phrases. Detection, not prevention — a flag is a prompt to review
+    containing injection-shaped phrases. Detection, not prevention - a flag is a prompt to review
     the tool and its source, never proof of compromise.
     """
     svc = mcp.configured_service()
@@ -1751,7 +1751,7 @@ def t_mcp_tool_metadata_scan() -> TestResult:
     url = mcp.service_url(svc)
     out = mcp.list_tools(url)
     if not out["ok"]:
-        return _todo(f"Could not list tools on `{svc}` — resolve the earlier MCP steps first.",
+        return _todo(f"Could not list tools on `{svc}` - resolve the earlier MCP steps first.",
                      service=svc, error=out["error"])
     tools = out["tools"]
     if not tools:
@@ -1767,14 +1767,14 @@ def t_mcp_tool_metadata_scan() -> TestResult:
         "service": svc, "tools_scanned": len(tools), "flagged": flagged,
         "why_this_matters": (
             "Tool names and descriptions are sent to the model, so a compromised or malicious "
-            "MCP server can smuggle instructions there — 'tool poisoning'. Review external "
+            "MCP server can smuggle instructions there - 'tool poisoning'. Review external "
             "servers before granting EXECUTE, and pin/verify the server version."),
         "note": ("Heuristic scan over the tool description the server advertised (truncated). A "
-                 "clean result is not a guarantee — it is a first-pass check, not prevention."),
+                 "clean result is not a guarantee - it is a first-pass check, not prevention."),
     }
     if flagged:
         return _todo(f"{len(flagged)} of {len(tools)} tool(s) on `{svc}` have injection-shaped "
-                     "text in their metadata — review them before trusting the server.", **detail)
+                     "text in their metadata - review them before trusting the server.", **detail)
     return _ok(f"No injection-shaped phrases found in the {len(tools)} tool description(s) on "
                f"`{svc}`. Still verify external servers and pin their versions.", **detail)
 
@@ -1792,7 +1792,7 @@ def t_external_provider_routing() -> TestResult:
             external.append(e.name)
     summary = (f"{len(external)} endpoint(s) look like external-provider routes, of "
                f"{len(all_names)} total." if external
-               else "No external-provider-shaped endpoints found — add one behind a governed "
+               else "No external-provider-shaped endpoints found - add one behind a governed "
                     "endpoint to route Bedrock/OpenAI/Anthropic through the Gateway.")
     return _ok(summary, external_like=external[:25], total_endpoints=len(all_names))
 
@@ -1877,7 +1877,7 @@ def t_provider_secret_readiness() -> TestResult:
         "scan_truncated": (f"stopped after {SCAN_CAP} endpoints" if truncated else False),
         "how_to": ("databricks secrets create-scope <scope>; databricks secrets put-secret "
                    "<scope> <key>; reference it as {{secrets/<scope>/<key>}} in the endpoint."),
-        "note": ("A read never returns the key value — a reference shows as {{secrets/...}}. "
+        "note": ("A read never returns the key value - a reference shows as {{secrets/...}}. "
                  "Where a reference is not visible, confirm the key was supplied as a secret "
                  "reference rather than pasted in."),
     }
@@ -1888,7 +1888,7 @@ def t_provider_secret_readiness() -> TestResult:
     unconfirmed = [x for x in external if not x["api_key_is_secret_reference"]]
     if unconfirmed:
         return _todo(f"{len(external)} external-model endpoint(s); {len(unconfirmed)} without a "
-                     "visible secret reference for the provider key — confirm each was supplied "
+                     "visible secret reference for the provider key - confirm each was supplied "
                      "as {{secrets/...}}.", **detail)
     return _ok(f"{len(external)} external-model endpoint(s), all referencing a secret for the "
                f"provider key; {len(scopes)} secret scope(s) present.", **detail)
@@ -1898,7 +1898,7 @@ def t_workspace_binding_check() -> TestResult:
     """Is the catalog of approved models bound ISOLATED, or open to every workspace?
 
     Without `isolation_mode = ISOLATED` plus explicit workspace bindings, "approved models" is
-    advisory — any workspace on the metastore can bind the catalog and use what is in it. Reports
+    advisory - any workspace on the metastore can bind the catalog and use what is in it. Reports
     the configured catalog's isolation mode and, when ISOLATED, its bindings. Read-only.
     """
     catalog = get_config().get("catalog", {}).get("name")
@@ -1922,18 +1922,18 @@ def t_workspace_binding_check() -> TestResult:
     detail = {"catalog": catalog, "isolation_mode": mode or "OPEN",
               "workspace_bindings": bindings,
               "why_this_matters": ("ISOLATED + explicit bindings is what makes approved-model "
-                    "access enforceable — otherwise any workspace on the metastore can bind the "
+                    "access enforceable - otherwise any workspace on the metastore can bind the "
                     "catalog and use what is in it.")}
     if isolated:
-        return _ok(f"`{catalog}` is ISOLATED and bound to {len(bindings)} workspace(s) — access "
+        return _ok(f"`{catalog}` is ISOLATED and bound to {len(bindings)} workspace(s) - access "
                    "is enforced, not advisory.", **detail)
-    return _todo(f"`{catalog}` isolation is `{mode or 'OPEN'}` — open to every workspace on the "
+    return _todo(f"`{catalog}` isolation is `{mode or 'OPEN'}` - open to every workspace on the "
                  "metastore. Set isolation_mode=ISOLATED and bind the workspaces that may use it "
                  "to make approved-model access enforceable.", **detail)
 
 
 def t_agent_versions() -> TestResult:
-    """A registered agent should be versioned and owned — not a one-off deploy.
+    """A registered agent should be versioned and owned - not a one-off deploy.
 
     Lists the registered models (agents) in the workshop schema with their version count and
     owner. The pattern to repeat across the fleet: every agent is a UC model with an owner and a
@@ -1970,7 +1970,7 @@ def t_agent_sp_attribution() -> TestResult:
     """The agent-identity gap: do custom agent endpoints carry limits, guardrails, usage tracking?
 
     Custom agent endpoints deployed on the gateway may lack the AI Gateway controls a model
-    endpoint has — rate limits, guardrails, usage tracking — and an agent's service principal may
+    endpoint has - rate limits, guardrails, usage tracking - and an agent's service principal may
     not even be selectable in the rate-limit UI. Inspects agent-like serving endpoints (matched
     by name) and reports which controls each has configured. Never raises.
     """
@@ -1997,9 +1997,9 @@ def t_agent_sp_attribution() -> TestResult:
         return _fail("Could not inspect serving endpoints.", error=str(e)[:300])
     detail = {
         "agent_like_endpoints": rows,
-        "why_this_matters": ("Where a control is missing, that agent's traffic is ungoverned — "
+        "why_this_matters": ("Where a control is missing, that agent's traffic is ungoverned - "
                              "no per-user limit, no guardrail, no attribution."),
-        "note": ("Matched by name (agent/assistant/bot/rag/chain) — adjust for your naming. An "
+        "note": ("Matched by name (agent/assistant/bot/rag/chain) - adjust for your naming. An "
                  "agent's service principal may also not be selectable in the rate-limit UI yet."),
     }
     if not rows:
@@ -2009,7 +2009,7 @@ def t_agent_sp_attribution() -> TestResult:
     gaps = [r for r in rows if not (r["usage_tracking"] and r["rate_limits"])]
     if gaps:
         return _todo(f"{len(gaps)}/{len(rows)} agent-like endpoint(s) are missing rate limits "
-                     "and/or usage tracking — that traffic is not fully governed.", **detail)
+                     "and/or usage tracking - that traffic is not fully governed.", **detail)
     return _ok(f"All {len(rows)} agent-like endpoint(s) have usage tracking and rate limits "
                "configured.", **detail)
 
@@ -2042,11 +2042,11 @@ def t_pii_safety_readiness() -> TestResult:
     if not have_payloads:
         # The judge scores request/response payloads. Without the inference table there is
         # nothing to score, so the audit log alone is not "ready".
-        return _todo("The inference table is not available yet — a PII-leakage judge needs "
+        return _todo("The inference table is not available yet - a PII-leakage judge needs "
                      "request/response payloads to score. Enable payload logging on the "
                      "governed endpoint (needs an external-storage catalog), then re-run.",
                      checks=checks, inference_table=table)
-    return _ok("Payload logging is available — ready for the PII-leakage judge and red-team "
+    return _ok("Payload logging is available - ready for the PII-leakage judge and red-team "
                "review.", checks=checks, inference_table=table)
 
 
@@ -2057,7 +2057,7 @@ def t_pii_mask_vs_block() -> TestResult:
       - block:       the request is refused (BLOCK mode)
       - mask:        the model answers but the SSN is redacted/absent (MASK mode)
       - passthrough: the SSN comes back intact (no PII guardrail on this path)
-    MASK is the more common production choice — it lets a benign request through with PII removed
+    MASK is the more common production choice - it lets a benign request through with PII removed
     rather than failing it. Never raises.
     """
     cfg = get_config().get("governed_endpoint", {})
@@ -2078,37 +2078,37 @@ def t_pii_mask_vs_block() -> TestResult:
     detail = {"endpoint": name, "prompt": prompt, "response_excerpt": r["text"],
               "finish_reason": r.get("finish_reason")}
     if r["outcome"] == "not_found":
-        return _todo(f"Endpoint `{name}` not found — create it, attach a PII guardrail, then "
+        return _todo(f"Endpoint `{name}` not found - create it, attach a PII guardrail, then "
                      "re-run.", endpoint=name, error=r["text"])
     if r["outcome"] == "error":
         return _fail("Could not run the PII probe.", endpoint=name, error=r["text"])
     if r["blocked"]:
-        return _ok("PII guardrail is in BLOCK mode — the request was refused. Consider MASK for "
+        return _ok("PII guardrail is in BLOCK mode - the request was refused. Consider MASK for "
                    "production: it lets a benign request through with the PII removed rather than "
                    "failing it.", mode="block", **detail)
     # Answered on HTTP 200. Only three things are certain enough to report as a pass or a fail:
     if re.search(r"\d{3}-\d{2}-\d{4}", r["text"]):
-        return _todo("The SSN came back INTACT — no PII masking on this path. Attach a PII "
+        return _todo("The SSN came back INTACT - no PII masking on this path. Attach a PII "
                      "guardrail (MASK or BLOCK) on the endpoint and re-run.",
                      mode="passthrough", **detail)
     # MASK is inferred only from an explicit redaction word/token or a masked-SSN shape
-    # (e.g. XXX-XX-XXXX, ***-**-****, XXX-XX-6789) — never from bare `***`/`xxxx`/`###`, which
+    # (e.g. XXX-XX-XXXX, ***-**-****, XXX-XX-6789) - never from bare `***`/`xxxx`/`###`, which
     # are common markdown/filler and would falsely report MASK when no PII guardrail is set.
     if re.search(r"(?i)\bredact(ed|ion)?\b|\bmask(ed|ing)?\b|\[(redacted|pii|ssn|removed|masked)\]"
                  r"|[X*#]{3}[- ]?[X*#]{2}[- ]?[X*#\d]{2,4}",
                  r["text"]):
-        return _ok("PII guardrail appears to be in MASK mode — the answer came back with the SSN "
+        return _ok("PII guardrail appears to be in MASK mode - the answer came back with the SSN "
                    "redacted. Confirm the mask configuration on the endpoint.", mode="mask",
                    **detail)
     return _todo("The answer came back on HTTP 200 without the SSN and without an obvious "
                  "redaction marker. This may be MASK, or the model simply declined to echo the "
-                 "SSN — confirm the PII guardrail (mask vs block) is configured on the endpoint "
+                 "SSN - confirm the PII guardrail (mask vs block) is configured on the endpoint "
                  "rather than inferring it from the model's behavior.", mode="inconclusive",
                  **detail)
 
 
 def t_guardrail_block_shape() -> TestResult:
-    """How is a block delivered — a 4xx error, or HTTP 200 with a refusal reason?
+    """How is a block delivered - a 4xx error, or HTTP 200 with a refusal reason?
 
     This matters for coding agents: they resend conversation history, so a 4xx block on one turn
     can re-trigger on every later benign turn ("sticky block") until a new session starts. The
@@ -2137,7 +2137,7 @@ def t_guardrail_block_shape() -> TestResult:
     detail = {"endpoint": name, "prompt": prompt, "response_excerpt": r["text"],
               "finish_reason": r.get("finish_reason"), "note": note}
     if r["outcome"] == "not_found":
-        return _todo(f"Endpoint `{name}` not found — create it, attach a guardrail, re-run.",
+        return _todo(f"Endpoint `{name}` not found - create it, attach a guardrail, re-run.",
                      endpoint=name, error=r["text"])
     if r["outcome"] == "error":
         return _fail("Could not run the block-shape probe.", endpoint=name, error=r["text"])
@@ -2145,11 +2145,11 @@ def t_guardrail_block_shape() -> TestResult:
         return _todo(
             "Block delivered as a 4xx ERROR. Coding agents resend history, so a 4xx block can "
             "'stick' across a session until a new one starts. If your account has the rolling "
-            "fix, blocks return HTTP 200 with a reason instead — confirm which behavior you have.",
+            "fix, blocks return HTTP 200 with a reason instead - confirm which behavior you have.",
             shape="4xx_error", **detail)
     if r["blocked"] and r["via"] == "http_200":
         return _ok("Block delivered as HTTP 200 with a structured reason "
-                   f"(finish_reason={r.get('finish_reason')}) — the client-friendly shape. A "
+                   f"(finish_reason={r.get('finish_reason')}) - the client-friendly shape. A "
                    "coding agent can continue the session rather than getting stuck on a sticky "
                    "4xx.", shape="200_with_reason", **detail)
     return _todo("The prompt was NOT blocked (a normal answer on HTTP 200 with no filter "
@@ -2158,12 +2158,12 @@ def t_guardrail_block_shape() -> TestResult:
 
 
 def t_use_open_weight_model() -> TestResult:
-    """Prove an open-weight model runs as a v3 UC model service on the same control plane.
+    """Prove an open-weight model runs as a Unity Gateway model service on the same control plane.
 
     Choice is not a single-vendor bet. Proprietary frontier models (Claude, GPT) and open-weight
-    ones (GLM, GPT-OSS, DeepSeek, Llama) are addressed identically through the Gateway — a Unity
-    Catalog model-service name (`catalog.schema.service`) on the v3 path, same grants, same
-    request-tag attribution. This calls the configured open-weight model service over that v3 path
+    ones (GLM, GPT-OSS, DeepSeek, Llama) are addressed identically through the Gateway - a Unity
+    Catalog model-service name (`catalog.schema.service`) on the Unity Gateway path, same grants, same
+    request-tag attribution. This calls the configured open-weight model service over that Unity Gateway path
     and shows it answered, tagged like any proprietary model. The model service is set by
     `gateway.open_weight_model_service` in config/workshop.yaml (default system.ai.glm-5-3-flash).
     """
@@ -2171,13 +2171,13 @@ def t_use_open_weight_model() -> TestResult:
         or "system.ai.glm-5-3-flash"
     prompt = "In one sentence, what is a model serving endpoint?"
     # GLM (and other reasoning models) spend tokens on hidden reasoning before the answer, so give
-    # the budget room — too small a max_tokens returns usage but empty content.
+    # the budget room - too small a max_tokens returns usage but empty content.
     r = routing.invoke_model(svc, prompt, max_tokens=512,
                              extra_tags={"task": "open_weight_probe"}, label=svc)
     if r["error"]:
         return _fail(
-            f"The open-weight model service `{svc}` did not answer over the governed v3 gateway "
-            "path — check it exists (GET /api/2.1/unity-catalog/model-services) and this identity "
+            f"The open-weight model service `{svc}` did not answer over the governed Unity Gateway "
+            "path - check it exists (GET /api/2.1/unity-catalog/model-services) and this identity "
             "has EXECUTE on it.", error=r["error"], model_service=svc, path_version=r["path_version"])
     if not (r["answer"] or "").strip():
         return _todo(
@@ -2187,21 +2187,21 @@ def t_use_open_weight_model() -> TestResult:
     return _ok(
         f"Open-weight model service `{svc}` answered over the governed "
         f"{r['path_version']} Gateway path in {r['duration_s']}s "
-        f"({r['input_tokens']}+{r['output_tokens']} tokens) — addressed as a Unity Catalog model "
+        f"({r['input_tokens']}+{r['output_tokens']} tokens) - addressed as a Unity Catalog model "
         "service, the same contract, grants, and request-tag attribution a proprietary model uses.",
         model_service=svc, path_version=r["path_version"], answer=r["answer"],
         input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
         duration_s=r["duration_s"], request_tags=r["request_tags"],
         gateway_path=routing.GATEWAY_CHAT_PATH,
         interpretation=(
-            "An open-weight model (GLM) is governed identically to Claude or GPT: same v3 UC "
-            "model-service contract, same gateway path, same attribution. Model choice — "
-            "proprietary or open weight — is a config change, never a re-platforming or a "
+            "An open-weight model (GLM) is governed identically to Claude or GPT: same Unity Catalog "
+            "model-service contract, same gateway path, same attribution. Model choice - "
+            "proprietary or open weight - is a config change, never a re-platforming or a "
             "single-vendor lock-in."))
 
 
 def t_cost_task_usage() -> TestResult:
-    """Link AI-completed tasks to token spend, by model — the most efficient model per task.
+    """Link AI-completed tasks to token spend, by model - the most efficient model per task.
 
     Where cost_usage attributes spend to a team/tag ("who spent"), this slices the same
     system.ai_gateway.usage telemetry by the `task` request tag the routing steps stamp on every
@@ -2221,7 +2221,7 @@ def t_cost_task_usage() -> TestResult:
             tasks = {r.get("task") for r in rows}
             models_seen = {r.get("model") for r in rows}
             # "Most efficient model" is only a meaningful comparison for a task that ran against
-            # MORE THAN ONE model — e.g. the routing tasks, which send every prompt to every tier.
+            # MORE THAN ONE model - e.g. the routing tasks, which send every prompt to every tier.
             # Single-model tasks (an ad-hoc route, the open-weight probe) would trivially "win"
             # with their one model, so exclude them rather than present a non-comparison as a
             # verdict. Per qualifying task, the lowest average-tokens row is the cheapest model.
@@ -2246,7 +2246,7 @@ def t_cost_task_usage() -> TestResult:
                 interpretation=(
                     "For a task that ran against multiple models (the routing tasks send every "
                     "prompt to every tier), the lowest average-tokens row is the cheapest model "
-                    "that did that work — read it alongside the answers from Cost → Project "
+                    "that did that work - read it alongside the answers from Cost → Project "
                     "routing savings to weigh cost against quality. Single-model tasks are "
                     "attributed but omitted from the comparison. Token counts are exact; convert "
                     "to dollars with your negotiated rate."),
@@ -2259,11 +2259,11 @@ def t_cost_task_usage() -> TestResult:
             if wm:
                 freshness = {"latest_event_in_table": str(wm[0].get("latest_event")),
                              "queried_at": str(wm[0].get("now_ts"))}
-        except Exception as e:  # noqa: BLE001 — freshness is a diagnostic, not the test
+        except Exception as e:  # noqa: BLE001 - freshness is a diagnostic, not the test
             freshness = {"error": str(e)[:200]}
         return _todo(
             "No task-tagged usage in the last 7 days. Run the Cost routing steps (they stamp a "
-            "`task` tag on every model call), then re-run — allow for ingestion lag.",
+            "`task` tag on every model call), then re-run - allow for ingestion lag.",
             rows=[], table_freshness=freshness,
             lag_note=("system.ai_gateway.usage is not real-time (a 13-21 minute lag was observed "
                       "on a reference workspace). If the gap covers when the routing steps ran, "

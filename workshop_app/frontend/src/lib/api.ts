@@ -13,14 +13,14 @@ export interface Step {
   title: string;
   /** One-line "We can …" outcome statement shown under the title. */
   outcome?: string;
-  /** Preview outcome — shown with a "Coming soon" badge, no Try-It yet. */
+  /** Preview outcome - shown with a "Coming soon" badge, no Try-It yet. */
   coming_soon?: boolean;
   concept?: string;
-  /** Key of a diagram to render under the concept — see VISUALS in StepCard. */
+  /** Key of a diagram to render under the concept - see VISUALS in StepCard. */
   visual?: string;
   /** Ids of steps that must be `done` before this one is meaningful (e.g. the governed
    *  endpoint must exist before its rate limits can be read). Surfaced as a warn-but-allow
-   *  banner — never a hard block — so a room that set something up out-of-band is never trapped. */
+   *  banner - never a hard block - so a room that set something up out-of-band is never trapped. */
   depends_on?: string[];
   action?: StepAction;
   verify?: StepAction;
@@ -78,17 +78,18 @@ export type ProgressMap = Record<
   }
 >;
 
-/** Resolve a step's effective outcome from its saved record. A step is `done` if the Try-It
- *  test passed OR it was hand-marked done; `na` drops it from completion counts. */
+/** Resolve a step's effective outcome from its saved record. A step is `done` only when it was
+ *  hand-marked done (never auto-marked from a passing Try-It); `na` drops it from completion
+ *  counts. `status` still reflects the last Try-It result for the result badge, separately. */
 export function stepOutcome(saved: ProgressMap[string] | null | undefined) {
   const status = saved?.status ?? "not_started";
   const outcome = saved?.outcome ?? null;
   const poc = !!saved?.poc;
-  return { status, outcome, poc, done: outcome === "done" || status === "done", na: outcome === "na" };
+  return { status, outcome, poc, done: outcome === "done", na: outcome === "na" };
 }
 
 /** A step's unmet dependencies: the `depends_on` ids that are not yet achieved. A dependency
- *  counts as met only when it is `done` (its Try-It passed or it was hand-marked done) — an
+ *  counts as met only when it is `done` (its Try-It passed or it was hand-marked done) - an
  *  `action_required` prerequisite (e.g. the endpoint still needs creating) is deliberately still
  *  unmet, since that is exactly the setup this step needs. Returns [{id, title}] for the banner. */
 export function unmetDependencies(
@@ -131,7 +132,7 @@ export interface PrereqItem {
   who?: string;
   /** Only needed for a specific scope (a named accelerator, external providers, …). */
   optional?: boolean;
-  /** Hard blocker — the workshop cannot run until this is met. */
+  /** Hard blocker - the workshop cannot run until this is met. */
   blocker?: boolean;
 }
 export interface PrereqGroup {
@@ -146,7 +147,7 @@ export interface Prerequisites {
   groups: PrereqGroup[];
   /** Shareable Google Doc generated from the same prerequisites.yaml (kept in sync). */
   google_doc_url?: string | null;
-  /** False when reportlab is missing from the deployment — hide the PDF button rather than 503. */
+  /** False when reportlab is missing from the deployment - hide the PDF button rather than 503. */
   pdf_available: boolean;
   pdf_unavailable_reason?: string | null;
 }
@@ -174,7 +175,7 @@ export const api = {
       body: JSON.stringify(body),
     }).then((r) => j<{ ok: boolean }>(r)),
 
-  // Clear ALL workshop progress so the room can start fresh. Cannot be undone — export first.
+  // Clear ALL workshop progress so the room can start fresh. Cannot be undone - export first.
   resetProgress: () =>
     fetch("/api/progress/reset", {
       method: "POST",
@@ -198,7 +199,7 @@ export const api = {
 
   prerequisites: () => fetch("/api/prerequisites").then((r) => j<Prerequisites>(r)),
 
-  // Export — the URLs the browser downloads (outcomes JSON + Markdown report).
+  // Export - the URLs the browser downloads (outcomes JSON + Markdown report).
   exportUrl: (kind: "outcomes" | "report") => `/api/export/${kind}`,
 
   // PDFs are generated server-side and set their own Content-Disposition filename, so these
@@ -207,7 +208,7 @@ export const api = {
   prerequisitesPdfUrl: (customerName?: string) =>
     "/api/export/prerequisites.pdf" +
     (customerName ? `?${new URLSearchParams({ customer_name: customerName }).toString()}` : ""),
-  // The one-page workshop brochure — a leave-ahead to book the session. No account needed.
+  // The one-page workshop brochure - a leave-ahead to book the session. No account needed.
   brochurePdfUrl: (customerName?: string) =>
     "/api/export/brochure.pdf" +
     (customerName ? `?${new URLSearchParams({ customer_name: customerName }).toString()}` : ""),

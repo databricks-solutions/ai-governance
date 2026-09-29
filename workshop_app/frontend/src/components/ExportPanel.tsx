@@ -1,12 +1,12 @@
 import { FileText, FileJson, Download, FileDown } from "lucide-react";
 import { api } from "@/lib/api";
 
-// Export the workshop outcomes: a PDF leave-behind (the primary artifact — it gets emailed and
+// Export the workshop outcomes: a PDF leave-behind (the primary artifact - it gets emailed and
 // attached to a POC), a Markdown report, and a machine-readable outcomes.json.
 export default function ExportPanel() {
   function download(kind: "outcomes" | "report" | "report-pdf") {
     // The PDF is generated server-side and already sends Content-Disposition with a filename,
-    // so navigating to it is enough — no `download` attribute needed (and setting one would
+    // so navigating to it is enough - no `download` attribute needed (and setting one would
     // override the server's name).
     if (kind === "report-pdf") {
       window.location.href = api.reportPdfUrl();
@@ -27,7 +27,7 @@ export default function ExportPanel() {
         <h3 className="font-semibold text-navy">Export workshop outcomes</h3>
       </div>
       <p className="mb-4 text-sm leading-relaxed text-muted">
-        Generate the POC-doc leave-behind and the machine-readable outcomes file — every step with
+        Generate the POC-doc leave-behind and the machine-readable outcomes file - every step with
         its status, the incomplete items as next steps, and everything flagged for POC.
       </p>
       <div className="flex flex-wrap gap-3">

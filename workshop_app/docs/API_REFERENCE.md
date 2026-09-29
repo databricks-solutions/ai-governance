@@ -1,4 +1,4 @@
-# API reference — every call the workshop makes
+# API reference - every call the workshop makes
 
 One row per API the workshop touches, with the **exact HTTP method and path** and which step
 uses it. Cite this when a customer asks "what is the app actually doing to my workspace?"
@@ -7,7 +7,7 @@ uses it. Cite this when a customer asks "what is the app actually doing to my wo
 returns HTTP 200 for *every* URL under `/api/workspace/`, including
 `/api/workspace/totallyfakegroup/nope`. Deep links therefore cannot be verified from a
 script, and a 404 in a customer-facing app is worse than no link. So this file cites the one
-URL confirmed to exist — the AI Gateway group index — and gives exact paths you can search
+URL confirmed to exist - the AI Gateway group index - and gives exact paths you can search
 for within it:
 
 > **https://docs.databricks.com/api/workspace/aigateway**
@@ -19,26 +19,26 @@ returned, not what a doc implied.
 
 ---
 
-## 1. Unity AI Gateway — the governed objects
+## 1. Unity AI Gateway - the governed objects
 
 | Operation | Method + path | Used by | Verified |
 |---|---|---|---|
 | List MCP services | `GET /api/2.1/unity-catalog/mcp-services` | `mcp_inventory`, `mcp_policy_target` | ✅ returned 6 `MCP_SERVICE` securables |
 | MCP service permissions | `GET /api/2.1/unity-catalog/permissions/mcp_service/{name}` | `mcp_grants` | ✅ showed `EXECUTE` → `account users` |
 | List model services | `GET /api/2.1/unity-catalog/model-services` | `model_services` | ✅ returned 24 `MODEL_SERVICE` securables |
-| List model provider services | `GET /api/2.1/unity-catalog/model-provider-services` | — (documented for the Providers accelerator) | ✅ responded; 0 registered |
+| List model provider services | `GET /api/2.1/unity-catalog/model-provider-services` | - (documented for the Providers accelerator) | ✅ responded; 0 registered |
 | Catalog / schema permissions | `GET /api/2.1/unity-catalog/permissions/{catalog\|schema}/{name}` | `default_access` | ✅ `system.ai` → `EXECUTE` to `account users` |
 
-The securable type in the permissions path is `mcp_service` (and `model_service`) — lowercase,
+The securable type in the permissions path is `mcp_service` (and `model_service`) - lowercase,
 singular. Reported `name` values arrive prefixed, e.g. `mcp-services/system.ai.github`, so
 strip the prefix before use.
 
 The same permissions endpoint serves catalogs and schemas, which is what `default_access` uses
 to show the open-by-default posture. An `effective-permissions/...` variant also exists and
-additionally reports inheritance (`inherited_from_type: CATALOG`) — useful when explaining why
+additionally reports inheritance (`inherited_from_type: CATALOG`) - useful when explaining why
 revoking on `system.ai` alone does not close the path.
 
-## 2. MCP runtime — JSON-RPC, not REST
+## 2. MCP runtime - JSON-RPC, not REST
 
 These are **not** REST operations and are not in the API reference. They speak JSON-RPC 2.0
 over Streamable HTTP.
@@ -60,7 +60,7 @@ learned the hard way (see `server/mcp.py`):
 Other managed families (same shape, different scope): `/api/2.0/mcp/genie/{space_id}`,
 `/api/2.0/mcp/sql`, `/api/2.0/mcp/ai-search/{catalog}/{schema}/{index}`.
 
-## 3. Model invocation — the two contracts
+## 3. Model invocation - the two contracts
 
 | Contract | Method + path | Model selector | Used by |
 |---|---|---|---|
@@ -71,14 +71,14 @@ Both were verified to return **200** on the same workspace. That is exactly why
 `choice_model_services` exists: a customer can be fully on the Gateway *path* and still on the
 legacy *contract*, and nothing errors to tell them.
 
-### Request tags — and why the routing steps moved to the Gateway path
+### Request tags - and why the routing steps moved to the Gateway path
 
 `Databricks-Ai-Gateway-Request-Tags` carries a JSON object of string→string and lands in
 `request_tags` in `system.ai_gateway.usage`.
 
 - `server/routing.py` calls `/ai-gateway/mlflow/v1/chat/completions` directly rather than the
   SDK's `serving_endpoints.query()`, which targets the legacy invocations path and **exposes no
-  way to set headers** — so it cannot carry the tag at all. The Gateway path accepts a plain
+  way to set headers** - so it cannot carry the tag at all. The Gateway path accepts a plain
   endpoint name in `model`, so no config change was needed.
 - Header names are case-insensitive per HTTP; both `...Ai-Gateway...` and `...AI-Gateway...`
   were accepted with a 200. The docs spell it `Databricks-Ai-Gateway-Request-Tags`.
@@ -97,17 +97,17 @@ request_tags  = {"project":"ai_governance_workshop","cost_center":"platform",
 Note `service_name` is **NULL** and `endpoint_name` is populated: a Gateway call that names a
 plain *endpoint* rather than a service FQN is recorded as an endpoint row. So
 `COALESCE(service_name, endpoint_name)` is needed even for traffic that went through
-`/ai-gateway/mlflow/v1` — it is not only a legacy-row concern.
+`/ai-gateway/mlflow/v1` - it is not only a legacy-row concern.
 
 **Read this before concluding a tag was dropped.** The table lags badly. On the reference
 workspace `max(event_time)` sat at **20:03** while the wall clock was **20:16**, was *still* at
-20:03 at **20:25**, and only reached 20:19 around 20:31 — roughly a **19-minute** lag, and it
+20:03 at **20:25**, and only reached 20:19 around 20:31 - roughly a **19-minute** lag, and it
 does not advance smoothly. An immediate query after a tagged call returns nothing, which looks
 exactly like the tag being dropped; I made that mistake on the first pass and had to retract it.
-Always compare `max(event_time)` to `current_timestamp()` first — `usage_by_project` reports both
+Always compare `max(event_time)` to `current_timestamp()` first - `usage_by_project` reports both
 on an empty result for this reason.
 
-Whether the **legacy** invocations path records a usage row is still **unconfirmed** — the A/B
+Whether the **legacy** invocations path records a usage row is still **unconfirmed** - the A/B
 markers for that test fell outside the window that had ingested by the time the check matched.
 It does not affect the workshop, which sends every routed call through the Gateway path, but do
 not assert it either way to a customer without re-testing.
@@ -132,7 +132,7 @@ Two things about the ACL operation that cost a debugging cycle each, both verifi
   `'<name>' is not a valid Inference Endpoint ID`, so `endpoint_acl` does a `get()` first to
   resolve the id.
 - **Provided foundation-model endpoints have no id** (`id` is `None`) and therefore carry no
-  workspace ACL — they are not workspace securables. Those are governed by UC grants on the
+  workspace ACL - they are not workspace securables. Those are governed by UC grants on the
   model service instead, which is why `default_access` and `endpoint_acl` are both needed and
   neither substitutes for the other.
 
@@ -146,7 +146,7 @@ customer endpoint unattended.
 `AiGatewayRateLimit` fields, from the installed SDK: `calls`, `tokens`, `key`, `principal`,
 `renewal_period`.
 
-## 5. Unity Catalog — inventory and DDL
+## 5. Unity Catalog - inventory and DDL
 
 | Operation | Method + path | Used by |
 |---|---|---|
@@ -161,14 +161,14 @@ reads the same inventory from a schema the app already has `USE SCHEMA` on, whic
 
 ## 6. Not available via API
 
-Worth stating plainly — these are the ones that surprise people mid-workshop.
+Worth stating plainly - these are the ones that surprise people mid-workshop.
 
 | Thing | Reality |
 |---|---|
 | **Attaching a service policy** | **UI-only** in Beta. No REST operation, no `ALTER ... SET SERVICE POLICY` DDL. The app creates the policy *function* (SQL) and verifies its logic by evaluating it against a synthetic event; attachment is the manual step. |
 | Guardrail config (PII, safety) | Configurable in the AI Gateway UI. The legacy `ai_gateway.guardrails` object on a serving endpoint is a different, older surface. |
 | Account-console budgets | Account-level, not a workspace API. Manual step with a cloud-aware deep link. |
-| Creating a governed endpoint | Intentionally not automated — the app never creates or mutates endpoints on a customer workspace. |
+| Creating a governed endpoint | Intentionally not automated - the app never creates or mutates endpoints on a customer workspace. |
 
 ## 7. System tables
 

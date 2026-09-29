@@ -3,13 +3,13 @@
 Two DIFFERENT things are both called "MCP" on Databricks, they are governed differently,
 and conflating them is the single biggest source of confusion in this space:
 
-  1. MANAGED (UC-native) endpoints — /api/2.0/mcp/{functions,genie,sql,ai-search}/...
+  1. MANAGED (UC-native) endpoints - /api/2.0/mcp/{functions,genie,sql,ai-search}/...
      These expose Unity Catalog objects as tools. They are governed by
      authentication (OAuth scope picks the endpoint FAMILY) and Unity Catalog grants
      (USE CATALOG + USE SCHEMA to SEE a tool, EXECUTE to CALL it). They are NOT
      MCP_SERVICE securables, so **service policies cannot attach to them**.
 
-  2. MCP SERVICES — /ai-gateway/mcp-services/{catalog}.{schema}.{name}
+  2. MCP SERVICES - /ai-gateway/mcp-services/{catalog}.{schema}.{name}
      Real Unity Catalog MCP_SERVICE securables: the Databricks-provided `system.ai.*`
      ones plus any external/custom server you register behind an HTTP connection.
      These get all of the above PLUS service policies (ALLOW / DENY / ASK).
@@ -19,7 +19,7 @@ The accelerator walks both, in that order, and says which plane it is exercising
 
 Protocol notes learned the hard way against a live workspace:
   - JSON-RPC errors ride INSIDE HTTP 200 over Streamable HTTP. Never infer success from
-    the status code — check for a `result` key.
+    the status code - check for a `result` key.
   - `MCP-Protocol-Version` must be sent on every request after `initialize`.
   - The response may be SSE (`text/event-stream`), so Accept must allow both and the body
     may need unwrapping from `data:` lines.
@@ -35,7 +35,7 @@ from .config import get_config, get_user_workspace_client, get_workspace_client
 PROTOCOL_VERSION = "2025-11-25"
 _TIMEOUT = 60
 
-# The Databricks-provided MCP Services. Kept as a hint for the UI only — the live list
+# The Databricks-provided MCP Services. Kept as a hint for the UI only - the live list
 # comes from the control API, because availability differs per workspace (verified: one
 # workspace exposed 6 of these and 403'd on atlassian).
 KNOWN_PROVIDED = [
@@ -100,11 +100,11 @@ def rpc(url: str, method: str, params: dict | None = None) -> dict:
         detail = ""
         try:
             detail = e.read().decode()[:300]
-        except Exception:  # noqa: BLE001 — best-effort error body
+        except Exception:  # noqa: BLE001 - best-effort error body
             pass
         return {"ok": False, "http_status": e.code,
                 "error": f"HTTP {e.code}: {e.reason}. {detail}".strip()}
-    except Exception as e:  # noqa: BLE001 — DNS/TLS/timeout
+    except Exception as e:  # noqa: BLE001 - DNS/TLS/timeout
         return {"ok": False, "http_status": None, "error": str(e)[:300]}
 
     try:
@@ -113,7 +113,7 @@ def rpc(url: str, method: str, params: dict | None = None) -> dict:
         return {"ok": False, "http_status": status,
                 "error": f"non-JSON response: {body[:200]}"}
 
-    # A JSON-RPC error arrives with HTTP 200 — this is the check people forget.
+    # A JSON-RPC error arrives with HTTP 200 - this is the check people forget.
     if isinstance(parsed, dict) and parsed.get("error"):
         err = parsed["error"]
         msg = err.get("message") if isinstance(err, dict) else str(err)
@@ -147,7 +147,7 @@ def call_tool(url: str, name: str, arguments: dict | None = None) -> dict:
 def list_mcp_services() -> dict:
     """Every MCP_SERVICE securable on the metastore, via the UC control API.
 
-    This is the real answer to "what MCP can I govern here?" — provided `system.ai.*`
+    This is the real answer to "what MCP can I govern here?" - provided `system.ai.*`
     services and any external ones a customer registered. Listing serving endpoints (the
     old placeholder) answers a different question entirely.
     """
@@ -170,7 +170,7 @@ def list_mcp_services() -> dict:
 
 
 def service_grants(service: str) -> dict:
-    """UC privilege assignments on an MCP Service — the Plane 2 answer for who can call it."""
+    """UC privilege assignments on an MCP Service - the Plane 2 answer for who can call it."""
     w = get_workspace_client()
     try:
         resp = w.api_client.do(

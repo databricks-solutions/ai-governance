@@ -30,13 +30,13 @@ export default function Intro({
       <PageHeader title={intro.title} />
       <div className="mx-auto max-w-4xl space-y-12 px-8 py-12 lg:px-14">
         {/* The invite artifact: a one-page overview to share with people BEFORE they open the
-            app — hence it lives at the top of the landing page. */}
+            app - hence it lives at the top of the landing page. */}
         <section className="flex flex-col gap-4 rounded-2xl border border-lava/20 bg-oat p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-navy">Inviting people to the workshop?</h2>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
               A one-pager on what the session covers, who to invite, and the optional
-              accelerators — send it to anyone deciding whether to attend.
+              accelerators - send it to anyone deciding whether to attend.
             </p>
           </div>
           <a

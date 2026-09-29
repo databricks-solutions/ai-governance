@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     for problem in config_problems():
         log.error("CONFIG: %s", problem)
 
-    # The volume-backed progress store backs progress tracking only — the guidebook and the
+    # The volume-backed progress store backs progress tracking only - the guidebook and the
     # Try-It tests do not need it. load() is best-effort by design (an empty/missing file on a
     # fresh deploy is normal), so a workshop with no saved progress is recoverable, whereas a
     # workshop with no app is not.
@@ -47,7 +47,7 @@ if os.path.exists(_frontend):
     async def spa(full_path: str):
         # An unmatched /api/* path is a real 404 (a typo or a removed endpoint), not an SPA
         # route. Falling through to index.html would return HTML with status 200, which the
-        # frontend's JSON parser chokes on with an opaque "Unexpected token <" — worst during
+        # frontend's JSON parser chokes on with an opaque "Unexpected token <" - worst during
         # a live workshop. Answer it honestly instead.
         if full_path == "api" or full_path.startswith("api/"):
             raise HTTPException(404, "Not found")

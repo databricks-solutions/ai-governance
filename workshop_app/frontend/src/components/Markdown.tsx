@@ -3,13 +3,13 @@ import type { ReactNode } from "react";
 // The one markdown renderer for the whole app.
 //
 // There were previously two near-identical copies (Intro and Faq) and step concepts used no
-// markdown at all — they rendered with `whitespace-pre-line`, so every `- bullet`, `**bold**`
+// markdown at all - they rendered with `whitespace-pre-line`, so every `- bullet`, `**bold**`
 // and table in config/steps.yaml showed as literal punctuation. Step concepts are the largest
 // body of prose in the product, so that was the most-read text in the app rendering wrong.
 //
 // Supports exactly what the content actually uses: headings, bullet and numbered lists, GFM
 // tables, fenced code, blockquotes, and inline bold/code/links. Deliberately not a full
-// CommonMark implementation — a dependency-free renderer we can reason about beats correctness
+// CommonMark implementation - a dependency-free renderer we can reason about beats correctness
 // on syntax nobody writes here.
 //
 // All text passes through escape() before any tag is emitted, so customer-edited YAML cannot
@@ -46,7 +46,7 @@ export function inline(s: string): string {
 const H = (s: string) => <span dangerouslySetInnerHTML={{ __html: inline(s) }} />;
 
 function isTableSep(line: string): boolean {
-  // |---|:--:|---| — the row that makes a GFM table a table.
+  // |---|:--:|---| - the row that makes a GFM table a table.
   return /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line) && line.includes("-");
 }
 
@@ -198,7 +198,7 @@ export default function Markdown({
       continue;
     }
 
-    // Lists — bulleted or numbered. Continuation lines (indented, no marker) join the item, so
+    // Lists - bulleted or numbered. Continuation lines (indented, no marker) join the item, so
     // a wrapped bullet in YAML stays one bullet.
     const bullet = /^[-*]\s+(.*)$/.exec(trimmed);
     const numbered = /^(\d+)[.)]\s+(.*)$/.exec(trimmed);

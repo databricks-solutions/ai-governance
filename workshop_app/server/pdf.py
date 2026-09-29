@@ -1,7 +1,7 @@
 """PDF generation for the two leave-behinds: the prerequisites checklist and the outcomes report.
 
 Server-side (reportlab) rather than browser print-to-PDF, so the customer gets a real file with
-a real filename and no print dialog — these are documents that get emailed to an account admin
+a real filename and no print dialog - these are documents that get emailed to an account admin
 and attached to a POC, not pages someone reads on screen.
 
 reportlab is imported LAZILY inside the builders. It is in requirements.txt, but a Databricks
@@ -155,7 +155,7 @@ def prerequisites_pdf(prereqs: dict, customer: str | None = None) -> bytes:
     """The pre-workshop checklist, with real checkboxes to tick.
 
     Printed and worked through with the customer's platform team about a week out. Every item
-    says WHY it matters — an admin who understands the consequence acts faster than one handed
+    says WHY it matters - an admin who understands the consequence acts faster than one handed
     a bare list of grants.
     """
     from reportlab.lib.units import inch
@@ -163,7 +163,7 @@ def prerequisites_pdf(prereqs: dict, customer: str | None = None) -> bytes:
 
     S = _styles()
     buf = io.BytesIO()
-    doc = _doc(buf, "AI Governance Workshop — Prerequisites")
+    doc = _doc(buf, "AI Governance Workshop - Prerequisites")
     avail_w = doc.width
     widths = [0.32 * inch, avail_w - 0.32 * inch]
 
@@ -203,7 +203,7 @@ def prerequisites_pdf(prereqs: dict, customer: str | None = None) -> bytes:
         "GET /api/health</font> on the deployed app returns "
         "<font face='Courier'>{\"status\":\"ok\",\"config_problems\":[]}</font> when the "
         "configuration side is complete. Items needing an account admin cannot be "
-        "self-checked — those are the ones to start early.", S["note"]))
+        "self-checked - those are the ones to start early.", S["note"]))
 
     doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
     return buf.getvalue()
@@ -213,7 +213,7 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
     """The one-page workshop brochure: what it covers, how long, who it's for, accelerators.
 
     A leave-ahead an account team sends to book the session. Deliberately one page and
-    marketing-toned — the substance lives in the app itself and the prerequisites checklist.
+    marketing-toned - the substance lives in the app itself and the prerequisites checklist.
     """
     from reportlab.lib.colors import HexColor, white
     from reportlab.lib.enums import TA_LEFT
@@ -273,7 +273,7 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
     if b.get("subtitle"):
         story.append(Paragraph(_md_inline(b["subtitle"]), st["subtitle"]))
 
-    # Duration + format band — the two facts a reader scans for first.
+    # Duration + format band - the two facts a reader scans for first.
     meta_bits = [x for x in (b.get("duration"), b.get("format")) if x]
     if meta_bits:
         meta = Table([[Paragraph(" &nbsp;·&nbsp; ".join(_esc(m) for m in meta_bits), st["meta"])]],
@@ -313,7 +313,7 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
         pt.setStyle(TableStyle(style))
         story.append(pt)
 
-    # Personas — two columns: bold role, muted why-they're-here.
+    # Personas - two columns: bold role, muted why-they're-here.
     personas = b.get("personas", [])
     if personas:
         story.append(Paragraph("Who it's for", st["h2"]))
@@ -378,7 +378,7 @@ def report_pdf(o: dict) -> bytes:
     """The outcomes report: what was proven, what wasn't, and what happens next.
 
     This is the leave-behind that replaced the POC DOC, so it has to stand on its own in an
-    inbox — hence the summary band up top and next steps called out as their own section.
+    inbox - hence the summary band up top and next steps called out as their own section.
     """
     from reportlab.lib.colors import HexColor
     from reportlab.lib.units import inch
@@ -386,7 +386,7 @@ def report_pdf(o: dict) -> bytes:
 
     S = _styles()
     buf = io.BytesIO()
-    doc = _doc(buf, "AI Governance Workshop — Outcomes")
+    doc = _doc(buf, "AI Governance Workshop - Outcomes")
     avail_w = doc.width
 
     summary = o.get("summary", {}) or {}
@@ -404,7 +404,7 @@ def report_pdf(o: dict) -> bytes:
     ]
 
     band = Table([[Paragraph(
-        f"<b>{done} of {applicable} applicable steps achieved ({pct}%)</b> — "
+        f"<b>{done} of {applicable} applicable steps achieved ({pct}%)</b> - "
         f"{applicable - done} item(s) remain, listed as next steps at the end"
         + (f"; {na} marked N/A" if na else "") + ".", S["item"])]],
         colWidths=[avail_w])
@@ -426,7 +426,7 @@ def report_pdf(o: dict) -> bytes:
             if not steps:
                 continue
             d = sum(1 for s in steps if s.get("complete"))
-            block = [Paragraph(f"{_esc(p.get('title'))} — {d}/{len(steps)}", S["h2"])]
+            block = [Paragraph(f"{_esc(p.get('title'))} - {d}/{len(steps)}", S["h2"])]
             story.append(KeepTogether(block + [_step_row(steps[0], S, widths)]))
             for s in steps[1:]:
                 story.append(_step_row(s, S, widths))

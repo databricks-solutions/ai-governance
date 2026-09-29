@@ -9,7 +9,7 @@ import { Pill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { shortTitle } from "@/lib/text";
 
-// The workshop outcomes checklist — every core and accelerator step in one place, checkable on
+// The workshop outcomes checklist - every core and accelerator step in one place, checkable on
 // its own so the workshop can guide activities even without the interactive Try-It flow. It
 // shares the same backing state as the step cards, so ticks sync both ways and feed the export.
 export default function Outcomes({
@@ -66,7 +66,7 @@ export default function Outcomes({
       <PageHeader
         eyebrow="Track & follow up"
         title="Outcomes"
-        lead="Every core and accelerator step in one checklist. Tick Done as you run each activity — you don't have to use the interactive Try-It buttons. Running a step's Try-It marks it Done here automatically, and these ticks sync with the step cards on each page and feed the exported outcomes."
+        lead="Every core and accelerator step in one checklist. Tick Done as you run each activity - you don't have to use the interactive Try-It buttons. Running a step's Try-It marks it Done here automatically, and these ticks sync with the step cards on each page and feed the exported outcomes."
       />
       <div className="mx-auto max-w-4xl px-8 py-12 lg:px-14">
         {/* Overall summary */}
@@ -95,26 +95,26 @@ export default function Outcomes({
           <p className="mb-3 max-w-3xl text-sm leading-relaxed text-muted">
             The workshop proves each control live on your workspace. Getting to{" "}
             <span className="font-semibold text-navy">production</span> means turning whatever you
-            couldn't finish in the room into a tracked punch list — a{" "}
+            couldn't finish in the room into a tracked punch list - a{" "}
             <span className="font-semibold text-navy">POC doc</span>. Mark every step as you go:
           </p>
           <ul className="mb-3 max-w-3xl space-y-1.5 text-sm leading-relaxed text-muted">
             <li>
-              <span className="font-semibold text-[#1E7E34]">Done</span> — proven on this workspace;
+              <span className="font-semibold text-[#1E7E34]">Done</span> - proven on this workspace;
               nothing more to do.
             </li>
             <li>
-              <span className="font-semibold text-navy">N/A</span> — out of scope for this customer;
+              <span className="font-semibold text-navy">N/A</span> - out of scope for this customer;
               drops from the count.
             </li>
             <li>
-              <span className="font-semibold text-lava">Add to POC</span> — carry it into the POC doc
+              <span className="font-semibold text-lava">Add to POC</span> - carry it into the POC doc
               as a production follow-up: something blocked in the room, waiting on an account admin,
               or needing a larger change to land.
             </li>
           </ul>
           <p className="max-w-3xl text-sm leading-relaxed text-muted">
-            Export the report below as the POC-doc leave-behind — it lists every step with its
+            Export the report below as the POC-doc leave-behind - it lists every step with its
             status, the incomplete items as next steps, and everything flagged for POC. Work that
             list down to zero to reach production.
           </p>
@@ -134,7 +134,7 @@ export default function Outcomes({
               ))}
             </select>
             <span className="text-xs text-muted">
-              Shows the core outcomes plus the selected accelerator's — pick the one this workshop runs.
+              Shows the core outcomes plus the selected accelerator's - pick the one this workshop runs.
             </span>
           </div>
         )}
@@ -168,13 +168,13 @@ export default function Outcomes({
           })}
         </div>
 
-        {/* Export — the POC-doc leave-behind and the machine-readable outcomes, relocated here
+        {/* Export - the POC-doc leave-behind and the machine-readable outcomes, relocated here
             from the Walkthrough so tracking and exporting live in one place. */}
         <div className="mt-10">
           <ExportPanel />
         </div>
 
-        {/* Start over — clears all progress on this deployment. */}
+        {/* Start over - clears all progress on this deployment. */}
         <ResetPanel onReset={onProgressChange} />
       </div>
     </div>

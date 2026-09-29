@@ -12,7 +12,7 @@ type Saved = ProgressMap[string] | null;
 
 // Diagrams a step can opt into with `visual: <key>` in config/steps.yaml or
 // config/accelerators.yaml. Keeping the registry here means content stays in YAML while the
-// rendering stays typed — an unknown key renders nothing rather than breaking the page.
+// rendering stays typed - an unknown key renders nothing rather than breaking the page.
 const VISUALS: Record<string, ReactNode> = {
   mcp_planes: <McpDiagram />,
 };
@@ -74,18 +74,18 @@ export default function StepCard({
   }
 
   // A step that ran but proved nothing (a guided UI action, or telemetry with no data yet)
-  // must not look complete — that is the difference between an honest workshop record and
+  // must not look complete - that is the difference between an honest workshop record and
   // a green wall of checks.
   const actionRequired = status === "action_required";
 
   // Prerequisites not yet done. Surfaced as a warn-but-allow banner: the room may have set the
-  // dependency up out-of-band, so Try-It stays live — we flag the likely cause of a failure
+  // dependency up out-of-band, so Try-It stays live - we flag the likely cause of a failure
   // before it happens rather than blocking. Suppressed once this step is itself achieved.
   const blockedBy = achieved ? [] : unmetDependencies(step, progress, stepTitles);
 
   return (
     <div className={cn("rounded-2xl border bg-white", achieved ? "border-navy/25" : "border-navy/10")}>
-      {/* Collapsed header — one line per step: status · title · Done/N/A · expand. The title and
+      {/* Collapsed header - one line per step: status · title · Done/N/A · expand. The title and
           chevron toggle the disclosure; the outcome chips act on their own and never toggle. */}
       <div className="flex items-center gap-3 p-4">
         <span
@@ -93,7 +93,7 @@ export default function StepCard({
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border",
             achieved ? "border-navy bg-navy text-white" : "border-navy/20 bg-navy/[0.02] text-navy-300",
           )}
-          title={achieved ? "Achieved" : na ? "Marked N/A" : "Not done yet — set the outcome"}
+          title={achieved ? "Achieved" : na ? "Marked N/A" : "Not done yet - set the outcome"}
         >
           {achieved ? (
             <Check className="h-4 w-4" strokeWidth={3} />
@@ -147,7 +147,7 @@ export default function StepCard({
         </button>
       </div>
 
-      {/* Detail — revealed on expand. Everything that used to be always-on lives here now. */}
+      {/* Detail - revealed on expand. Everything that used to be always-on lives here now. */}
       {open && (
         <div className="border-t border-navy/[0.07] px-4 pb-5 pt-4">
           {step.outcome && (
@@ -175,7 +175,7 @@ export default function StepCard({
           {step.visual && <div className="mb-4">{VISUALS[step.visual] ?? null}</div>}
 
           {/* Dependency warning: this step reads something an earlier step sets up. Warn, don't
-              block — the Try-It below stays enabled in case it was arranged out-of-band. */}
+              block - the Try-It below stays enabled in case it was arranged out-of-band. */}
           {blockedBy.length > 0 && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-[#B7791F]/30 bg-[#FDF3E0]/60 p-3 text-xs leading-relaxed text-navy">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#B7791F]" />
@@ -221,7 +221,7 @@ export default function StepCard({
             )}
           </div>
 
-          {/* Result — three states, not two: passed, action needed, failed. */}
+          {/* Result - three states, not two: passed, action needed, failed. */}
           {result && (
             <div
               className={cn(
@@ -244,7 +244,7 @@ export default function StepCard({
                 <span className="text-navy">{result.summary}</span>
               </div>
               {/* What this step actually called. Shown so the room can see exactly what the app
-                  does to their workspace — the first question a platform team asks. */}
+                  does to their workspace - the first question a platform team asks. */}
               {result.api && (
                 <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted">
                   <span className="font-semibold uppercase tracking-wider text-[10px]">API</span>

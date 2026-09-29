@@ -4,21 +4,21 @@ A simplified port of the Routing Impact demo, kept to one file because the
 workshop only needs the measurable-ROI story, not the full three-tab demo. Three router
 options are framed for the customer (Cost pillar):
 
-  a) Smart router  — Databricks-managed routing. Roadmap; nothing to run here yet.
-  b) Omnigent      — partner routing layer in front of the models.
-  c) Custom router — a cheap classifier picks the cheapest model that meets the bar.
+  a) Smart router  - Databricks-managed routing. Roadmap; nothing to run here yet.
+  b) Omnigent      - partner routing layer in front of the models.
+  c) Custom router - a cheap classifier picks the cheapest model that meets the bar.
 
 Only (c) executes: it is the one a customer can stand up today, and it is what produces a
 defensible number. (a) and (b) are described in config/steps.yaml so the workshop can
 position them honestly without pretending to demo them.
 
-COST MODEL — READ BEFORE QUOTING THE DOLLARS
+COST MODEL - READ BEFORE QUOTING THE DOLLARS
 --------------------------------------------
 Foundation Model APIs bill open-weight models in DBUs/MTok; Anthropic/OpenAI models on
 Databricks bill against their own SKUs. We convert DBU->USD with `cost.dbu_to_usd` from
 config/workshop.yaml, which defaults to a LIST-PRICE PLACEHOLDER. Until a customer sets
 their negotiated rate, every dollar figure here is illustrative and the API says so via
-`pricing_note` — surface it in the UI, don't hide it.
+`pricing_note` - surface it in the UI, don't hide it.
 
 The savings figure is a COUNTERFACTUAL: what the same token volume would have cost on the
 frontier model, minus what the route actually cost (classifier overhead included). It is
@@ -44,7 +44,7 @@ from .config import get_config, get_workspace_client
 # Request tags are CALLER-supplied: an attribution signal, never an enforcement boundary.
 # Server-side (endpoint/service) tags are the trustworthy ones for a budget filter.
 #
-# NOTE on verifying this: system.ai_gateway.usage lags real time by many minutes — on a
+# NOTE on verifying this: system.ai_gateway.usage lags real time by many minutes - on a
 # reference workspace max(event_time) stayed 13-21 minutes behind wall clock across a 20-minute
 # window. An empty result right after a call means "not ingested yet", NOT "the tag was
 # dropped". Always compare max(event_time) to current_timestamp() before concluding anything;
@@ -55,7 +55,7 @@ GATEWAY_CHAT_PATH = "/ai-gateway/mlflow/v1/chat/completions"
 # Fallback panel, used when config/workshop.yaml has no `cost.routing` block. Prices are
 # public list rates per million tokens; `unit` says how to convert. Endpoints are the
 # pay-per-token FMAPI names available on most workspaces.
-# Endpoints are v3 UC model services (catalog.schema.service), addressed by name on the governed
+# Endpoints are Unity Gateway model services (catalog.schema.service), addressed by name on the governed
 # Gateway path. Override per key with `cost.routing.endpoints` in config/workshop.yaml.
 _DEFAULT_MODELS = {
     "frontier": {
@@ -65,7 +65,7 @@ _DEFAULT_MODELS = {
         "open_weight": False,
         "provider": "Anthropic (proprietary)",
         "price": {"unit": "usd", "in": 3.0, "out": 15.0},
-        "oneliner": "Frontier model — highest quality, highest cost. Reserve it for genuinely hard work.",
+        "oneliner": "Frontier model - highest quality, highest cost. Reserve it for genuinely hard work.",
     },
     "mid": {
         "endpoint": "system.ai.meta-llama-3-3-70b-instruct",
@@ -74,7 +74,7 @@ _DEFAULT_MODELS = {
         "open_weight": True,
         "provider": "Meta (open weight)",
         "price": {"unit": "dbu", "in": 14.286, "out": 42.857},
-        "oneliner": "Strong open-weight model — near-frontier on many tasks at a fraction of the cost.",
+        "oneliner": "Strong open-weight model - near-frontier on many tasks at a fraction of the cost.",
     },
     "cheap": {
         "endpoint": "system.ai.meta-llama-3-1-8b-instruct",
@@ -83,7 +83,7 @@ _DEFAULT_MODELS = {
         "open_weight": True,
         "provider": "Meta (open weight)",
         "price": {"unit": "dbu", "in": 2.143, "out": 6.429},
-        "oneliner": "Small open-weight model — cheapest and fastest; fine for simple, well-defined tasks.",
+        "oneliner": "Small open-weight model - cheapest and fastest; fine for simple, well-defined tasks.",
     },
 }
 
@@ -98,15 +98,15 @@ COMPLEXITY_DEFS = {
        "quick comparison to a target. If the answer is retrieval or plugging numbers "
        "into a formula, it is Simple.",
     2: "Medium: a bounded task with a mostly-correct answer that needs more than one "
-       "step — explaining a concept, drafting a short document, comparing a few "
+       "step - explaining a concept, drafting a short document, comparing a few "
        "options, or the trade-offs of a single decision.",
     3: "Complex: reserve ONLY for open-ended, high-stakes work with multiple competing "
-       "constraints — strategy, root-cause diagnosis across interacting factors, or "
+       "constraints - strategy, root-cause diagnosis across interacting factors, or "
        "rigorous architecture and financial-model design. If a competent analyst could "
        "answer it well in a few paragraphs, it is NOT Complex.",
 }
 
-# The classifier runs on the cheapest model — its cost is real overhead and is counted.
+# The classifier runs on the cheapest model - its cost is real overhead and is counted.
 CLASSIFIER_KEY = "cheap"
 CLASSIFIER_MAX_TOKENS = 200
 DEFAULT_MAX_TOKENS = 512
@@ -161,7 +161,7 @@ def task_tag(prompt_index: int) -> str:
 
     Each sample prompt is one unit of work ("task"). Because every prompt is run against every
     model, tagging by task makes system.ai_gateway.usage answer "which model was most efficient
-    for THIS task" — the basis for the cost_task_usage step.
+    for THIS task" - the basis for the cost_task_usage step.
     """
     return f"routing_task_{prompt_index + 1}"
 
@@ -196,7 +196,7 @@ def pricing_note() -> str:
     return (
         f"Open-weight models are billed in DBU/MTok and converted at ${dbu_to_usd()}/DBU; "
         "frontier models are billed in USD/MTok at list price. Set "
-        "`cost.routing.dbu_to_usd` in config/workshop.yaml to your negotiated rate — "
+        "`cost.routing.dbu_to_usd` in config/workshop.yaml to your negotiated rate - "
         "until then these dollar figures are illustrative, though the token counts are real."
     )
 
@@ -216,7 +216,7 @@ def request_tags() -> dict:
     """The project tags this workshop attaches to every model call it makes.
 
     Same values as the server-side tags in the Cost pillar, so a customer can compare the
-    two paths in `system.ai_gateway.usage` — `request_tags` (these) vs `endpoint_tags`.
+    two paths in `system.ai_gateway.usage` - `request_tags` (these) vs `endpoint_tags`.
     """
     proj = get_config().get("project", {}) or {}
     keys = ("name", "cost_center", "environment", "use_case")
@@ -232,11 +232,11 @@ def _merge_tags(extra_tags: dict | None) -> dict:
 
 
 def is_model_service(model: str) -> bool:
-    """True if `model` is a UC model-service FQN (catalog.schema.service) — the v3 contract.
+    """True if `model` is a UC model-service FQN (catalog.schema.service) - the Unity Gateway model-service contract.
 
-    A dotted name names a Unity Catalog model service and rides the governed v3 path; a bare
-    `databricks-...` (or any undotted) name is a legacy workspace endpoint on the v1 path. Both
-    go through the same `/ai-gateway/mlflow/v1/chat/completions` URL — v1 vs v3 is decided by what
+    A dotted name names a Unity Catalog model service and rides the governed Unity Gateway path; a bare
+    `databricks-...` (or any undotted) name is a legacy workspace endpoint on the legacy path. Both
+    go through the same `/ai-gateway/mlflow/v1/chat/completions` URL - legacy vs model-service is decided by what
     you put in `model`, not by the URL.
     """
     return "." in (model or "") and not (model or "").startswith("databricks-")
@@ -270,7 +270,7 @@ def query(model_key: str, prompt: str, max_tokens: int | None = None,
           extra_tags: dict | None = None) -> dict:
     """Call one panel model and return the answer plus measured tokens, latency, and cost.
 
-    `extra_tags` are merged into the request tags on top of the project tags — the routing steps
+    `extra_tags` are merged into the request tags on top of the project tags - the routing steps
     use it to stamp a per-prompt `task` tag, so system.ai_gateway.usage can be sliced by task and
     by the model that handled it (the `cost_task_usage` step).
 
@@ -284,13 +284,13 @@ def query(model_key: str, prompt: str, max_tokens: int | None = None,
     base = {"model_key": model_key, "label": m["label"], "tier": m["tier"],
             "endpoint": m["endpoint"], "request_tags": tags,
             "gateway_path": GATEWAY_CHAT_PATH,
-            "path_version": "v3" if is_model_service(m["endpoint"]) else "v1"}
+            "path_version": "model service" if is_model_service(m["endpoint"]) else "legacy"}
     try:
         r = _invoke(m["endpoint"], prompt, max_tokens, tags)
         return {**base, **r, "duration_s": round(time.monotonic() - start, 2),
                 "cost_usd": cost_usd(model_key, r["input_tokens"], r["output_tokens"]),
                 "error": None}
-    except Exception as e:  # noqa: BLE001 — surface endpoint errors per-card, don't fail the step
+    except Exception as e:  # noqa: BLE001 - surface endpoint errors per-card, don't fail the step
         return {**base, "answer": None, "input_tokens": 0, "output_tokens": 0,
                 "duration_s": round(time.monotonic() - start, 2), "cost_usd": 0.0,
                 "error": str(e)[:300]}
@@ -300,8 +300,8 @@ def invoke_model(model: str, prompt: str, max_tokens: int | None = None,
                  extra_tags: dict | None = None, label: str | None = None) -> dict:
     """Call an arbitrary model by name/FQN over the governed Gateway path.
 
-    For steps that target a specific model service (a UC FQN `catalog.schema.service`, v3) rather
-    than a routing-panel tier — e.g. the open-weight-model step. `path_version` reports v3 vs v1
+    For steps that target a specific model service (a UC FQN `catalog.schema.service`) rather
+    than a routing-panel tier - e.g. the open-weight-model step. `path_version` reports model-service vs legacy
     from the model name. Never raises; on failure the result carries an `error` field. Cost is
     not computed here (the panel price list only covers the routing tiers).
     """
@@ -310,17 +310,17 @@ def invoke_model(model: str, prompt: str, max_tokens: int | None = None,
     start = time.monotonic()
     base = {"model": model, "label": label or model, "request_tags": tags,
             "gateway_path": GATEWAY_CHAT_PATH,
-            "path_version": "v3" if is_model_service(model) else "v1"}
+            "path_version": "model service" if is_model_service(model) else "legacy"}
     try:
         r = _invoke(model, prompt, max_tokens, tags)
         return {**base, **r, "duration_s": round(time.monotonic() - start, 2), "error": None}
-    except Exception as e:  # noqa: BLE001 — surface per-card, don't fail the step
+    except Exception as e:  # noqa: BLE001 - surface per-card, don't fail the step
         return {**base, "answer": None, "input_tokens": 0, "output_tokens": 0,
                 "duration_s": round(time.monotonic() - start, 2), "error": str(e)[:300]}
 
 
 def compare(prompt: str) -> dict:
-    """Send one prompt to every model in parallel — the raw cost/latency/quality spread.
+    """Send one prompt to every model in parallel - the raw cost/latency/quality spread.
 
     This is the step that makes the ROI argument concrete before any routing exists: the
     same question, three price points, and the answers side by side so the room can judge
@@ -437,7 +437,7 @@ def evaluate() -> dict:
             "decisions": decisions,
             "note": (
                 "Placeholder estimate. Databricks smart routing has no chat-completions API to "
-                "call from this app — it is a Beta feature enabled per account and used through "
+                "call from this app - it is a Beta feature enabled per account and used through "
                 "the Omnigent and ucode harnesses. This row approximates its cost by classifying "
                 "each prompt's complexity and pricing the cheapest sufficient model, including "
                 "the classifier's own token cost."),
@@ -485,7 +485,7 @@ def classify(prompt: str) -> dict:
             except (ValueError, TypeError):
                 reason = "defaulted to frontier (classifier returned unparseable JSON)"
         else:
-            # The classifier DID answer, just with no JSON object — don't mislabel that as
+            # The classifier DID answer, just with no JSON object - don't mislabel that as
             # "unavailable"; say what actually happened so the surfaced reason is truthful.
             reason = "defaulted to frontier (classifier response had no JSON object)"
     return {
@@ -504,7 +504,7 @@ def route(prompt: str) -> dict:
     `savings_usd` compares the routed cost (classifier + chosen model) against what the
     SAME token volume would have cost on the frontier model. That is an approximation:
     the frontier model would likely emit a different number of output tokens for the same
-    prompt. It is the honest, cheap comparison — one extra call, not two — and the API
+    prompt. It is the honest, cheap comparison - one extra call, not two - and the API
     labels it so the workshop can state the caveat out loud.
     """
     c = classify(prompt)
@@ -545,7 +545,7 @@ def panel() -> dict:
             "oneliner": m["oneliner"], "price_unit": m["price"]["unit"],
             "usd_in_per_mtok": round(in_usd, 4), "usd_out_per_mtok": round(out_usd, 4),
             "open_weight": bool(m.get("open_weight")), "provider": m.get("provider"),
-            "path_version": "v3" if is_model_service(m["endpoint"]) else "v1",
+            "path_version": "model service" if is_model_service(m["endpoint"]) else "legacy",
         })
     return {
         "models": out,
@@ -555,7 +555,7 @@ def panel() -> dict:
         "attribution_note": (
             f"Every model call below is sent through {GATEWAY_CHAT_PATH} with the "
             f"{REQUEST_TAGS_HEADER} header, so its tokens attribute to this project in "
-            "system.ai_gateway.usage.request_tags. Request tags are caller-supplied — use "
+            "system.ai_gateway.usage.request_tags. Request tags are caller-supplied - use "
             "them for attribution, never as an enforcement boundary."),
         "classifier_model": M[CLASSIFIER_KEY]["label"],
         "routing_map": {str(k): M[v]["label"] for k, v in COMPLEXITY_TO_MODEL.items()},

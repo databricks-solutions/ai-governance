@@ -1,4 +1,4 @@
-# Workshop prerequisites — the checklist we send the customer BEFORE the session.
+# Workshop prerequisites - the checklist we send the customer BEFORE the session.
 #
 # This is written as a note FROM the Databricks account team TO the customer, so it reads as
 # customer-facing prose, not a run-of-show runbook. Config-driven (same as
@@ -10,16 +10,16 @@
 #   python scripts/generate_google.py workshop_app/config/prerequisites.yaml --prereqs
 # Link the resulting Doc back here in `google_doc_url` so the app points at the shareable copy.
 #
-# Two groups only — long lead time and short lead time — and only the essentials. Every item is
+# Two groups only - long lead time and short lead time - and only the essentials. Every item is
 # tagged by persona in `who`. The workshop needs as few as THREE people:
-#   - Account admin      — enables platform capabilities and runs the account-level grants.
-#   - Business champion   — owns the AI budget and the "why this matters to us".
-#   - Technical champion  — deploys the app and provides the catalog and warehouse.
+#   - Account admin      - enables platform capabilities and runs the account-level grants.
+#   - Business champion   - owns the AI budget and the "why this matters to us".
+#   - Technical champion  - deploys the app and provides the catalog and warehouse.
 # Everything else is optional; items only some customers need are marked `optional: true`.
 #
 # Fields:
 #   id        stable key (used as the PDF checkbox anchor)
-#   item      what needs to be true (short — it is a checkbox label)
+#   item      what needs to be true (short - it is a checkbox label)
 #   why       what it buys you / what it unblocks. Plain language, customer-facing.
 #   who       the persona who owns it (Account admin / Business champion / Technical champion)
 #   optional  true if only some customers need it; say who/when in `why`
@@ -29,17 +29,17 @@
 google_doc_url: https://docs.google.com/document/d/12CnGW0qXCAfrL_lH8r1vPezdQvAzm5OL4GKGVdKePPE/edit
 
 lead_time_note: >-
-  These are the prerequisites for your AI Governance Workshop — getting them in place ahead of
+  These are the prerequisites for your AI Governance Workshop - getting them in place ahead of
   time is what lets us spend the three hours of hands-on time (plus about an hour of slides and
   discussion) proving governance on your own workspace instead of waiting on access. Each item
   is tagged by persona. The session needs as few as three people:
-  an account admin, a business champion, and a technical champion — everyone else is optional.
+  an account admin, a business champion, and a technical champion - everyone else is optional.
   The long-lead items need an account admin and can take a few days, so please start those about
   a week out; the short-lead items we can run together the day before.
 
 groups:
   - id: long_lead
-    title: Long lead time — please start about a week out
+    title: Long lead time - please start about a week out
     lead_time: Days
     intro: >-
       These need an account or metastore admin and can take a few days to arrange, so they are
@@ -49,8 +49,8 @@ groups:
       - id: account_admin_available
         item: Confirm an account admin is available for the setup (and ideally the session)
         why: >-
-          The items that stall a workshop — enabling the Gateway, the MCP previews, and the two
-          `system` grants — can **only** be done by an account admin. Name that person now so the
+          The items that stall a workshop - enabling the Gateway, the MCP previews, and the two
+          `system` grants - can **only** be done by an account admin. Name that person now so the
           long-lead work doesn't wait on tracking someone down, and ideally have them join for the
           session so anything missing can be fixed in the room.
         who: Account admin
@@ -63,11 +63,11 @@ groups:
         who: Account admin
         blocker: true
       - id: beta_readiness
-        item: Confirm your org can use Beta features — and flag CSP
+        item: Confirm your org can use Beta features - and flag CSP
         why: >-
           Unity AI Gateway and several of the system tables the telemetry steps read are still
           **Beta**. If your organization cannot run Beta features in production, tell us before
-          the session — we will scope the workshop to what is GA on your account and skip the
+          the session - we will scope the workshop to what is GA on your account and skip the
           rest, rather than discover it live. If this workspace is on **CSP** (Compliance
           Security Profile), flag that too: some Governance Hub / cost surfaces render differently
           there, and we would rather plan around it than hit it in the room.
@@ -75,7 +75,7 @@ groups:
       - id: system_grants
         item: Grant the app read access to two `system` schemas (`system.ai_gateway` and `system.access`)
         why: >-
-          These let the app read the telemetry that proves cost and control actually fired — spend
+          These let the app read the telemetry that proves cost and control actually fired - spend
           by model, budgets, per-team attribution, and the audit trail. The exact GRANT statements
           are on this page; fill in the app's service principal (get it with
           `databricks apps get ai-governance-workshop`). If they are not ready in time the workshop
@@ -85,7 +85,7 @@ groups:
         item: Provide a Unity Catalog catalog and a running SQL warehouse the app can use
         why: >-
           The app deploys into a catalog you choose and runs every live check through the warehouse.
-          A serverless warehouse starts fastest. The catalog must already exist — the app creates
+          A serverless warehouse starts fastest. The catalog must already exist - the app creates
           only its own schema inside it. Without Unity Catalog there is nothing to govern and the
           workshop cannot run.
         who: Technical champion
@@ -94,7 +94,7 @@ groups:
         item: Line up a few pilot users from your identity provider
         why: >-
           Per-user cost attribution and the on-behalf-of identity demo are only convincing with real,
-          separate logins. Optional, but it makes those moments land — shared logins prove nothing.
+          separate logins. Optional, but it makes those moments land - shared logins prove nothing.
         who: Technical champion
         optional: true
       - id: uc_foundation_models
@@ -102,7 +102,7 @@ groups:
         why: >-
           The workshop governs models, tools, and agents as Unity Catalog assets, so UC must be on
           and the account's foundation models reachable. This is usually already true wherever the
-          Gateway is enabled — confirm it so the Choice steps have something to inventory and govern.
+          Gateway is enabled - confirm it so the Choice steps have something to inventory and govern.
         who: Technical champion
       - id: mcp_previews
         item: Enable the MCP previews (Service policies and Managed MCP)
@@ -119,7 +119,7 @@ groups:
         why: >-
           If we route external providers (Bedrock, OpenAI, Anthropic) or an external/custom MCP server
           through the Gateway, the workspace must be allowed to reach them. Only needed if the External
-          Providers or MCP accelerators are in scope — share any egress-control (firewall/PrivateLink)
+          Providers or MCP accelerators are in scope - share any egress-control (firewall/PrivateLink)
           constraints ahead of time so routing doesn't fail live.
         who: Account admin
         optional: true
@@ -127,8 +127,8 @@ groups:
         item: Identify existing external providers and get a test API key (if you want to route them)
         why: >-
           The whole idea is to be ready to *test*, not just talk. Tell us which external providers you
-          already use (Bedrock, OpenAI, Anthropic, Azure OpenAI, self-hosted) and — if you'd like to
-          govern them — bring at least one **test API key** we can store in a secret scope and route
+          already use (Bedrock, OpenAI, Anthropic, Azure OpenAI, self-hosted) and - if you'd like to
+          govern them - bring at least one **test API key** we can store in a secret scope and route
           live through the Gateway. This is what makes the External Providers accelerator real instead
           of a slide; without a key we can only describe it. Only needed if external providers are in
           scope. Pairs with the egress allowlist above.
@@ -139,16 +139,16 @@ groups:
         why: >-
           Tell us about any private networking (PrivateLink / VPC / firewall egress rules, NCC, storage
           firewalls) and let's **test it before the session**. This matters most for the two things
-          that are easy to get wrong live: **inference tables** — the guardrail/PII steps and the
+          that are easy to get wrong live: **inference tables** - the guardrail/PII steps and the
           Policies & Guardrails accelerator log request/response payloads here, and with private
           networking or private storage those tables and traces may not surface until the paths are
-          confirmed — and **end-to-end tracing / audit** (the telemetry must actually reach the system
+          confirmed - and **end-to-end tracing / audit** (the telemetry must actually reach the system
           tables and any SIEM). Confirming the paths early means the Control steps prove something
           instead of timing out.
         who: Account admin
 
   - id: short_lead
-    title: Short lead time — the day before (with us, if you like)
+    title: Short lead time - the day before (with us, if you like)
     lead_time: Minutes to an hour
     intro: >-
       Quick to do once the long-lead items are in place. We are happy to walk through these together
@@ -158,7 +158,7 @@ groups:
         item: "Deploy the app to your workspace and confirm it is healthy"
         why: >-
           You run this in your own environment to try the capabilities first-hand. It is a
-          standard Databricks Asset Bundle — no scripts. From the `workshop_app/` folder:
+          standard Databricks Asset Bundle - no scripts. From the `workshop_app/` folder:
           `databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"`
           then `databricks bundle run ai_governance_workshop_app -t dev -p <profile>`. Open the
           app URL it prints and check `GET /api/health` returns `{"status":"ok","config_problems":[]}`.
@@ -181,14 +181,14 @@ groups:
         item: Decide whether to run an accelerator, and which one
         why: >-
           There are six optional ~3-hour deep dives (MCP, agent registry, coding agents, external
-          providers, policies & guardrails, and skills). Pick the one matching your top priority —
+          providers, policies & guardrails, and skills). Pick the one matching your top priority -
           we won't run all of them, there isn't time.
         who: Business champion
         optional: true
       - id: target_mcp_or_agent
         item: Have a target agent or MCP server to govern (Agents / MCP accelerators)
         why: >-
-          The Agents and MCP accelerators land best on something you actually run — bring one target
+          The Agents and MCP accelerators land best on something you actually run - bring one target
           agent or MCP server to register and govern. If you'd rather see the mechanics first, the
           provided read-only `system.ai.github` MCP works out of the box. Only needed if those
           accelerators are in scope.
@@ -205,7 +205,7 @@ groups:
       - id: security_stakeholder
         item: Invite a security / compliance stakeholder for the Control hour
         why: >-
-          The Control pillar — guardrails, policies, audit — turns from a demo into a real evaluation
+          The Control pillar - guardrails, policies, audit - turns from a demo into a real evaluation
           when the person who owns security or compliance sign-off is in the room to watch it fire.
           Optional, but it's what makes Control land with the buyer who cares most.
         who: Business champion

@@ -1,4 +1,4 @@
-# AI Governance Workshop — customer configuration
+# AI Governance Workshop - customer configuration
 #
 # This is the ONE file a customer edits to run the workshop on their own workspace.
 # Everything the app does (which endpoints to govern, which MCP service to policy,
@@ -8,39 +8,39 @@
 workspace:
   # Left blank on purpose. When deployed as a bundle the app reads the warehouse from the
   # DATABRICKS_WAREHOUSE_ID env var, which the bundle sets on the app from the `warehouse_id`
-  # variable (databricks.yml → apps.*.config.env) — so `--var="warehouse_id=..."` is the
+  # variable (databricks.yml → apps.*.config.env) - so `--var="warehouse_id=..."` is the
   # single source of truth and you do not need to set this. Set it only for LOCAL development.
   warehouse_id: ""
 
 # Unity Catalog location for governance artifacts (the MCP policy function, inference
-# tables, audit views). REQUIRED — the bundle creates this schema in this catalog, and the
+# tables, audit views). REQUIRED - the bundle creates this schema in this catalog, and the
 # catalog must already exist. Pass the catalog at deploy time with
 # `--var="catalog=<your-catalog>"` so the bundle and the app agree.
 catalog:
-  name: ""                        # e.g. main — must match the bundle's `catalog` variable
+  name: ""                        # e.g. main - must match the bundle's `catalog` variable
   schema: workshop                # matches the bundle's `schema` default (databricks.yml)
 
 # Foundation Model endpoints the workshop references (Choice pillar).
 gateway:
-  # A shared, out-of-the-box foundation model — a v3 UC model service (catalog.schema.service).
+  # A shared, out-of-the-box foundation model - a Unity Gateway model service (catalog.schema.service).
   ootb_endpoint: system.ai.claude-sonnet-4-5
   # Alternate (open-weight) model used by the routing-agent cost demo (Cost pillar).
   cheap_endpoint: system.ai.meta-llama-3-3-70b-instruct
   # Open-weight model called by the "Use proprietary and open-weight frontier models" step
-  # (Choice). A v3 Unity Catalog model service (catalog.schema.service) invoked over the governed
-  # gateway path — proving an open-weight model is addressed exactly like a proprietary one.
+  # (Choice). A Unity Gateway model service (catalog.schema.service) invoked over the governed
+  # gateway path - proving an open-weight model is addressed exactly like a proprietary one.
   open_weight_model_service: system.ai.glm-5-3-flash
 
 # The governed endpoint the workshop creates and layers controls onto (Control pillar).
-# The governed model SERVICE — a v3 Unity Catalog securable (catalog.schema.service), NOT a
+# The governed model SERVICE - a Unity Catalog securable (catalog.schema.service), NOT a
 # legacy v1 serving endpoint. Every governed step (create/verify, ACL, rate limits, guardrails,
-# invocation) addresses it by FQN on the v3 `/ai-gateway/mlflow/v1` path.
+# invocation) addresses it by FQN on the Unity Gateway `/ai-gateway/mlflow/v1` path.
 #
 # `service` is either a bare name (resolved to <catalog>.<schema>.<service> against the
-# workshop's own catalog/schema — the default, a service the customer creates in front of
+# workshop's own catalog/schema - the default, a service the customer creates in front of
 # `base_model`) or an already-qualified FQN like `system.ai.claude-sonnet-4-5` to point the
 # governed steps at a provided model instead. base_model/fallback_model are hints for the
-# guided (UI) creation — the app never creates the service unattended on a customer workspace.
+# guided (UI) creation - the app never creates the service unattended on a customer workspace.
 governed_endpoint:
   service: governed
   base_model: system.ai.claude-sonnet-4-5
@@ -57,7 +57,7 @@ governed_endpoint:
 
 # MCP service the workshop governs (Control pillar + MCP accelerator).
 #
-# Must be an MCP_SERVICE securable — a Databricks-provided `system.ai.*` service or an
+# Must be an MCP_SERVICE securable - a Databricks-provided `system.ai.*` service or an
 # external one you registered. The managed UC-native endpoints (/api/2.0/mcp/functions/...)
 # are NOT securables and cannot carry a service policy.
 #
@@ -73,32 +73,32 @@ mcp:
     #
     # NOTE: the provided `system.ai.github` service is already filtered to READ-ONLY tools,
     # so there is no write tool on it to deny. `get_file_contents` is therefore used as the
-    # deny target — denying a tool that genuinely exists still proves enforcement, and it is
+    # deny target - denying a tool that genuinely exists still proves enforcement, and it is
     # honest about what this service exposes. Point this at a real write tool
     # (e.g. `push_files`, `create_issue`) on an external MCP that exposes one.
     deny_tools:
       - get_file_contents
-    # Reason returned to the caller in the structured DENY error. Keep it specific — this is
+    # Reason returned to the caller in the structured DENY error. Keep it specific - this is
     # what a developer sees when the policy fires.
     deny_reason: "Blocked by workshop policy: this tool is not permitted for the pilot group."
     allow_probe_tool: get_commit      # a read tool used to prove ALLOW still works
     # Read tool that echoes the calling user, used to prove on-behalf-of identity.
     identity_probe_tool: get_me
 
-# Cost pillar — routing ROI.
+# Cost pillar - routing ROI.
 #
 # The workshop frames three ways to cut token spend:
-#   a) Smart routing — Databricks-managed model selection. Beta; nothing to configure here.
-#   b) Omnigent      — partner routing layer above the agent harnesses.
-#   c) Custom router — a cheap classifier picks the cheapest sufficient model. This is the
+#   a) Smart routing - Databricks-managed model selection. Beta; nothing to configure here.
+#   b) Omnigent      - partner routing layer above the agent harnesses.
+#   c) Custom router - a cheap classifier picks the cheapest sufficient model. This is the
 #                      one the app actually runs, because it is the one you can stand up
 #                      today and measure.
 cost:
   routing:
-    # Your negotiated $/DBU. The default is LIST PRICE — until you change it, dollar
+    # Your negotiated $/DBU. The default is LIST PRICE - until you change it, dollar
     # figures are illustrative (token counts are always real).
     dbu_to_usd: 0.070
-    # The three routing tiers, as v3 UC model services (catalog.schema.service). Retarget to
+    # The three routing tiers, as Unity Gateway model services (catalog.schema.service). Retarget to
     # whichever model services exist on this workspace.
     endpoints:
       frontier: system.ai.claude-sonnet-4-5
@@ -108,7 +108,7 @@ cost:
     # monthly dollar figure. Set it to the workload's real volume.
     requests_per_month: 10000
     # Prompts the comparison runs against all three models. Shown to the room, so use ones
-    # representative of the workload — the numbers only mean something on work they run. A
+    # representative of the workload - the numbers only mean something on work they run. A
     # spread of complexity makes the smart-routing estimate realistic (it routes each to a
     # different tier).
     sample_prompts:
@@ -125,12 +125,12 @@ project:
   environment: workshop
   use_case: governance_enablement
 
-# MLflow experiment for agent traces (Control pillar — observability). Leave blank to skip trace steps.
+# MLflow experiment for agent traces (Control pillar - observability). Leave blank to skip trace steps.
 mlflow:
   experiment_id: ""
 
 # Where workshop progress is stored. Progress is a single JSON file on a Unity Catalog
-# volume (created by the asset bundle in the catalog/schema above) — no database to
+# volume (created by the asset bundle in the catalog/schema above) - no database to
 # provision. The app reads it at startup and rewrites it on every step update.
 volume:
   name: workshop_state          # created by the bundle in <catalog>.<schema>

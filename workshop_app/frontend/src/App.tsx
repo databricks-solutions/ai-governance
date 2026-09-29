@@ -10,7 +10,7 @@ import Outcomes from "@/pages/Outcomes";
 
 const PILLAR_ICONS: Record<string, typeof Layers> = { choice: Layers, cost: DollarSign, control: Lock };
 
-// Customer-facing (external) repo — for feedback links in the sidebar.
+// Customer-facing (external) repo - for feedback links in the sidebar.
 const REPO_URL = "https://github.com/databricks-solutions/ai-governance";
 
 export default function App() {
