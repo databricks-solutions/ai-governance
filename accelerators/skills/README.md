@@ -1,8 +1,8 @@
-# Accelerator — Agent Skills
+# Accelerator - Agent Skills
 
 Build, govern, and deploy Agent Skills in Genie Code as a runtime allowlist and tiered registry. A ~3-hour deep dive that transforms ad-hoc prompt instructions into registered, versioned, security-reviewed skills with owners, data scope, and evals.
 
-Agent Skills are markdown files in `~/.assistant/skills/` that extend the Databricks Assistant with custom instructions and examples. The **allowlist is the governance enforcement point** — what's in the folder is invokable; what's not, isn't. This is hard enforcement: no admin can override, no user can circumvent. Tier 1 (personal) stays zero-friction so teams don't route around governance; friction scales with risk as you move to Tier 2 (peer-reviewed, limited data scope) and Tier 3 (security-reviewed, full audit, regulated data).
+Agent Skills are markdown files in `~/.assistant/skills/` that extend the Databricks Assistant with custom instructions and examples. The **allowlist is the governance enforcement point** - what's in the folder is invokable; what's not, isn't. This is hard enforcement: no admin can override, no user can circumvent. Tier 1 (personal) stays zero-friction so teams don't route around governance; friction scales with risk as you move to Tier 2 (peer-reviewed, limited data scope) and Tier 3 (security-reviewed, full audit, regulated data).
 
 ## What you'll prove
 
@@ -17,12 +17,12 @@ Understand the three-layer instruction model (user instructions, workspace instr
 ## The production framework (included)
 
 This accelerator includes the real, batteries-included implementation at
-[`skills-collaboration-framework/`](skills-collaboration-framework) — a full copy, no submodule to
+[`skills-collaboration-framework/`](skills-collaboration-framework) - a full copy, no submodule to
 init. It ships the tiered registry (`tier1/`, `tier2/`, `tier3/`, `config/registry.yaml`), the CI
 gates (`scripts/lint-and-scan.sh`, `validate-meta.sh`, `run-skill-tests.sh`, `ai-review.sh`), the
 allowlist sync (`scripts/sync-skills.sh`), ownership-health tooling, and a
 [`docs/demo-runbook.md`](skills-collaboration-framework/docs/demo-runbook.md). Copy it into your
-own Git repo and open a PR to watch the gates fire — that is the non-app, production route. The
+own Git repo and open a PR to watch the gates fire - that is the non-app, production route. The
 notebook below is the lightweight hands-on primer that teaches the same concepts before you adopt
 the framework.
 

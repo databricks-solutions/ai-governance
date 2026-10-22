@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 04 — Traffic routing
+# MAGIC # Lab 04 - Traffic routing
 # MAGIC
 # MAGIC Split traffic across served entities for load balancing and A/B/canary rollouts.
 # MAGIC

@@ -187,7 +187,7 @@ export function RoiChart({ roi, frontierLabel = 'FRONTIER ONLY', routedLabel = '
         {/* x-axis title */}
         <text x={(PADL + (W - PADR)) / 2} y={H - 5} textAnchor="middle" fontSize={8} fontWeight={700} fill="rgba(255,255,255,0.5)" style={{ letterSpacing: '.08em' }}>{periodNoun.toUpperCase()}</text>
       </svg>
-      <div className="mt-1 text-center text-[10px] text-white/40">{single ? `cumulative cost over ${N} ${periodNoun} · the frontier model was the best value here — nothing cheaper cleared the bar` : `cumulative cost over ${N} ${periodNoun} · log scale — the gap between the lines is the savings multiple`}</div>
+      <div className="mt-1 text-center text-[10px] text-white/40">{single ? `cumulative cost over ${N} ${periodNoun} · the frontier model was the best value here - nothing cheaper cleared the bar` : `cumulative cost over ${N} ${periodNoun} · log scale - the gap between the lines is the savings multiple`}</div>
     </div>
   );
 }

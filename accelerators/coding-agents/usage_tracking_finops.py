@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 02 — Usage tracking & FinOps
+# MAGIC # Lab 02 - Usage tracking & FinOps
 # MAGIC
 # MAGIC Turn Gateway telemetry into tokens, cost, and a budget alert.
 # MAGIC
@@ -237,7 +237,7 @@ spend = (mtd[0][0] or 0.0) if mtd else 0.0
 pct = 100 * spend / MONTHLY_BUDGET_USD if MONTHLY_BUDGET_USD else 0
 print(f"Month-to-date spend on {ENDPOINT_NAME}: ${spend:,.2f} ({pct:.1f}% of ${MONTHLY_BUDGET_USD:,.0f} budget)")
 if spend > MONTHLY_BUDGET_USD:
-    print("⚠️  OVER BUDGET — tighten rate limits or review top consumers above.")
+    print("⚠️  OVER BUDGET - tighten rate limits or review top consumers above.")
 else:
     print("✅ Within budget.")
 

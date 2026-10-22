@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # External Providers — reference queries
+# MAGIC # External Providers - reference queries
 # MAGIC
 # MAGIC Standalone version of the checks the **External Providers** accelerator runs inside the
 # MAGIC AI Governance Workshop app, so you can reference and run them without deploying the app.
@@ -31,7 +31,7 @@ _EXTERNAL_HINTS = ("bedrock", "openai", "gpt", "anthropic", "claude", "external"
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1 — Inventory current provider access (`list_endpoints`)
+# MAGIC ## Step 1 - Inventory current provider access (`list_endpoints`)
 # MAGIC Map how external providers are reached today. The target is a single governed path;
 # MAGIC start by listing the serving endpoints that exist.
 
@@ -45,7 +45,7 @@ for ep in endpoints:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2 — Route a provider through the Gateway (`external_provider_routing`)
+# MAGIC ## Step 2 - Route a provider through the Gateway (`external_provider_routing`)
 # MAGIC Which serving endpoints look like external-model providers routed through the Gateway
 # MAGIC (Bedrock / OpenAI / Anthropic)? Registering them as external models behind a governed
 # MAGIC endpoint makes them inherit the same limits, guardrails, and logging.
@@ -58,9 +58,9 @@ print("External-provider-looking endpoints:", external or "(none found by name)"
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3 — Credentials in secrets, never inline (`provider_secret_readiness`)
+# MAGIC ## Step 3 - Credentials in secrets, never inline (`provider_secret_readiness`)
 # MAGIC A provider key pasted into config is the first pitfall. Store it in a secret scope and
-# MAGIC reference it as `{{secrets/<scope>/<key>}}` — a read of the endpoint then returns the
+# MAGIC reference it as `{{secrets/<scope>/<key>}}` - a read of the endpoint then returns the
 # MAGIC reference, never the value. List the scopes and check which external endpoints reference
 # MAGIC a secret.
 
@@ -82,9 +82,9 @@ if not external:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4 — Bind approved models to approved workspaces (`workspace_binding_check`)
+# MAGIC ## Step 4 - Bind approved models to approved workspaces (`workspace_binding_check`)
 # MAGIC "Approved models" is only advisory until the catalog is `isolation_mode = ISOLATED` with
-# MAGIC explicit workspace bindings — otherwise any workspace on the metastore can bind it.
+# MAGIC explicit workspace bindings - otherwise any workspace on the metastore can bind it.
 
 # COMMAND ----------
 
@@ -94,12 +94,12 @@ if str(cat.isolation_mode) == "ISOLATED":
     bindings = w.api_client.do("GET", f"/api/2.1/unity-catalog/bindings/catalog/{CATALOG}")
     print(json.dumps(bindings, indent=2, default=str))
 else:
-    print(">>> Not ISOLATED — the approved-models list is advisory only until you isolate + bind.")
+    print(">>> Not ISOLATED - the approved-models list is advisory only until you isolate + bind.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5 — Confirm routed usage by project (`usage_by_project`)
+# MAGIC ## Step 5 - Confirm routed usage by project (`usage_by_project`)
 # MAGIC Migrate one workload that bypasses governance onto the governed endpoint, then confirm
 # MAGIC its traffic and cost attribute by project tag (request tag or endpoint tag).
 
@@ -119,7 +119,7 @@ display(spark.sql(f"""
     GROUP BY 1, 2 ORDER BY tokens DESC LIMIT 20
 """))
 
-# Table watermark — if the query above is empty, check how fresh the usage table is.
+# Table watermark - if the query above is empty, check how fresh the usage table is.
 display(spark.sql("""
     SELECT max(event_time) AS latest_event, current_timestamp() AS now_ts
     FROM system.ai_gateway.usage

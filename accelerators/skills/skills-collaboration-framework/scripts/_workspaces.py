@@ -3,14 +3,14 @@
 
 This is BOTH a library (imported by _validate_meta.py) and a CLI (called by the
 sync-skills.sh / prune-deprecated.sh shell scripts), so "where does a tier/domain
-sync to" is defined in exactly ONE place — the resolution logic can never drift
+sync to" is defined in exactly ONE place - the resolution logic can never drift
 between validate, sync, and prune again.
 
 CLI:
   _workspaces.py skills-path                -> print skills_path (default /.assistant/skills)
   _workspaces.py targets <tier> [domain]    -> print target workspace URLs, one per line.
                                                Exit 3 (with a stderr message) if the tier/domain
-                                               resolves to no workspaces — the caller decides
+                                               resolves to no workspaces - the caller decides
                                                whether that's fatal (sync) or skip-with-warning (prune).
   _workspaces.py domains                     -> print every configured tier2 domain, one per line
 
@@ -40,7 +40,7 @@ def skills_path(cfg=None):
 
 def resolve_targets(tier, domain, cfg=None):
     """Target workspace URLs for a tier (+domain for tier 2). Returns [] when the
-    tier/domain is not mapped — callers distinguish fatal-vs-skip on the empty result."""
+    tier/domain is not mapped - callers distinguish fatal-vs-skip on the empty result."""
     cfg = cfg if cfg is not None else load_config()
     tier = str(tier)
     if tier == '2':

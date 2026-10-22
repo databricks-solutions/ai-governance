@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab — Agent evaluation & monitoring
+# MAGIC # Lab - Agent evaluation & monitoring
 # MAGIC
 # MAGIC Score responses from the governed endpoint with Mosaic AI Agent Evaluation (MLflow).
 # MAGIC

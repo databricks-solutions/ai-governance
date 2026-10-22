@@ -7,8 +7,8 @@ SKILL_FILE="${1:-}"
 PR_NUMBER="${2:-}"
 CI_SYSTEM="${CI_SYSTEM:-ado}"   # ado is the live CI here; the github path is kept for vendor portability
 REPORT_FILE="${REPORT_FILE:-}"   # if set, append a markdown eval report (CI surfaces it as a build/step summary)
-MIN_EVAL_SCORE="${MIN_EVAL_SCORE:-0.8}"   # advisory threshold — see EVAL_GATE_MODE for how a below-threshold score is handled
-EVAL_GATE_MODE="${EVAL_GATE_MODE:-advisory}"   # global default | advisory | human-review | auto-drop — what a below-threshold eval_score does
+MIN_EVAL_SCORE="${MIN_EVAL_SCORE:-0.8}"   # advisory threshold - see EVAL_GATE_MODE for how a below-threshold score is handled
+EVAL_GATE_MODE="${EVAL_GATE_MODE:-advisory}"   # global default | advisory | human-review | auto-drop - what a below-threshold eval_score does
 # Per-tier override (spec §16.3 recommends advisory@T2, blocking@T3). If EVAL_GATE_MODE_T2 /
 # EVAL_GATE_MODE_T3 is set, it wins for that tier; otherwise the global EVAL_GATE_MODE applies.
 # The effective mode is resolved from the skill's tier once SKILL_FILE is validated (below).
@@ -23,28 +23,28 @@ AI_ENDPOINT_NAME="${AI_ENDPOINT_NAME:-}"
 # Decide the build outcome from the eval verdict + score, honoring EVAL_GATE_MODE.
 #   - verdict "fail" (any dimension < 0.5) is a HARD gate: blocks in every mode.
 #   - a below-threshold eval_score is handled by mode:
-#       advisory     (default) — warn only, never blocks (the verdict still governs)
-#       human-review           — warn + emit a "::needs-human-review::" marker, does not block
-#       auto-drop              — block the build (exit 1)
-# Returns 0 = allow, 1 = block. Pure decision logic — no endpoint needed — so it is unit-tested
+#       advisory     (default) - warn only, never blocks (the verdict still governs)
+#       human-review           - warn + emit a "::needs-human-review::" marker, does not block
+#       auto-drop              - block the build (exit 1)
+# Returns 0 = allow, 1 = block. Pure decision logic - no endpoint needed - so it is unit-tested
 # directly via the `--gate-decision <score> [verdict]` dry path below.
 gate_decision() {
   local score="$1" verdict="${2:-pass}" mode="${EVAL_GATE_MODE:-advisory}" min="${MIN_EVAL_SCORE:-0.8}"
   if [[ "$verdict" == "fail" ]]; then
-    echo "ERROR: AI review verdict is FAIL — blocking (hard gate, applies in every mode)." >&2
+    echo "ERROR: AI review verdict is FAIL - blocking (hard gate, applies in every mode)." >&2
     return 1
   fi
   # Below the advisory threshold?
   if python3 -c "import sys; sys.exit(0 if float('$score') < float('$min') else 1)"; then
     case "$mode" in
       auto-drop)
-        echo "AUTO-DROP: eval_score ${score} is below the ${min} threshold — blocking build (EVAL_GATE_MODE=auto-drop)." >&2
+        echo "AUTO-DROP: eval_score ${score} is below the ${min} threshold - blocking build (EVAL_GATE_MODE=auto-drop)." >&2
         return 1 ;;
       human-review)
-        echo "::needs-human-review:: eval_score ${score} is below the ${min} threshold — requires steward sign-off (EVAL_GATE_MODE=human-review)."
+        echo "::needs-human-review:: eval_score ${score} is below the ${min} threshold - requires steward sign-off (EVAL_GATE_MODE=human-review)."
         return 0 ;;
       advisory|*)
-        echo "ADVISORY: eval_score ${score} is below the ${min} threshold (non-blocking — verdict governs; EVAL_GATE_MODE=${mode})."
+        echo "ADVISORY: eval_score ${score} is below the ${min} threshold (non-blocking - verdict governs; EVAL_GATE_MODE=${mode})."
         return 0 ;;
     esac
   fi
@@ -95,7 +95,7 @@ HAVE_AUTH=false
 [[ -n "$DATABRICKS_CLIENT_ID" && -n "$DATABRICKS_CLIENT_SECRET" ]] && HAVE_AUTH=true
 if [[ -z "$DATABRICKS_HOST" || "$HAVE_AUTH" != "true" || -z "$AI_ENDPOINT_NAME" ]]; then
   echo "WARNING: need DATABRICKS_HOST, AI_ENDPOINT_NAME, and a credential (DATABRICKS_TOKEN, or DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET)." >&2
-  echo "ai-review: ADVISORY — skipped (no endpoint configured)"
+  echo "ai-review: ADVISORY - skipped (no endpoint configured)"
   exit 0
 fi
 
@@ -109,7 +109,7 @@ if [[ -z "$BEARER" ]]; then
     --user "${DATABRICKS_CLIENT_ID}:${DATABRICKS_CLIENT_SECRET}" \
     --data 'grant_type=client_credentials&scope=all-apis' || echo "000")
   if [[ "$TOK_STATUS" != "200" ]]; then
-    # Surface the failure loudly — a wrong/expired DATABRICKS_CLIENT_SECRET lands here (HTTP 401).
+    # Surface the failure loudly - a wrong/expired DATABRICKS_CLIENT_SECRET lands here (HTTP 401).
     echo "ERROR: OAuth M2M token exchange failed (HTTP ${TOK_STATUS})." >&2
     echo "       Check DATABRICKS_CLIENT_ID / DATABRICKS_CLIENT_SECRET. Response:" >&2
     head -c 300 "$TOK_BODY" >&2; echo >&2
@@ -127,7 +127,7 @@ fi
 ENDPOINT_URL="${DATABRICKS_HOST%/}/serving-endpoints/${AI_ENDPOINT_NAME}/invocations"
 
 # Build the request body safely. The SKILL content is read INSIDE python from a file
-# path passed via env — never interpolated into a shell-quoted string (that was the
+# path passed via env - never interpolated into a shell-quoted string (that was the
 # original quoting bug, since the prompt contains quotes, braces, and newlines).
 REQUEST_BODY=$(SKILL_FILE="$SKILL_FILE" python3 <<'PYEOF'
 import json, os
@@ -138,7 +138,7 @@ instructions = (
   "write the note so it states how each criterion fared.\n\n"
   "clarity:\n"
   "  (a) the description names concrete triggers/keywords a router can match;\n"
-  "  (b) scope is unambiguous — clear what the skill does AND does not cover;\n"
+  "  (b) scope is unambiguous - clear what the skill does AND does not cover;\n"
   "  (c) neither so broad it would over-trigger nor so narrow it never loads.\n"
   "safety:\n"
   "  (a) no secrets, tokens, or credentials embedded;\n"
@@ -155,7 +155,7 @@ instructions = (
   "SKILL.md content:\n" + skill
 )
 # A small, low-cost model (e.g. databricks-claude-haiku-4-5) is plenty for a markdown review.
-# response_format=json_schema forces a clean, structured object — no prose, no code fences.
+# response_format=json_schema forces a clean, structured object - no prose, no code fences.
 schema = {
   "type": "object",
   "properties": {
@@ -198,7 +198,7 @@ resp = json.loads(os.environ['RESPONSE'])
 
 def _flatten(c):
     # content may be a plain string, or a list of parts. Reasoning models (e.g. gpt-oss)
-    # return [{type:'reasoning',summary:[...]}, {type:'text',text:'...'}] — keep text parts.
+    # return [{type:'reasoning',summary:[...]}, {type:'text',text:'...'}] - keep text parts.
     if isinstance(c, str):
         return c
     if isinstance(c, list):
@@ -247,7 +247,7 @@ EVAL_SCORE=$(echo "$PARSED" | python3 -c "import json,sys; print(json.load(sys.s
 echo "==> Verdict: ${VERDICT}  Score: ${EVAL_SCORE}"
 echo "$PARSED" | python3 -c "import json,sys; d=json.load(sys.stdin); print('==> Dimensions: ' + ', '.join(f\"{k} {v['score']}\" for k,v in d['dimensions'].items())); print('==> Summary:', d['summary'])"
 
-# Resolve skill name from frontmatter (file path via env — no interpolation).
+# Resolve skill name from frontmatter (file path via env - no interpolation).
 SKILL_NAME=$(SKILL_FILE="$SKILL_FILE" python3 <<'PYEOF'
 import re, yaml, os
 content = open(os.environ['SKILL_FILE']).read()
@@ -257,7 +257,7 @@ PYEOF
 )
 
 # eval_score is surfaced in the build report + build tags on merge (see azure-pipelines.yml
-# "Report eval_score" step) — never written back to registry.yaml, since main is branch-protected
+# "Report eval_score" step) - never written back to registry.yaml, since main is branch-protected
 # and CI cannot push to it. The build is the durable record of the score.
 
 # Render the structured verdict as a markdown block (verdict, score, per-dimension table, summary).
@@ -275,15 +275,15 @@ icon = '✅' if verdict == 'pass' else '❌'
 try:    below = float(score) < float(threshold)
 except Exception: below = False
 if below and mode == 'auto-drop':
-    band = f"⛔ below threshold ({threshold}) — BLOCKING (gate mode: auto-drop)"
+    band = f"⛔ below threshold ({threshold}) - BLOCKING (gate mode: auto-drop)"
 elif below and mode == 'human-review':
-    band = f"⚠️ below threshold ({threshold}) — needs human review (gate mode: human-review)"
+    band = f"⚠️ below threshold ({threshold}) - needs human review (gate mode: human-review)"
 elif below:
-    band = f"⚠️ below advisory threshold ({threshold}) — non-blocking, please review"
+    band = f"⚠️ below advisory threshold ({threshold}) - non-blocking, please review"
 else:
     band = f"✓ meets advisory threshold ({threshold})"
 lines = [
-    f"## AI Skill Review — `{name}`", "",
+    f"## AI Skill Review - `{name}`", "",
     f"**Verdict:** {icon} {verdict}  |  **eval_score:** {score}/1.0  |  {band}", "",
     "| Dimension | Score | Notes |", "|-----------|-------|-------|",
 ]
@@ -320,9 +320,9 @@ if [[ -n "$PR_NUMBER" ]]; then
     ADO_ORG="${ADO_ORG:-greenwood-demo}"
     ADO_PROJECT="${ADO_PROJECT:-cicd-demo}"
     ADO_REPO="${ADO_REPO:-skills-collaboration-framework}"
-    ADO_TOKEN="${ADO_TOKEN:-}"   # Azure DevOps token — set to $(System.AccessToken) in the pipeline.
+    ADO_TOKEN="${ADO_TOKEN:-}"   # Azure DevOps token - set to $(System.AccessToken) in the pipeline.
     if [[ -z "$ADO_TOKEN" ]]; then
-      echo "WARNING: ADO_TOKEN not set — skipping ADO PR comment. Map \$(System.AccessToken) → ADO_TOKEN." >&2
+      echo "WARNING: ADO_TOKEN not set - skipping ADO PR comment. Map \$(System.AccessToken) → ADO_TOKEN." >&2
     else
       COMMENT_JSON=$(COMMENT="$COMMENT" python3 -c "import json,os; print(json.dumps(os.environ['COMMENT']))")
       # System.AccessToken is an OAuth bearer token; if you use a classic ADO PAT instead,

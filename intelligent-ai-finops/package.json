@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "Intelligent AI FinOps — a routing layer that sends each query to the cheapest model that clears a quality bar, on Databricks.",
+  "description": "Intelligent AI FinOps - a routing layer that sends each query to the cheapest model that clears a quality bar, on Databricks.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

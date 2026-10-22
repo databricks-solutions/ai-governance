@@ -513,8 +513,9 @@ def t_routing_roi() -> TestResult:
     """Run the custom router end to end and report the measured saving vs always-frontier.
 
     Option (c) of the three cost-routing approaches - the only one a customer can stand up
-    today. Smart Routing (a) is Databricks-managed and in Beta; Omnigent (b) is a partner
-    layer. Both are positioned in the step concept rather than executed here.
+    today. Smart Routing (a) is Databricks-managed and in Beta; Omnigent (b) is Databricks'
+    open-source meta-harness (managed version in Beta). Both are positioned in the step concept
+    rather than executed here.
     """
     prompt = _routing_prompt()
     r = routing.route(prompt)

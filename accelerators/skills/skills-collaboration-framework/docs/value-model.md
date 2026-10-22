@@ -1,4 +1,4 @@
-# Value Model — A Worksheet the Client Fills In
+# Value Model - A Worksheet the Client Fills In
 
 This framework's ROI is **the client's number, not ours.** A self-computed figure from the
 customer's own rates and volumes is far more credible than a vendor ROI slide. This document gives
@@ -8,7 +8,7 @@ the **levers and formulas**; every value is left blank for the client to fill in
 > `system.access.assistant_events` (adoption) and their own time-tracking / incident data. Keep the
 > numbers theirs.
 
-## Lever 1 — Duplication cost (work rebuilt because it couldn't be found)
+## Lever 1 - Duplication cost (work rebuilt because it couldn't be found)
 
 ```
 duplication_cost_per_year
@@ -20,7 +20,7 @@ duplication_cost_per_year
 
 The registry's mandatory dupe-check at *Propose* is what this lever measures the avoidance of.
 
-## Lever 2 — Low-quality-skill cost (re-prompting and fixing)
+## Lever 2 - Low-quality-skill cost (re-prompting and fixing)
 
 ```
 low_quality_cost_per_year
@@ -33,7 +33,7 @@ low_quality_cost_per_year
 
 A reviewed, tiered skill reduces the re-prompt/fix rate. The AI review + human gate is the lever.
 
-## Lever 3 — Accuracy-driven rework (downstream corrections)
+## Lever 3 - Accuracy-driven rework (downstream corrections)
 
 ```
 accuracy_rework_cost_per_year
@@ -46,9 +46,9 @@ accuracy_rework_cost_per_year
 Plausible-but-wrong outputs from an ungoverned skill create silent rework. Tiering high-impact
 skills to Tier 3 (full review + security) is the lever.
 
-## Lever 4 — Quality lever (qualitative)
+## Lever 4 - Quality lever (qualitative)
 
-Not a dollar line — the **mechanism** that moves Levers 1–3:
+Not a dollar line - the **mechanism** that moves Levers 1–3:
 
 - SME / governance-council attention applied **at the right tier** (more for Tier 3, none for Tier 1).
 - Reuse incentives tied to team OKRs so discovery beats rebuild.
@@ -71,4 +71,4 @@ skills) · no shadow-IT cleanup · a defensible "who can touch what data" story.
 | **Net / payback** | | | **______** |
 
 > No fabricated benchmarks live in this repo on purpose. If you want ranges to seed a conversation,
-> source them from the customer's own pilot or a named internal study — never invent them.
+> source them from the customer's own pilot or a named internal study - never invent them.

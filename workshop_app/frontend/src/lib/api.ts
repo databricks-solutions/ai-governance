@@ -13,6 +13,10 @@ export interface Step {
   title: string;
   /** One-line "We can …" outcome statement shown under the title. */
   outcome?: string;
+  /** How essential the step is - shown as a badge so the room scans fast. */
+  tier?: "mandatory" | "recommended" | "optional";
+  /** Where the action runs, e.g. "this app", "AI Gateway UI", "Account console". */
+  where?: string;
   /** Preview outcome - shown with a "Coming soon" badge, no Try-It yet. */
   coming_soon?: boolean;
   concept?: string;

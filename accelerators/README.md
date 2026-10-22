@@ -1,4 +1,4 @@
-# Accelerators — reference notebooks
+# Accelerators - reference notebooks
 
 Optional **~3-hour deep dives** that run after the core AI Governance Workshop (Choice · Cost ·
 Control). Each accelerator is delivered in-app by the workshop app (defined in
@@ -7,11 +7,11 @@ folders here let you **reference and run the same checks without deploying the a
 
 Every folder contains:
 
-- **`README.md`** — what the accelerator proves, its steps, and prerequisites.
-- **`reference_queries.py`** — a self-contained Databricks notebook that reproduces the app's
+- **`README.md`** - what the accelerator proves, its steps, and prerequisites.
+- **`reference_queries.py`** - a self-contained Databricks notebook that reproduces the app's
   SQL/API checks, one section per step. SQL runs through `spark.sql`; the rest uses the Databricks
   SDK / REST.
-- **Ported deep-dive notebooks** — longer, hands-on notebooks for that topic.
+- **Ported deep-dive notebooks** - longer, hands-on notebooks for that topic.
 
 | Accelerator | Folder | Deep-dive notebooks |
 |---|---|---|
@@ -28,6 +28,6 @@ widgets at the top to your workspace, and run top to bottom. No bundle and no ap
 required.
 
 Most SQL steps read Unity Catalog `system` schemas (`system.ai_gateway`, `system.access`), which
-need an account/metastore admin grant — each folder's README notes exactly which. Steps that send
+need an account/metastore admin grant - each folder's README notes exactly which. Steps that send
 prompts, burst the endpoint, or reconfigure a served entity are called out in the folder READMEs;
 everything else is read-only.

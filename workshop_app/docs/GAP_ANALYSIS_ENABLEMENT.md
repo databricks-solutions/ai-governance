@@ -4,7 +4,7 @@ Feature-by-feature check of the core workshop steps + 21 accelerator steps again
 *Unity Gateway Enablement* (July 2026), which is a **customer-enablement** document -
 i.e. what one specific customer needs to stand this up, not what the product can do.
 
-That distinction drives every call below. The enablement doc is broader than a 4-hour
+That distinction drives every call below. The enablement doc is broader than a 2-hour
 workshop on purpose: it includes Genie/Teams/Copilot integration, Terraform IaC, identity
 provisioning, and secret rotation. Those are real requirements; most are not *live testable*
 in a room.
@@ -16,7 +16,7 @@ Buckets, as requested:
 - **NICE TO HAVE** - for the customer fork, not the general workshop.
 
 > **Status (2026-08-06): all three BASE items are implemented and verified live.** The core
-> workshop is now **20 steps** (choice 5 / cost 8 / control 7), still inside 4 hours - the two
+> workshop is now **14 steps** (choice 5 / cost 5 / control 4), inside 2 hours - the two
 > new steps spend the budget recovered by cutting `control_lakewatch`, and request tags cost no
 > extra time. Accelerator and fork items below remain proposals. Implementation notes are
 > inline under each item; the surprises are in §"What testing changed".
@@ -264,7 +264,7 @@ client contract · audit trail · UC grants on MCP services.
 3. ✅ Request-tag header on every routing call, plus a split request/endpoint count in
    `cost_usage` (0 min)
 
-Core is **20 steps**, still inside 4 hours: items 1–2 spend the budget recovered by cutting
+Core is **14 steps**, inside 2 hours: items 1–2 spend the budget recovered by cutting
 `control_lakewatch`, and item 3 costs no time.
 
 **Do next (accelerators, no core time):**

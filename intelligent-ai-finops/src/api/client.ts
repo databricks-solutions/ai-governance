@@ -23,7 +23,7 @@ export async function optimizePrompt(prompt: string, model?: string): Promise<Op
     if (!res.ok) throw new Error(`POST /api/optimize failed: ${res.status}`);
     return res.json();
   } catch {
-    return { optimized: prompt, changed: false, note: 'optimizer unavailable — using the original prompt' };
+    return { optimized: prompt, changed: false, note: 'optimizer unavailable - using the original prompt' };
   }
 }
 

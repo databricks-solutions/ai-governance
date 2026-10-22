@@ -1,4 +1,4 @@
-"""PDF generation for the two leave-behinds: the prerequisites checklist and the outcomes report.
+"""PDF generation for the leave-behinds: the prerequisites checklist, the brochure, and the POC DOC.
 
 Server-side (reportlab) rather than browser print-to-PDF, so the customer gets a real file with
 a real filename and no print dialog - these are documents that get emailed to an account admin
@@ -120,6 +120,16 @@ def _footer(canvas, doc):
     canvas.setFillColor(HexColor(MUTED))
     canvas.drawString(0.75 * 72, 0.45 * 72, "Databricks · AI Governance Workshop")
     canvas.drawRightString(canvas._pagesize[0] - 0.75 * 72, 0.45 * 72, f"Page {doc.page}")
+    canvas.restoreState()
+
+
+def _brochure_footer(canvas, doc):
+    """Brochure footer: provenance only, no page number (it is a single-page one-pager)."""
+    from reportlab.lib.colors import HexColor
+    canvas.saveState()
+    canvas.setFont("Helvetica", 7.5)
+    canvas.setFillColor(HexColor(MUTED))
+    canvas.drawString(0.7 * 72, 0.4 * 72, "Databricks · AI Governance Workshop")
     canvas.restoreState()
 
 
@@ -355,10 +365,30 @@ def brochure_pdf(b: dict, customer: str | None = None) -> bytes:
         ]))
         story.append(band)
 
+    # "Let's go" - the closing flow from interested to booked: numbered steps in a navy band.
+    lg = b.get("lets_go", {}) or {}
+    lg_steps = lg.get("steps", [])
+    if lg_steps:
+        story.append(Spacer(1, 12))
+        cell = [Paragraph(_esc(lg.get("title", "Let's go")), st["acc_h"])]
+        if lg.get("intro"):
+            cell.append(Paragraph(_md_inline(lg["intro"]), st["acc"]))
+        for n, it in enumerate(lg_steps, 1):
+            cell.append(Paragraph(_md_inline(it), st["acc_bullet"], bulletText=f"{n}."))
+        band = Table([[cell]], colWidths=[avail_w])
+        band.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F5F7F8")),
+            ("BOX", (0, 0), (-1, -1), 0.4, HexColor(RULE)),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        story.append(band)
+
     if b.get("footer_note"):
         story.append(Paragraph(_md_inline(b["footer_note"]), st["note"]))
 
-    doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
+    # One-pager, so the footer carries provenance but no page number.
+    doc.build(story, onFirstPage=_brochure_footer, onLaterPages=_brochure_footer)
     return buf.getvalue()
 
 
@@ -374,106 +404,190 @@ def _row_for(item: dict, S: dict, widths: list) -> Any:
     return _checklist_row(_checkbox(), Paragraph(label, S["item"]), why, who, widths)
 
 
-def report_pdf(o: dict) -> bytes:
-    """The outcomes report: what was proven, what wasn't, and what happens next.
+def _poc_cell_styles():
+    """Paragraph styles for POC-table cells: body, bold header, and a muted small variant."""
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
-    This is the leave-behind that replaced the POC DOC, so it has to stand on its own in an
-    inbox - hence the summary band up top and next steps called out as their own section.
+    base = getSampleStyleSheet()["BodyText"]
+    return {
+        "cell": ParagraphStyle("pc", parent=base, fontName="Helvetica", fontSize=8.3,
+                               leading=11, textColor=HexColor(NAVY)),
+        "cell_head": ParagraphStyle("pch", parent=base, fontName="Helvetica-Bold", fontSize=8.3,
+                                    leading=11, textColor=HexColor(NAVY)),
+        "cell_muted": ParagraphStyle("pcm", parent=base, fontName="Helvetica", fontSize=8,
+                                     leading=10.5, textColor=HexColor(MUTED)),
+    }
+
+
+def _poc_table(headers, rows, widths, group_rows, C):
+    """A POC table with a tinted header, striped group/phase rows spanned full-width.
+
+    `rows` is a list of cell-lists; `group_rows` is the set of row indices (0-based, data rows)
+    that are spanned group/phase headers (bold, tinted).
+    """
+    from reportlab.lib.colors import HexColor
+    from reportlab.platypus import Paragraph, Table, TableStyle
+
+    # Header text white via inline font colour - a Paragraph's own colour wins over TableStyle.
+    head = [Paragraph(f'<font color="#FFFFFF">{h}</font>', C["cell_head"]) for h in headers]
+    body = [head]
+    for ri, r in enumerate(rows):
+        if ri in group_rows:
+            # One spanned cell carries the group label; pad the rest so the row has ncols cells.
+            body.append([Paragraph(r[0], C["cell_head"])] + [""] * (len(headers) - 1))
+        else:
+            body.append([Paragraph(c, C["cell"]) if c else "" for c in r])
+    t = Table(body, colWidths=widths, repeatRows=1)
+    style = [
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor(NAVY)),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, HexColor(RULE)),
+        ("BOX", (0, 0), (-1, -1), 0.4, HexColor(RULE)),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 3.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+    ]
+    for ri in group_rows:
+        style.append(("SPAN", (0, ri + 1), (-1, ri + 1)))
+        style.append(("BACKGROUND", (0, ri + 1), (-1, ri + 1), HexColor("#EEF2F3")))
+    t.setStyle(TableStyle(style))
+    return t
+
+
+def report_pdf(doc_data: dict) -> bytes:
+    """The AI Governance **POC DOC** as a PDF.
+
+    Consumes the structured dict from `poc.build_poc_doc`, so it renders exactly the same
+    sections (header, contacts, scope & success criteria, tasks & timeline, staffing, outcomes,
+    mutual success plan, evaluation, resources) as the Markdown export and the Google-Doc template.
     """
     from reportlab.lib.colors import HexColor
     from reportlab.lib.units import inch
     from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table, TableStyle
 
     S = _styles()
+    C = _poc_cell_styles()
     buf = io.BytesIO()
-    doc = _doc(buf, "AI Governance Workshop - Outcomes")
-    avail_w = doc.width
-
-    summary = o.get("summary", {}) or {}
-    done, total = summary.get("done", 0), summary.get("total", 0)
-    applicable = summary.get("applicable", total)
-    na = summary.get("na", 0)
-    pct = summary.get("pct", 0)
+    pdoc = _doc(buf, f"AI Governance POC DOC - {doc_data.get('customer', '')}")
+    W = pdoc.width
 
     story: list[Any] = [
-        Paragraph("AI Governance Workshop", S["title"]),
-        Paragraph("Outcomes report", S["h2"]),
-        Paragraph(
-            f"Generated {_esc((o.get('generated_at') or '')[:19])}",
-            S["subtitle"]),
+        Paragraph(_esc(doc_data["title"]), S["title"]),
+        Paragraph(_esc(doc_data["subtitle"]), S["h2"]),
     ]
+    if doc_data.get("generated_at"):
+        story.append(Paragraph(
+            f"Generated {_esc(str(doc_data['generated_at'])[:19])} from the AI Governance "
+            "Workshop app", S["subtitle"]))
+    story.append(Paragraph(_md_inline(doc_data["intro"]), S["intro"]))
 
-    band = Table([[Paragraph(
-        f"<b>{done} of {applicable} applicable steps achieved ({pct}%)</b> - "
-        f"{applicable - done} item(s) remain, listed as next steps at the end"
-        + (f"; {na} marked N/A" if na else "") + ".", S["item"])]],
-        colWidths=[avail_w])
+    # Summary band - the one-line progress read.
+    band = Table([[Paragraph(_md_inline(doc_data["summary"]["line"]), S["item"])]], colWidths=[W])
     band.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F5F7F8")),
         ("BOX", (0, 0), (-1, -1), 0.4, HexColor(RULE)),
         ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
         ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
-    story += [band, Spacer(1, 4)]
+    story += [Spacer(1, 2), band, Spacer(1, 4)]
 
-    widths = [0.32 * inch, avail_w - 0.32 * inch]
+    def h2(text):
+        story.append(Paragraph(_esc(text), S["h2"]))
 
-    def section(groups: list, heading: str | None = None):
-        if heading and any(g.get("steps") for g in groups):
-            story.append(Paragraph(_esc(heading), S["h2"]))
-        for p in groups:
-            steps = p.get("steps", [])
-            if not steps:
-                continue
-            d = sum(1 for s in steps if s.get("complete"))
-            block = [Paragraph(f"{_esc(p.get('title'))} - {d}/{len(steps)}", S["h2"])]
-            story.append(KeepTogether(block + [_step_row(steps[0], S, widths)]))
-            for s in steps[1:]:
-                story.append(_step_row(s, S, widths))
+    def small_table(headers, rows, widths):
+        return _poc_table(headers, rows, widths, set(), C)
 
-    section(o.get("pillars", []))
-    section(o.get("accelerators", []), heading="Accelerators (optional add-ons)")
+    # Key Contacts
+    h2("Key Contacts")
+    story.append(Paragraph("<b>Databricks</b>", C["cell"]))
+    story.append(small_table(["Name", "Role"], doc_data["contacts"]["databricks"], [W * 0.4, W * 0.6]))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(f"<b>{_esc(doc_data['customer'])}</b>", C["cell"]))
+    story.append(small_table(["Name", "Title / Role"], doc_data["contacts"]["customer"],
+                             [W * 0.4, W * 0.6]))
 
-    nxt = o.get("next_steps", [])
-    if nxt:
-        story.append(Paragraph("Next steps", S["h2"]))
-        story.append(Paragraph(
-            "Everything not completed in the session. These carry into the 1–2 week "
-            "follow-up.", S["intro"]))
-        for n in nxt:
-            story.append(_checklist_row(
-                _checkbox(),
-                Paragraph(_md_inline(n.get("title")), S["item"]),
-                Paragraph(f'<font size="7.5">{_esc(n.get("pillar_id"))} · '
-                          f'status: {_esc(n.get("status"))}</font>', S["why"]),
-                None, widths))
-
-    story.append(Spacer(1, 10))
+    # Summary & Scope (the narrative lives in the intro + band; this is the scope statement)
+    h2("Executive Alignment")
     story.append(Paragraph(
-        "For adopting Unity Gateway fresh, or migrating from a previous Databricks or "
-        "external gateway, see the detailed field guides: the <b>Adoption Guide</b> and the "
-        "<b>Migration Guide</b>.", S["note"]))
+        "[Date]: [Customer exec] ([title]) and [Databricks exec] ([title]) - [purpose]", S["intro"]))
 
-    doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
+    # Governance Objectives
+    h2("Governance Objectives")
+    for o in doc_data["objectives"]:
+        story.append(Paragraph(f"<b>{_esc(o['title'])}</b> - {_md_inline(o['text'])}", S["intro"]))
+
+    # POC Scope & Success Criteria
+    h2("POC Scope & Success Criteria")
+    rows, group_rows = [], set()
+    for g in doc_data["scope_groups"]:
+        group_rows.add(len(rows))
+        rows.append([f"{g['title']} - {g['objective']}"])
+        for r in g["rows"]:
+            rows.append([r["okr"], r["success_criteria"], r["status"]])
+    story.append(_poc_table(["OKR", "Success criteria", "Status"], rows,
+                            [W * 0.34, W * 0.49, W * 0.17], group_rows, C))
+
+    # Tasks and Timeline
+    h2("Tasks and Timeline")
+    story.append(Paragraph(
+        "Everything not proven in the workshop, as a tracked punch list. <b>Add to POC</b> items "
+        "from the room are listed first in each section.", S["intro"]))
+    trows, tgroup = [], set()
+    for g in doc_data["task_groups"]:
+        tgroup.add(len(trows))
+        trows.append([g["phase"]])
+        for r in g["rows"]:
+            task = r["task"] + ("  ·  <i>Add to POC</i>" if r.get("poc") else "")
+            trows.append([task, "", "", r.get("comments", ""), "", r.get("status", "")])
+    story.append(_poc_table(
+        ["Task", f"{doc_data['customer']} owner", "Databricks owner", "Comments", "Due", "Status"],
+        trows, [W * 0.3, W * 0.12, W * 0.14, W * 0.21, W * 0.1, W * 0.13], tgroup, C))
+
+    # Staffing
+    h2("POC Staffing Plan")
+    story.append(Paragraph("<b>Databricks</b>", C["cell"]))
+    story.append(small_table(["Name", "Role", "Focus"], doc_data["staffing"]["databricks"],
+                             [W * 0.3, W * 0.25, W * 0.45]))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(f"<b>{_esc(doc_data['customer'])}</b>", C["cell"]))
+    story.append(small_table(["Name", "Role", "Focus"], doc_data["staffing"]["customer"],
+                             [W * 0.3, W * 0.25, W * 0.45]))
+    story.append(Spacer(1, 4))
+    for c in doc_data["staffing"]["cadence"]:
+        story.append(Paragraph(f"• {_esc(c)}", C["cell"]))
+
+    # Workshop Outcomes
+    if doc_data["proven_groups"]:
+        h2("Done in the Workshop")
+        for g in doc_data["proven_groups"]:
+            lines = [Paragraph(f"<b>{_esc(g['title'])}</b>", C["cell"])]
+            for t in g["proven"]:
+                lines.append(Paragraph(f'<font color="{LAVA}">✓</font> {_esc(t)}', C["cell"]))
+            for t in g["carried"]:
+                lines.append(Paragraph(f"– {_esc(t)} <i>(carried into the task list)</i>",
+                                       C["cell_muted"]))
+            story.append(KeepTogether(lines + [Spacer(1, 3)]))
+
+    # Mutual Success Plan
+    h2("Mutual Success Plan")
+    story.append(small_table(["Objective", "Actions", "Owner", "Target"], doc_data["mutual_success"],
+                             [W * 0.24, W * 0.44, W * 0.16, W * 0.16]))
+
+    # Evaluation Results
+    h2("Evaluation Results")
+    story.append(Paragraph("<i>To be completed during and after the POC.</i>", S["intro"]))
+    erows = [[g["title"], c["success_criteria"], "", c["status"]]
+             for g in doc_data["scope_groups"] for c in g["rows"] if not c["na"]]
+    story.append(small_table(["Pillar / OKR", "Success criteria (target)", "Result", "Status"],
+                             erows, [W * 0.22, W * 0.44, W * 0.17, W * 0.17]))
+
+    # Resources
+    h2("Resources")
+    for label, url in doc_data["resources"]:
+        story.append(Paragraph(f"• {_esc(label)} - {_esc(url)}", C["cell"]))
+
+    h2("Notes")
+    story.append(Paragraph("<i>Running notes - filled during the POC.</i>", S["intro"]))
+
+    pdoc.build(story, onFirstPage=_footer, onLaterPages=_footer)
     return buf.getvalue()
-
-
-def _step_row(step: dict, S: dict, widths: list) -> Any:
-    """One step: a ticked or empty box, the title, its status, and any notes."""
-    from reportlab.graphics.shapes import Line
-    from reportlab.lib.colors import HexColor
-    from reportlab.platypus import Paragraph
-
-    box = _checkbox()
-    if step.get("complete"):
-        # Draw a check INSIDE the box rather than swapping in a glyph.
-        box.add(Line(2.6, 5.4, 4.4, 3.0, strokeColor=HexColor(LAVA), strokeWidth=1.5))
-        box.add(Line(4.4, 3.0, 8.2, 8.0, strokeColor=HexColor(LAVA), strokeWidth=1.5))
-    status = _esc(step.get("status") or "not started").replace("_", " ")
-    meta = f'<font size="7.5">status: {status}</font>'
-    if step.get("poc"):
-        meta += ' <font size="7.5">· flagged for POC</font>'
-    if step.get("notes"):
-        meta += f'<br/><font size="7.5"><i>notes: {_esc(step["notes"])}</i></font>'
-    return _checklist_row(box, Paragraph(_md_inline(step.get("title")), S["item"]),
-                          Paragraph(meta, S["why"]), None, widths)

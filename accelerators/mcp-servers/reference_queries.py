@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # MCP Servers — reference queries
+# MAGIC # MCP Servers - reference queries
 # MAGIC
 # MAGIC Standalone version of the checks the **MCP Servers** accelerator runs inside the AI
 # MAGIC Governance Workshop app, so you can reference and run them without deploying the app.
@@ -63,8 +63,8 @@ print("MCP Service URL           :", SERVICE_URL)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1 — Inventory MCP services (`mcp_inventory`)
-# MAGIC Every `MCP_SERVICE` securable on the metastore — the Databricks-provided `system.ai.*`
+# MAGIC ## Step 1 - Inventory MCP services (`mcp_inventory`)
+# MAGIC Every `MCP_SERVICE` securable on the metastore - the Databricks-provided `system.ai.*`
 # MAGIC services plus any external/custom server you registered. These are the ones that can
 # MAGIC carry a service policy.
 
@@ -76,9 +76,9 @@ print(json.dumps(services, indent=2, default=str))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2 — Managed MCP: UC functions as tools (`mcp_managed_tools`)
+# MAGIC ## Step 2 - Managed MCP: UC functions as tools (`mcp_managed_tools`)
 # MAGIC The managed UC-native endpoint turns the functions in a schema into MCP tools.
-# MAGIC A caller without `USE CATALOG` + `USE SCHEMA` gets an **empty list**, not an error —
+# MAGIC A caller without `USE CATALOG` + `USE SCHEMA` gets an **empty list**, not an error -
 # MAGIC deny-by-absence, so an empty result is ambiguous.
 
 # COMMAND ----------
@@ -92,9 +92,9 @@ for t in managed_tools:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3 — MCP Service: the live tool surface (`mcp_service_tools`)
+# MAGIC ## Step 3 - MCP Service: the live tool surface (`mcp_service_tools`)
 # MAGIC The configured MCP Service's tools over JSON-RPC. A `403` here means the caller is not
-# MAGIC entitled or OAuth consent is incomplete — not that the service is broken.
+# MAGIC entitled or OAuth consent is incomplete - not that the service is broken.
 
 # COMMAND ----------
 
@@ -107,9 +107,9 @@ for t in service_tools:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4 — Who is allowed to call it (`mcp_grants`, Plane 2)
+# MAGIC ## Step 4 - Who is allowed to call it (`mcp_grants`, Plane 2)
 # MAGIC UC grants decide callability. By default `system.ai` grants `EXECUTE` to **all account
-# MAGIC users** — a broad grant here is the signal to scope the service (deny-by-absence in a
+# MAGIC users** - a broad grant here is the signal to scope the service (deny-by-absence in a
 # MAGIC customer-owned catalog).
 
 # COMMAND ----------
@@ -120,9 +120,9 @@ print(json.dumps(grants, indent=2, default=str))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5 — Prove on-behalf-of identity (`mcp_obo`)
+# MAGIC ## Step 5 - Prove on-behalf-of identity (`mcp_obo`)
 # MAGIC The tool runs as the **calling user**. Call a read tool that echoes the upstream
-# MAGIC identity — two participants running this should see different names. That difference is
+# MAGIC identity - two participants running this should see different names. That difference is
 # MAGIC the proof, versus taking OBO on trust.
 
 # COMMAND ----------
@@ -135,14 +135,14 @@ if probe:
     print("Identity probe tool:", probe)
     print(json.dumps(service.call_tool(probe, {}), indent=2, default=str))
 else:
-    print("No identity-echo tool on this service — action required.")
+    print("No identity-echo tool on this service - action required.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6 — Confirm a policy can attach here (`mcp_policy_target`, Plane 3)
+# MAGIC ## Step 6 - Confirm a policy can attach here (`mcp_policy_target`, Plane 3)
 # MAGIC Service policies attach **only** to `MCP_SERVICE` securables. Verify the configured
-# MAGIC service is one before writing a policy — managed UC-native endpoints are not securables
+# MAGIC service is one before writing a policy - managed UC-native endpoints are not securables
 # MAGIC and have nothing to attach to.
 
 # COMMAND ----------
@@ -155,7 +155,7 @@ print("Registered services:", names)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 7 — Write the contextual policy (`create_mcp_policy`, Plane 3)
+# MAGIC ## Step 7 - Write the contextual policy (`create_mcp_policy`, Plane 3)
 # MAGIC A service policy is a UC SQL function taking `event VARIANT` and returning ALLOW / DENY
 # MAGIC / ASK. Note `to_variant_object(...)` (not `to_variant`) and the VARIANT path cast
 # MAGIC `event:context.tool.name::STRING`.
@@ -180,7 +180,7 @@ print("Created", f"{CATALOG}.{SCHEMA}.{POLICY_FN}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 8 — Verify DENY / ALLOW logic (`mcp_policy_enforcement`)
+# MAGIC ## Step 8 - Verify DENY / ALLOW logic (`mcp_policy_enforcement`)
 # MAGIC Evaluate the policy function against synthetic events before attaching it. A write tool
 # MAGIC should return DENY; a read tool should return ALLOW. (Attaching the policy to the
 # MAGIC service itself is a manual step in the AI Gateway UI.)
@@ -203,7 +203,7 @@ for probe_tool in (DENY_TOOLS[0] if DENY_TOOLS else "push_files", "get_commit"):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 9 — Read-only enforcement (`mcp_readonly_enforcement`)
+# MAGIC ## Step 9 - Read-only enforcement (`mcp_readonly_enforcement`)
 # MAGIC Classify the service's tools read vs write, so you see exactly what a read-only policy
 # MAGIC would need to deny (keep coding-agent users to reads; humans keep write).
 
@@ -217,7 +217,7 @@ print("WRITE tools (a read-only policy would DENY these):", write_tools or "(non
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 10 — External-MCP readiness (`mcp_external_readiness`)
+# MAGIC ## Step 10 - External-MCP readiness (`mcp_external_readiness`)
 # MAGIC For a customer not yet running MCP on Databricks, an HTTP connection is the prerequisite
 # MAGIC for registering an external server (which is what enables service policies).
 
@@ -233,7 +233,7 @@ print("Already-registered external MCP services:", external or "(none yet)")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 11 — Scan tools for poisoning (`mcp_tool_metadata_scan`)
+# MAGIC ## Step 11 - Scan tools for poisoning (`mcp_tool_metadata_scan`)
 # MAGIC A tool's name/description is sent to the model, so a malicious server can smuggle
 # MAGIC instructions into them. Scan the advertised metadata for injection-shaped phrases.
 # MAGIC A flag is a prompt to review the tool and its source, not proof of compromise.
@@ -252,12 +252,12 @@ for t in service_tools:
     blob = f"{t.name} {getattr(t, 'description', '') or ''}"
     if INJECTION.search(blob):
         flagged.append(t.name)
-print("Flagged tools:", flagged or "(none — no injection-shaped phrases found)")
+print("Flagged tools:", flagged or "(none - no injection-shaped phrases found)")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 12 — What was actually recorded (`mcp_telemetry`)
+# MAGIC ## Step 12 - What was actually recorded (`mcp_telemetry`)
 # MAGIC MCP Service calls write a usage row (identity, service, tool, latency, cost); managed
 # MAGIC UC-native endpoints write no MCP-specific telemetry. Arguments and results are **not**
 # MAGIC captured in the current Beta.

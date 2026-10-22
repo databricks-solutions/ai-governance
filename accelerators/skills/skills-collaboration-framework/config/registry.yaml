@@ -1,4 +1,4 @@
-# Skills registry — governance metadata for T2/T3 skills.
+# Skills registry - governance metadata for T2/T3 skills.
 # T1 (personal sandbox) entries are optional.
 # IMPORTANT: registry.name must match SKILL.md name; tier must match folder placement.
 # Illustrative reference implementation for a fictional "Greenwood" org.
@@ -8,7 +8,7 @@ skills:
     version: 1.0.2
     owner: dana.lee@greenwood.example
     domain: platform
-    description: Recommend Databricks cost-optimization actions — commitment/discount coverage, budget variance, and forecast-vs-actual DBU spend from system.billing.usage and system.billing.list_prices.
+    description: Recommend Databricks cost-optimization actions - commitment/discount coverage, budget variance, and forecast-vs-actual DBU spend from system.billing.usage and system.billing.list_prices.
     data_classification: internal
     pii: false
     unity_catalog_scopes:
@@ -42,7 +42,7 @@ skills:
     version: 1.0.1
     owner: dana.lee@greenwood.example
     domain: analytics
-    description: Analyze BI adoption — active users, query volumes, warehouse utilization, and slow-query hotspots — from system.query.history.
+    description: Analyze BI adoption - active users, query volumes, warehouse utilization, and slow-query hotspots - from system.query.history.
     data_classification: internal
     pii: false
     unity_catalog_scopes:
@@ -92,7 +92,7 @@ skills:
     version: 1.0.1
     owner: dana.lee@greenwood.example
     domain: governance
-    description: Report Unity Catalog governance coverage — table comments, ownership, and classification tags — from system.information_schema.
+    description: Report Unity Catalog governance coverage - table comments, ownership, and classification tags - from system.information_schema.
     data_classification: internal
     pii: false
     unity_catalog_scopes:
@@ -108,7 +108,7 @@ skills:
     tier: 3
     version: 1.0.1
     owner: dana.lee@greenwood.example
-    description: Enterprise-wide Unity Catalog discovery — find tables by name or topic, inspect columns, and locate data across the metastore from system.information_schema.
+    description: Enterprise-wide Unity Catalog discovery - find tables by name or topic, inspect columns, and locate data across the metastore from system.information_schema.
     data_classification: internal
     pii: false
     unity_catalog_scopes:

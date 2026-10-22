@@ -159,7 +159,7 @@ Anything red here is a prerequisite that didn't land - resolve it before the roo
 
 ## 6. Scope guard
 
-The workshop is 3 hours hands-on plus about 1 hour of slides and discussion, and deliberately does **not** try to prove every Gateway feature.
+The workshop is 2 hours hands-on plus a short slide intro, and deliberately does **not** try to prove every Gateway feature.
 Resist adding boxes; the goal is a governed path that demonstrably works, not exhaustive
 coverage.
 

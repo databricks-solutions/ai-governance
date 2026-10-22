@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab — OpenAI Agents SDK on a governed endpoint
+# MAGIC # Lab - OpenAI Agents SDK on a governed endpoint
 # MAGIC
 # MAGIC Run an OpenAI Agents SDK agent against the OpenAI-compatible governed endpoint.
 # MAGIC

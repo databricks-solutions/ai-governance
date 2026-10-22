@@ -4,7 +4,7 @@ CI_SYSTEM="${CI_SYSTEM:-ado}"   # ado is the live CI here; the github path is ke
 
 if [[ "$CI_SYSTEM" == "ado" ]]; then
   : "${ADO_ORG:?}"; : "${ADO_PROJECT:?}"; : "${ADO_REPO:?}"; : "${ADO_TOKEN:?}"
-  # ADO_AUTH selects the auth scheme: 'bearer' (default — CI's $(System.AccessToken) OAuth token)
+  # ADO_AUTH selects the auth scheme: 'bearer' (default - CI's $(System.AccessToken) OAuth token)
   # or 'pat' (a classic Personal Access Token, which must be sent as HTTP Basic ':<pat>').
   ADO_AUTH="${ADO_AUTH:-bearer}"
   if [[ "$ADO_AUTH" == "pat" ]]; then

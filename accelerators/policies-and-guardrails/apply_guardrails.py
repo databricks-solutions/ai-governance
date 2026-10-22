@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Guardrail Lab · Part 1 — Apply guardrails
+# MAGIC # Guardrail Lab · Part 1 - Apply guardrails
 # MAGIC Apply Unity AI Gateway guardrails (PII, safety, topic, keyword) and watch the endpoint enforce them. See README.md for details.
 
 # COMMAND ----------
@@ -167,7 +167,7 @@ show_json(get_ai_gateway().get("guardrails"))
 
 # COMMAND ----------
 
-# MAGIC %md ### 2. PII masking — the model never sees the raw email / phone
+# MAGIC %md ### 2. PII masking - the model never sees the raw email / phone
 
 # COMMAND ----------
 
@@ -180,7 +180,7 @@ show_json(r["body"])
 
 # COMMAND ----------
 
-# MAGIC %md ### 3. Topic moderation — off-topic prompt is refused
+# MAGIC %md ### 3. Topic moderation - off-topic prompt is refused
 
 # COMMAND ----------
 
@@ -190,7 +190,7 @@ show_json(r["body"])
 
 # COMMAND ----------
 
-# MAGIC %md ### 4. Invalid keyword filtering — banned term is blocked
+# MAGIC %md ### 4. Invalid keyword filtering - banned term is blocked
 
 # COMMAND ----------
 
@@ -200,7 +200,7 @@ show_json(r["body"])
 
 # COMMAND ----------
 
-# MAGIC %md ### Cleanup — reset guardrails so later runs start clean
+# MAGIC %md ### Cleanup - reset guardrails so later runs start clean
 
 # COMMAND ----------
 

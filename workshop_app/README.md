@@ -45,7 +45,7 @@ an MCP policy function, etc.).
 
 ## Accelerators (optional add-ons)
 
-Beyond the core workshop, six optional **~3-hour accelerators** each get their own page (same
+Beyond the core workshop, six optional **~2-hour accelerators** each get their own page (same
 concept → Try It → Verify flow), driven by `config/accelerators.yaml`:
 
 Each accelerator is **additive** to the core - it only covers what the core does not. IDs are

@@ -13,9 +13,10 @@ subtitle: Work with Databricks to stand up Unity Gateway in your workshop and se
 
 # The one-line frame that sits under the title band.
 lead: >-
-  In one focused four hour session, we are going to review the concepts behind Unity Gateway and
-  prove it works in your environment. We will set up model services, tools, and budgets and show
-  how Databricks delivers choice, cost, and control to run AI at scale.
+  One focused two-hour session: review the concepts behind Unity Gateway and prove it works in
+  your environment. Set up model services, tools, and budgets, and see how Databricks delivers
+  choice, cost, and control to run AI at scale. This workshop is the bridge from demo to POC:
+  turn Unity Gateway on and clear the setup paper cuts.
 
 # The three pillars - the spine of the workshop and of the brochure.
 pillars:
@@ -54,7 +55,7 @@ personas:
 # The blurb that closes the page: an intro line, then one bullet per accelerator.
 accelerators:
   title: Go deeper with accelerators
-  intro: "There are also six optional ~3-hour accelerators to explore concepts deeper:"
+  intro: "There are also six optional ~2-hour accelerators to explore concepts deeper:"
   items:
     - "**MCP** - on-behalf-of identity, UC permissions, and service policies"
     - "**Agents** - register, version, and own a representative agent"
@@ -62,3 +63,12 @@ accelerators:
     - "**Providers** - route Bedrock, OpenAI, and Anthropic through the Gateway"
     - "**Policies** - safety filters and a custom PII-leakage judge"
     - "**Skills** - build, govern, and deploy Agent Skills in Genie Code with a tiered registry and allowlist enforcement"
+
+# The closing call to action: the path from interested to booked.
+lets_go:
+  title: "Let's go!"
+  intro: "Three steps to get your workshop on the calendar:"
+  steps:
+    - "Complete the AI governance maturity assessment with your Databricks team."
+    - "Review the prerequisites and start the long-lead items."
+    - "Book time with your Databricks account team to run the session."

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Per-skill regression tests — static, behavior-oriented (spec Ch 10.2 / §16.3).
+"""Per-skill regression tests - static, behavior-oriented (spec Ch 10.2 / §16.3).
 
 Each T2/T3 skill MAY ship a `TESTS.yaml` beside its `SKILL.md`. It declares test cases that
 assert on what the skill *does* (which tables its SQL references, and which it must never touch),
-NOT on the literal wording of any generated natural-language output — that is fragile against
+NOT on the literal wording of any generated natural-language output - that is fragile against
 model drift and is explicitly out of scope per the spec.
 
 TESTS.yaml schema (beside SKILL.md):
@@ -21,11 +21,11 @@ TESTS.yaml schema (beside SKILL.md):
           - main.hr.employees
 
 Assertion model (both kinds from the spec):
-  - Deterministic: expect_tables — each listed table must be referenced by some SQL block in SKILL.md.
-  - Negative:      forbid_tables — no SQL block in SKILL.md may reference any listed table
+  - Deterministic: expect_tables - each listed table must be referenced by some SQL block in SKILL.md.
+  - Negative:      forbid_tables - no SQL block in SKILL.md may reference any listed table
                    (the guardrail case: the skill stays inside its declared scope).
 
-This is a STATIC check over the SQL declared in SKILL.md — it shares extraction with validate-meta
+This is a STATIC check over the SQL declared in SKILL.md - it shares extraction with validate-meta
 and needs no workspace/endpoint. Skills without a TESTS.yaml are reported as untested (advisory),
 never failed, so the harness can be adopted incrementally.
 """
@@ -78,7 +78,7 @@ def run_case(skill_name, case, tables):
     for t in forbid:
         if t in tables:
             error(f"{skill_name} / {name}: forbidden table '{t}' IS referenced by the skill's SQL "
-                  f"(guardrail violated — the skill must stay within its declared scope)")
+                  f"(guardrail violated - the skill must stay within its declared scope)")
 
 
 def main():
@@ -120,7 +120,7 @@ def main():
               file=sys.stderr)
         sys.exit(1)
     print(f"run-skill-tests: {CASES_RUN} test case(s) passed "
-          f"({len(UNTESTED)} skill(s) untested — advisory).")
+          f"({len(UNTESTED)} skill(s) untested - advisory).")
     sys.exit(0)
 
 

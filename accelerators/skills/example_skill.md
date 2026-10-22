@@ -26,7 +26,7 @@ Or in your Databricks workspace SQL editor, right-click the catalog and select '
 SHOW TABLES IN your_catalog.your_schema
 ```
 
-This respects your existing UC grants — you'll only see tables you have permission to access."
+This respects your existing UC grants - you'll only see tables you have permission to access."
 
 ---
 
@@ -53,7 +53,7 @@ For column-level classification, inspect the table schema and check for masks:
 DESCRIBE TABLE DETAIL your_catalog.your_schema.your_table;
 ```
 
-If a column is masked, it will show in the schema metadata. Masks are an access control, not a safety control — they hide the value from the user but don't stop the query from running."
+If a column is masked, it will show in the schema metadata. Masks are an access control, not a safety control - they hide the value from the user but don't stop the query from running."
 
 ---
 
@@ -65,7 +65,7 @@ If a column is masked, it will show in the schema metadata. Masks are an access 
 
 ## Tier
 
-Tier 1 (personal, no review) — read-only, no data access, in home directory.
+Tier 1 (personal, no review) - read-only, no data access, in home directory.
 
 ## Tags
 

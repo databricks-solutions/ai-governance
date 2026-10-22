@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab — Mosaic AI Agent Framework on a governed endpoint
+# MAGIC # Lab - Mosaic AI Agent Framework on a governed endpoint
 # MAGIC
 # MAGIC Build, log, and register a `ChatAgent` whose model calls run through the governed endpoint.
 # MAGIC

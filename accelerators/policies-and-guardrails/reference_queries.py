@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Policies & Guardrails — reference queries
+# MAGIC # Policies & Guardrails - reference queries
 # MAGIC
 # MAGIC Standalone version of the checks the **Policies & Guardrails** accelerator runs inside
 # MAGIC the AI Governance Workshop app, so you can reference and run them without deploying the
@@ -40,7 +40,7 @@ SSN = "123-45-6789"
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1 — Safety & PII guardrail on input/output (`test_guardrail`)
+# MAGIC ## Step 1 - Safety & PII guardrail on input/output (`test_guardrail`)
 # MAGIC Send a prompt containing a blocked keyword to the governed endpoint and expect a block.
 # MAGIC A block is the pass condition. (Configure the safety filter + PII detection on the
 # MAGIC endpoint first, in the AI Gateway UI.)
@@ -57,12 +57,12 @@ try:
     print("Endpoint ANSWERED (guardrail did NOT block):")
     print(resp.choices[0].message.content if resp.choices else resp)
 except Exception as e:
-    print("Guardrail fired — request blocked:", e)
+    print("Guardrail fired - request blocked:", e)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2 — Mask vs block (`pii_mask_vs_block`)
+# MAGIC ## Step 2 - Mask vs block (`pii_mask_vs_block`)
 # MAGIC BLOCK refuses the request; MASK lets it through with the PII removed (the more common
 # MAGIC production choice). Send a prompt that echoes a synthetic SSN and classify the outcome.
 
@@ -77,20 +77,20 @@ try:
     )
     text = str(out)
     if SSN in text:
-        print("PASSTHROUGH — the SSN came back intact:", text[:300])
+        print("PASSTHROUGH - the SSN came back intact:", text[:300])
     elif MASK.search(text):
-        print("MASK — the SSN was redacted/masked in the response.")
+        print("MASK - the SSN was redacted/masked in the response.")
     else:
         print("Inconclusive:", text[:300])
 except Exception as e:
-    print("BLOCK — the request was refused:", e)
+    print("BLOCK - the request was refused:", e)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3 — How a block is delivered / fail-closed (`guardrail_block_shape`)
+# MAGIC ## Step 3 - How a block is delivered / fail-closed (`guardrail_block_shape`)
 # MAGIC A block comes back either as a 4xx error or as HTTP 200 + a refusal reason. It matters
-# MAGIC for coding agents (a 4xx on one turn can re-trigger on later benign turns — "sticky
+# MAGIC for coding agents (a 4xx on one turn can re-trigger on later benign turns - "sticky
 # MAGIC block"). Either way, evaluation is fail-closed. Report which shape this account returns.
 
 # COMMAND ----------
@@ -105,17 +105,17 @@ try:
     if "content_filter" in finish or "filter" in finish.lower():
         print("Block shape: HTTP 200 + refusal reason (client-friendly).")
     else:
-        print("Not blocked — the endpoint answered.")
+        print("Not blocked - the endpoint answered.")
 except Exception as e:
     print("Block shape: 4xx error (sticky-block risk for coding agents):", e)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4 — Does the guardrail fire on every path? (`path_coverage_check`)
+# MAGIC ## Step 4 - Does the guardrail fire on every path? (`path_coverage_check`)
 # MAGIC Controls are reliably enforced on the OpenAI-compatible chat path; whether they fire on
 # MAGIC the provider-native path coding agents use is account- and version-dependent. Probe both
-# MAGIC and compare — a silent gap means the guardrail does not cover the traffic you care about.
+# MAGIC and compare - a silent gap means the guardrail does not cover the traffic you care about.
 
 # COMMAND ----------
 
@@ -143,9 +143,9 @@ if chat_blocked and not anthropic_blocked:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5 — Guardrail + judge readiness (`pii_safety_readiness`)
+# MAGIC ## Step 5 - Guardrail + judge readiness (`pii_safety_readiness`)
 # MAGIC "Is the guardrail on?" is not "does it work?". A judge/red-team review reads from the
-# MAGIC payload inference table and the audit log — confirm they are present and populated so
+# MAGIC payload inference table and the audit log - confirm they are present and populated so
 # MAGIC the benchmark has data to score. (See `guardrail_benchmark.py` for the scoring itself.)
 
 # COMMAND ----------
@@ -164,7 +164,7 @@ display(spark.sql("""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6 — Review guardrail activity (`guardrail_activity`)
+# MAGIC ## Step 6 - Review guardrail activity (`guardrail_activity`)
 # MAGIC Every blocked/filtered request lands in the inference table. Review which requests were
 # MAGIC blocked (non-2xx status) and for whom.
 

@@ -1,38 +1,48 @@
 # AI Governance Workshop - step definitions (the guidebook content).
 #
-# Steps are grouped by pillar (choice / cost / control) - the Aug 2026 messaging
-# source of truth. Each step has:
+# Steps are grouped by pillar. Tab order is control / choice / cost: lead with governance
+# (create the governed model service and the policies that attach to it), then model choice,
+# then cost. Each step has:
 #   id       : stable key used for progress tracking (the JSON progress file on the UC volume)
 #   title    : shown in the UI
-#   concept  : the "why" (markdown) - the CONCEPT card
+#   tier     : mandatory | recommended | optional - shown as a badge so the room scans fast
+#   where    : where the action runs (this app / AI Gateway UI / Account console)
+#   outcome  : the one-line result (shown under the title), direct and imperative
+#   concept  : short "why + how" (markdown). Point-form. Implementation first.
 #   action   : optional Try-It test; `test` names a backend test (see server/routes/tests.py)
 #   verify   : optional follow-up check that proves it worked
 #   manual   : optional UI-only step the customer does in the workspace (with a deep link)
 #
+# Target: ~2 hours, 15 core steps (Control 5 / Choice 5 / Cost 5). The workshop is the bridge
+# from demo to POC: turn Unity Gateway on and clear the setup paper cuts. It does not reach prod.
 # `test` values map to backend handlers; `null`/absent means the step is guided-only.
 
 intro:
   title: What this workshop covers
   body: |
-    About **three hours hands-on** (plus ~an hour of slides), standing up a governed AI control
-    plane on **your own workspace** - every step runs live, not a simulation.
+    About **two hours hands-on**, plus a short slide intro. Stand up a governed AI control plane
+    on **your own workspace**, every step live.
 
-    - **Choice** - put any model, tool, or agent behind one Unity Catalog name; run proprietary
-      and open-weight models through the same path; flag endpoints still on the legacy (v1) path.
-    - **Cost** - project routing savings, set budgets and rate limits, and attribute spend by
-      team and task.
-    - **Control** - rate limits, guardrails, and MCP policies that deny specific calls, with the
-      telemetry that proves they fired.
+    - **Control** - create one governed model service, then attach the policies, guardrails, and
+      rate limits everything else inherits. Start here.
+    - **Choice** - put any model, tool, or agent behind one Unity Catalog name. Flag endpoints
+      still on the legacy (v1/v2) path for migration.
+    - **Cost** - see spend, project routing savings, set budgets, and attribute spend by team
+      and task.
 
-    Each step is a one-line outcome you expand for the concept, a **Try It** that runs live, and a
-    **Verify** check. Progress saves automatically.
+    This workshop is the bridge from demo to POC: turn Unity Gateway on and clear the setup paper
+    cuts. The workshop identifies potential blockers to putting Unity Gateway into production at
+    your organization.
 
-    New here? Start with **Prerequisites** - two `system` grants (account admin) gate the cost and
-    audit steps; everything else runs without them.
+    Each step shows a one-line outcome, a **Try It** that runs live, and a **Verify** check,
+    tagged **mandatory**, **recommended**, or **optional**, with where to run it. Progress saves
+    automatically. New here? Start with **Prerequisites**: an account admin runs two `system`
+    grants before the session.
 
-    Databricks team: before the day, size the opportunity with the
-    [AI governance maturity assessment](http://go/ug/maturity-assessment) (internal link - what
-    they use AI for, who they're weighing against, where spend is running away).
+    The Databricks team can help evaluate focuses for the workshop using the
+    [AI governance maturity assessment](https://github.com/databricks-solutions/ai-governance/blob/main/workshop_app/docs/AI_Governance_Maturity_Assessment.xlsx)
+    (a static copy in this repo) and the
+    [AI Governance field portal](http://go/aigovernance) (Databricks internal link).
 
   # Step-by-step deploy guide shown on the Walkthrough. Structured (not one markdown blob) so
   # each step renders as a numbered "do this / ensure this" card. `do` and `ensure` accept
@@ -41,7 +51,7 @@ intro:
     title: Deploy this workshop in your own workspace
     intro: >-
       You run this in your own Databricks workspace to try the capabilities first-hand. It is a
-      standard Databricks Asset Bundle - no scripts, about ten minutes end to end.
+      standard Databricks Asset Bundle. No scripts, about ten minutes end to end.
     steps:
       - do: >-
           **Install the Databricks CLI and log in.** This creates a named profile you reuse in
@@ -60,10 +70,10 @@ intro:
           databricks warehouses list -p <profile>
         ensure: >-
           The catalog already exists (the app creates only its own schema inside it) and the
-          warehouse is running - a serverless warehouse starts fastest.
+          warehouse is running. A serverless warehouse starts fastest.
       - do: >-
           **Deploy the bundle.** This builds the UI and creates the schema, the progress volume,
-          and the app - and grants the app's own service principal on them in one pass.
+          and the app. It grants the app's own service principal on them in one pass.
         cmd: |
           databricks bundle deploy -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<catalog>"
         ensure: "It finishes with `Deployment complete!` and no errors."
@@ -73,250 +83,40 @@ intro:
         cmd: |
           databricks bundle run ai_governance_workshop_app -t dev -p <profile> --var="warehouse_id=<id>" --var="catalog=<catalog>"
         ensure: >-
-          Open the URL it prints, then check `GET /api/health` returns
-          `{"status":"ok","config_problems":[]}`. If it lists a problem, that is exactly what
-          still needs setting.
+          Open the URL it prints. Check `GET /api/health` returns
+          `{"status":"ok","config_problems":[]}`. If it lists a problem, that is what still needs
+          setting.
       - do: >-
           **(Optional) Grant the two `system` schemas.** An account admin runs the GRANTs shown
-          in *What the app needs from your workspace*, just below. The workshop runs without them
-          - the eight telemetry steps show "action needed" until they are in place.
+          in *What the app needs from your workspace*, just below. The workshop runs without them.
+          The telemetry steps show "action needed" until they are in place.
     footer: "Made a change and want it live? Re-run the last two commands - deploy, then run."
 
 pillars:
-  - id: choice
-    title: Choice
-    tagline: Any model, tool, or agent behind one control plane, addressed as a UC securable.
+  - id: control
+    title: Control
+    tagline: Create the governed model service, then the policies, guardrails, and audit that attach to it.
     steps:
-      - id: choice_connect
-        title: "Choice: Connect to the workspace"
-        outcome: "The app reaches your workspace and SQL warehouse and reads its config - the base every later step runs on."
+      - id: control_model_service
+        title: "Control: Create the governed model service"
+        tier: mandatory
+        where: AI Gateway UI
+        outcome: "Stand up a governed model service (catalog.schema.service): the attach point for rate limits, guardrails, policies, and an inference table that logs every payload."
         concept: |
-          This app runs as a Databricks App with its own service principal. Confirm it can reach
-          your SQL warehouse and read its config - every later step depends on both.
-        action:
-          label: Test connection
-          test: connection
-        verify:
-          label: Show workspace context
-          test: workspace_context
+          Every control in this workshop attaches to a **governed model service**: a Unity
+          Catalog securable (`catalog.schema.service`), not a legacy serving endpoint. Create it
+          first, early in the day, because the later steps read it.
 
-      - id: choice_list_endpoints
-        title: "Choice: Inventory endpoints & flag legacy endpoints vs model services"
-        outcome: "We can inventory every serving endpoint and agent, and split recent traffic into the legacy vs Unity Gateway model-service path to expose the migration backlog."
-        concept: |
-          Two views of the same surface. First, **every serving endpoint** on this workspace:
-          foundation models, external models, and custom ones - the inventory you are about to
-          govern.
+          It puts a control layer in front of a base model: a fallback for resilience, an
+          inference table that logs every payload, usage tracking, and the attach point for rate
+          limits (Cost) and guardrails (below).
 
-          Then the migration question, answered from real traffic. A request that names a
-          **legacy endpoint** rides the **v1** path (`/serving-endpoints`); a request that names
-          a **model service** (a Unity Catalog name) rides the **Unity Gateway** path (`/ai-gateway`). The
-          Verify step reads `system.ai_gateway.usage` and splits your last 30 days of traffic
-          into legacy versus model-service. Any legacy traffic is a **migration backlog**: it breaks when the legacy
-          killswitch flips, so it has to move to a model service first.
+          - **Try It** checks whether the model service exists. If not, it hands you the config to
+            create it in the AI Gateway UI.
+          - **Verify** confirms it is present with its rate-limit and inference-table config.
 
-          The exact query is in `queries/endpoint_inventory_v1_v3.sql` - copy it to re-check on
-          your own after the workshop.
-        action:
-          label: List serving endpoints
-          test: list_endpoints
-        verify:
-          label: Split recent traffic into legacy endpoints vs model services
-          test: endpoint_inventory_v1_v3
-
-      - id: choice_model_services
-        title: "Choice: Put a model behind a governed name"
-        outcome: "We can stand a model up as a Unity Catalog model service (catalog.schema.service) with a stable client contract and UC-grant access."
-        concept: |
-          Controls used to hang off a **workspace serving endpoint**: the endpoint name was the
-          application contract and access was a workspace ACL. They now hang off a **model
-          service** - a Unity Catalog object with a fully-qualified name (`catalog.schema.service`).
-
-          Two things this buys you:
-
-          - **A stable contract.** Swap the model, add a fallback, or split traffic, and the
-            application keeps calling the same name. Permissions become UC grants, which apply
-            across every workspace on the metastore.
-          - **Access you can reason about.** Provided model services are **closed by default** -
-            callable only by an identity granted `EXECUTE` (directly or inherited). So the
-            question isn't "what is everyone exposed to?" but "what can *this* identity reach?"
-            You check that with UC grants on the service, the same question you'd ask of any
-            pilot user before rollout.
-
-          The client change is exactly two things, and they must move **together**:
-
-          - **Base URL** - `/serving-endpoints` → `/ai-gateway/mlflow/v1`
-          - **Model selector** - `<endpoint-name>` → `<catalog>.<schema>.<service>`
-
-          A new base URL with an old endpoint name fails; so does a name against the legacy path.
-          There is **no in-place rename**: stand the service up alongside the old endpoint,
-          validate on real traffic, move clients in stages, then revoke the old path. A 200
-          response is not acceptance - compare latency, tokens, cost, and output quality.
-
-          **Model services stack.** Put a broad service in front of a base model for the whole
-          enterprise and attach the policies everyone should get; put team-specific services in
-          front of it with their own tighter policies, budgets, and grants. Enterprise defaults
-          at the base, team rules on top - the same layering you already use for data.
-        action:
-          label: Show model services & the client contract
-          test: model_services
-
-      - id: choice_default_access
-        title: "Choice: Choose which models teams can access"
-        outcome: "We can choose which models each team and the wider organization can access - governed by Unity Catalog grants, not per-developer API keys."
-        depends_on: [choice_model_services]
-        concept: |
-          Choice starts with deciding **which models each team and the wider organization can
-          reach** - and enforcing it centrally. Provided model services are **closed by default**:
-          callable only by an identity granted `EXECUTE` (directly or inherited). So access is a
-          UC grant you can reason about - grant a team the models it should have, withhold the
-          rest - not a per-developer API key sprayed across the org.
-
-          The question is never "what is everyone exposed to?" but "what can *this* identity
-          reach?" - the same question you'd ask of a pilot user before rollout. This reads the
-          **effective permissions** for the app's own identity against the model services and
-          reports which it can actually call. It is read-only - it reports reach, it never changes
-          a grant.
-        action:
-          label: Show which models this identity can access (effective access)
-          test: default_access
-
-      - id: use_open_weight_model
-        title: "Choice: Run proprietary & open-weight models"
-        outcome: "We can run the latest open-weight frontier models (GLM, GPT-OSS, DeepSeek, Llama) alongside proprietary ones (Claude, GPT) as Unity Gateway model services on one governed control plane - same grants, policies, and attribution - so model choice is never a single-vendor bet."
-        concept: |
-          Choice is not a single-vendor bet. Through the Gateway, **proprietary frontier models**
-          (Claude, GPT) and **open-weight frontier models** (GLM, GPT-OSS, DeepSeek, Llama) are
-          addressed the same way - as a **Unity Gateway model service**
-          (`catalog.schema.service`, e.g. `system.ai.glm-5-3-flash`) on the governed
-          `/ai-gateway` path - and carry the same UC grants, the same guardrails and rate limits,
-          and the same request-tag attribution. So a team picks the best model for each task, and
-          swapping proprietary for open-weight (or the reverse) is a config change, not a
-          re-platforming.
-
-          Two things this proves for a governance program:
-
-          - **No lock-in.** The Unity Gateway model-service contract, the grants, and the telemetry are
-            identical regardless of who trained the model. You are governing *access to models*,
-            not betting the platform on one lab.
-          - **Data residency and cost latitude.** An open-weight model served on your own
-            Databricks compute keeps the payload inside your account - an option you keep open
-            precisely because it rides the same governed Unity Gateway path as everything else.
-
-          This Try-It calls the configured open-weight model service
-          (`gateway.open_weight_model_service` in `config/workshop.yaml`, default
-          `system.ai.glm-5-3-flash`) over the Unity Gateway path and shows it answered, tokened, and
-          attributed exactly like a proprietary model. Point it at whichever open-weight model
-          service your organization uses.
-        action:
-          label: Call an open-weight model service through the governed Gateway
-          test: use_open_weight_model
-
-      - id: choice_smart_routing
-        title: "Choice: Automate model choice with routing"
-        outcome: "We can use custom or smart routing to automate model choice - each request goes to the right model without the caller picking it (smart-routing example coming soon)."
-        coming_soon: true
-        concept: |
-          Choice isn't only *which* models are available - it's making the **right choice
-          automatically**. Instead of every caller hard-coding a frontier model, a router sends
-          each request to the model that fits it: cheapest-sufficient for simple asks, a frontier
-          model for the hard ones. The router changes; the governed control plane does not.
-
-          Two ways to own the routing policy, both governed through the same Gateway:
-
-          - **Smart routing (Databricks-managed)** - the Gateway selects a model per request.
-            Enabled per account; Beta.
-          - **Custom router** - a classifier you own scores each request and routes it to the
-            cheapest model that clears a defined bar.
-
-          **Coming Soon.** A live smart-routing Try-It lands here once the managed router is GA on
-          this account. Today you can quantify the routing case in **Cost → Project routing
-          savings**, and stand up a custom router yourself - this core step becomes interactive
-          when smart routing is available.
-
-  - id: cost
-    title: Cost
-    tagline: Project routing cost, cap spend and throughput, and attribute each request.
-    steps:
-      - id: cost_model_panel
-        title: "Cost: List available models & pricing"
-        outcome: "We can see the models available to route across and their per-token prices - the basis for routing ROI."
-        concept: |
-          The Cost pillar reduces spend by sending each request to an appropriately priced
-          model rather than defaulting every request to a frontier model. Routing can be owned
-          three ways, differing in who holds the routing policy:
-
-          - **Smart routing (Databricks-managed)** - the Gateway selects a model per request.
-            Enabled per account and used through the Omnigent and ucode harnesses. Beta.
-          - **Omnigent (partner layer)** - a meta-harness above Claude Code, Codex, Cursor, and
-            custom agents, routing above the harness and governed through the same Gateway.
-          - **Custom router** - a classifier scores each request and sends it to the cheapest
-            model that meets a defined bar.
-
-          The router changes; the control plane does not. This panel lists the three configured
-          models and their per-token prices. The following steps use those prices to project
-          monthly cost and to estimate routing.
-        action:
-          label: Show the models and prices
-          test: routing_panel
-
-      - id: cost_routing_compare
-        title: "Cost: Project routing savings"
-        outcome: "We can run prompts across models, measure the tokens each returns, and project the monthly savings from routing each request to the cheapest sufficient model."
-        concept: |
-          This step runs the configured prompts against all three models, measures the tokens
-          each returns, and multiplies the per-request cost by the monthly request volume set
-          in `cost.routing.requests_per_month` (default 10,000). The result is the projected
-          monthly cost of sending every request to each model, alongside the estimated cost of
-          routing each request to the cheapest sufficient model.
-
-          The prompts and each model's answer are shown, so the output can be assessed on
-          quality as well as price. The smart-routing figure is an estimate: it classifies each
-          prompt's complexity and prices the cheapest model that meets it. Dollar figures depend
-          on the DBU rate in config; token counts are measured.
-        action:
-          label: Compare monthly cost across models
-          test: routing_compare
-
-      - id: cost_spend_by_model
-        title: "Cost: Read 30-day spend by model"
-        outcome: "We can read 30-day AI spend in USD - external-provider spend directly, plus internal DBU-billed foundation-model spend when the optional system.billing grant is present - to see where the money goes and where a routing policy has the most leverage."
-        concept: |
-          AI spend comes from two places, and this step reads both:
-
-          - **External providers** - `system.ai_gateway.external_model_spend` reports estimated
-            USD **directly** (no price-list join), for external models routed through the Gateway.
-          - **Internal Databricks-hosted models** (`system.ai.*`, FMAPI) - these bill in **DBUs**
-            and never land in `external_model_spend`, so their dollars come from
-            `system.billing.usage` priced with `list_prices`. This is exactly what the workshop's
-            own routing tiers use, so without it the dollar view reads **$0** even after you run
-            the routing steps. It needs an **optional** `system.billing` grant; without the grant
-            the step still runs and points you at token attribution instead of failing.
-
-          Broken down by model/SKU, this shows which models dominate spend - where a routing
-          policy has leverage - and grounds the ROI estimate in this account's real mix. Dollars
-          are estimated (list price) until you apply a negotiated rate; token counts are real.
-        action:
-          label: Show 30-day spend by model
-          test: gateway_spend_by_model
-
-      - id: cost_governed_endpoint
-        title: "Cost: Stand up the governed model service"
-        outcome: "We can put a control layer in front of a model as a Unity Gateway model service (catalog.schema.service) - the attach point for the rate limits and guardrails that follow, with an inference table logging every payload."
-        depends_on: [choice_model_services]
-        concept: |
-          The rate limits, budgets, and guardrails ahead all attach to a **governed model
-          service** - a Unity Catalog securable (`catalog.schema.service`), not a legacy v1
-          serving endpoint - so we stand it up here, before the steps that read it. It puts a
-          control layer in front of a base model: a fallback for resilience, an inference table
-          logging every payload, usage tracking, and the attachment point for rate limits (next)
-          and guardrails (in Control). Every governed step addresses it by **FQN** on the Unity Gateway
-          `/ai-gateway/mlflow/v1` path.
-
-          The app never creates the service unattended on a customer workspace: **Try It** checks
-          whether the model service exists (`GET /api/2.1/unity-catalog/model-services/{fqn}`)
-          and, if not, hands you the config to create it in the UI; **Verify** confirms it is
-          present with its rate-limit and inference-table config.
+          The app never creates the service unattended on a customer workspace. You create it in
+          the UI.
         action:
           label: Create / verify governed model service
           test: create_governed_endpoint
@@ -324,186 +124,42 @@ pillars:
           label: Check model-service config
           test: verify_governed_endpoint
 
-      - id: cost_rate_limits
-        title: "Cost: Enforce rate limits (QPM/TPM)"
-        outcome: "We can enforce QPM/TPM rate limits per service, user, and group and see HTTP 429 when exceeded - the ceiling that reliably holds today."
-        depends_on: [cost_governed_endpoint]
-        concept: |
-          Two controls, easily conflated. **Rate limits** cap *throughput* - exceeding one
-          returns HTTP 429 immediately. They are GA. **Budgets** cap *spend*, and today they
-          reliably **alert**; hard blocking is still rolling out. Rate limits are therefore the
-          control that reliably enforces a hard ceiling today.
-
-          This step reads the limits configured on the **governed model service** you stood up
-          above (from its `config.rate_limits`), in queries/minute (QPM) and tokens/minute (TPM)
-          - set per service, per user, and per group, with the most restrictive winning. Set
-          limits in the AI Gateway UI so the workshop never changes throughput on a live
-          customer service.
-        action:
-          label: Show enforced rate limits
-          test: rate_limits
-        manual:
-          label: Set a rate limit on the model service
-          deep_link: model_service
-
-      - id: cost_budgets
-        title: "Cost: Set budgets & alert thresholds"
-        outcome: "We can set account budgets with alert thresholds and read the spend they govern, pairing them with rate limits for a hard ceiling."
-        concept: |
-          Budgets are scoped to the account and configured in the account console, with
-          shared and per-user thresholds. **Alerts are GA; hard blocking is rolling out** -
-          confirm on this account before telling a FinOps owner that spend is hard-capped.
-
-          The spend this step reads spans both sources: external-provider USD, plus - with the
-          optional `system.billing` grant - internal DBU-billed foundation-model spend. That
-          matters here, because an internal-only workspace bills entirely in DBUs, so without
-          that grant a budget would be sized against **$0** of visible spend.
-
-          Enforcement is based on near-real-time estimates, so thresholds are approximate in
-          both directions. Pair budgets with the rate limit above: the budget tells you when
-          spend is drifting, the rate limit is what actually stops it.
-
-          Two things teams keep asking for:
-
-          - **Self-service visibility.** A team lead or model user does not need admin to see
-            their own spend against a budget - they run `queries/budget_status.sql` (the same
-            query this step runs) filtered to their model or user. Hand them the query, not the
-            console.
-          - **Exhaustion alerts.** Set an alert threshold when you create the budget, then confirm
-            the notification actually fires as spend approaches it. An alert nobody receives is
-            not a control - validate the delivery, and note whether your org needs a programmatic
-            (API-driven) budget-change path rather than the UI.
-        action:
-          label: Show 30-day spend the budget governs
-          test: budget_status
-        manual:
-          label: Create a budget (with an alert threshold) in the account console
-          deep_link: account_budgets
-
-      - id: cost_usage
-        title: "Cost: Attribute usage by team/tag"
-        outcome: "We can split AI usage by model service and tag to attribute spend to teams - distinguishing caller request-tags from budget-safe server-side tags."
-        concept: |
-          `system.ai_gateway.usage` rolls tokens up by project tag - the basis for attributing
-          and forecasting AI spend. First, how a request gets tagged, because it decides what you
-          can trust:
-
-          - **Request tags** are supplied per-request by the caller
-            (`Databricks-Ai-Gateway-Request-Tags`). Great for attribution and analytics, but
-            **caller-controlled** - never a budget boundary. Every model call in the routing steps
-            above already sent this header, so that traffic is attributed live.
-          - **Server-side tags** are set by the platform owner on the service and apply to every
-            request through it. These are the only ones a FinOps owner can trust as a budget
-            filter, because the caller cannot change them. (Note: the SDK's
-            `serving_endpoints.query()` can't send request tags - it uses the legacy invocations
-            path; tagging means calling `/ai-gateway/mlflow/v1/chat/completions`, as this app does.)
-
-          The result below splits the count on exactly that line: **request-tagged** calls prove
-          per-caller attribution works end to end; **endpoint-tagged** calls are the ones safe to
-          budget on. Both, ideally. The query is in `queries/usage_by_project.sql`.
-
-          If you see request-tagged traffic and **zero** endpoint-tagged, that is the finding,
-          not a bug: attribution is working, but only in the form a caller can switch off. Fix
-          it by tagging the service itself, not by trusting the header.
-
-          The table is **not real-time**. On a reference workspace the latest recorded event
-          stayed 13-21 minutes behind the wall clock, so an empty result right after the
-          routing steps means *not ingested yet*, not *tagging is broken*. Check
-          `SELECT max(event_time) FROM system.ai_gateway.usage` before treating it as a fault.
-        action:
-          label: Query usage by project tag
-          test: usage_by_project
-
-      - id: cost_task_usage
-        title: "Cost: Attribute spend per task & model"
-        outcome: "We can link AI-completed tasks to spend by model - tagging each unit of work with a `task` tag and reading tokens per task per model - to see which model does each kind of work most efficiently."
-        concept: |
-          `cost_usage` answers *who* spent (attribution by team/tag). This answers a different
-          question a FinOps or platform owner keeps asking: **which model is most efficient for
-          the work we actually do?**
-
-          The mechanism is the same telemetry, sliced one level finer. Every model call the Cost
-          routing steps send now carries a **`task` request tag** on top of the project tags, and
-          each sample prompt (one *task*) is run against every model. So
-          `system.ai_gateway.usage` can be grouped by **task × model**, and the lowest
-          average-tokens row for a task is the cheapest model that did that unit of work.
-
-          Read this next to **Cost → Project routing savings**, which shows each model's *answer*
-          to the same prompts: put the two together and you have cost *and* quality per task -
-          exactly the evidence to decide which model (or which routing tier) a given workload
-          should default to. Token counts are exact; convert to dollars with your negotiated rate.
-
-          The tag is caller-supplied, so - like all request tags - it is an attribution signal,
-          not a budget boundary. The query is in `queries/usage_by_task.sql`. As with
-          `cost_usage`, the table lags real time by minutes: an empty result right after the
-          routing steps means *not ingested yet*, not *tagging is broken*.
-        action:
-          label: Show cost/tokens per task, by model
-          test: cost_task_usage
-
-      - id: cost_team_governance
-        title: "Cost: Give teams their own budgets & visibility"
-        outcome: "We can show budget alerts and spend/usage visibility managed by team leads and FinOps - not just the account admin - so each team owns its own consumption."
-        concept: |
-          Governance sticks when the people who own a budget can see and manage it without going
-          through an account admin. Two moves make that real:
-
-          - **Self-service visibility.** A team lead runs `queries/budget_status.sql` (and
-            `usage_by_project.sql`) filtered to their own team's model service or tag - their
-            spend, their attribution, no admin required. Hand them the query, not the console.
-          - **Delegated ownership.** Server-side tags on each team's model service make spend
-            attributable and budgetable per team, so every AI spend spike ties back to a named
-            owner and an approved use case - the business-case discipline FinOps asks for.
-
-          This reads the 30-day spend a team's budget governs, run the way a team lead would run
-          it, to prove the visibility works without account-admin access.
-        action:
-          label: Show a team's budgeted spend (self-service, no admin)
-          test: budget_status
-
-  - id: control
-    title: Control
-    tagline: Policies, guardrails, identity propagation, and the telemetry that records them.
-    steps:
-      # The governed model service itself is now stood up in the Cost pillar
-      # (cost_governed_endpoint), because Cost's rate-limit and budget steps read it first. These
-      # Control steps govern that same service, so they depend on it.
       - id: control_endpoint_acl
         title: "Control: Review who can call the model service"
-        outcome: "We can review the Unity Catalog grants on the governed model service (EXECUTE = can call, MANAGE = can reconfigure) and spot over-broad or shadow-service grants."
-        depends_on: [cost_governed_endpoint]
+        tier: recommended
+        where: this app
+        outcome: "Review the Unity Catalog grants on the governed model service and spot over-broad or shadow-service grants."
+        depends_on: [control_model_service]
         concept: |
-          On the Unity Gateway plane, "who may call this model?" is a **Unity Catalog grant** question on
-          the model-service securable - not a workspace endpoint ACL. Two privileges to read
-          carefully in the result:
+          On the Unity Gateway plane, "who may call this model?" is a UC grant on the model-service
+          securable. Read two privileges carefully:
 
-          - **`EXECUTE`** is the right to call the service. A broad group (e.g. `account users`)
-            holding it means the governed service is callable by everyone, which undoes the
-            scoping you set up in Choice.
-          - **`MANAGE`** is the **shadow-service risk** - it lets someone reconfigure the model
-            or strip the guardrails off it. Keep it with platform admins only; grant callers
-            only `EXECUTE`.
+          - **`EXECUTE`** is the right to call the service. A broad group (for example
+            `account users`) holding it means everyone can call the service.
+          - **`MANAGE`** is the shadow-service risk. It lets someone reconfigure the model or strip
+            its guardrails. Keep it with platform admins only.
 
-          This reads the grants on the `model_service` securable
-          (`GET /api/2.1/unity-catalog/permissions/model_service/{fqn}`) and flags a broad group
-          holding EXECUTE/MANAGE. It is read-only - it reports grants, it changes none. To do a
-          live before/after, grant `EXECUTE` to `account users` in the UI, re-run (it flags
-          "open to everyone"), then revoke and re-run.
+          **Try It** reads the grants on the model-service securable and flags a broad group holding
+          EXECUTE or MANAGE. It is read-only.
         action:
           label: Show the model-service grants
           test: endpoint_acl
 
       - id: control_guardrails
         title: "Control: Prove a guardrail blocks a prompt"
-        outcome: "We can screen inputs and outputs for PII and unsafe content and prove a blocked prompt is actually stopped."
-        depends_on: [cost_governed_endpoint]
+        tier: mandatory
+        where: AI Gateway UI
+        outcome: "Screen inputs and outputs for PII and unsafe content, and prove a blocked prompt is actually stopped."
+        depends_on: [control_model_service]
         concept: |
-          Guardrails screen inputs and outputs for PII, unsafe content, and blocked keywords.
-          Configure PII and safety filters in the AI Gateway UI - there is no full CRUD API yet.
-          The keyword blocklist is a UC SQL function you attach as a policy.
+          Guardrails screen inputs and outputs for PII, unsafe content, and blocked keywords. Set
+          PII and safety filters in the AI Gateway UI. There is no full CRUD API yet. The keyword
+          blocklist is a UC SQL function you attach as a policy.
 
-          A **blocked** request is the pass condition here. If the prompt gets answered, the
-          guardrail is not attached.
+          A **blocked** request is the pass condition.
+
+          - **Try It** sends a blocked prompt. If it gets answered, the guardrail is not attached.
+          - **Verify** shows the guardrail activity from the inference table.
         manual:
           label: Open the model service to attach guardrails
           deep_link: model_service
@@ -516,15 +172,20 @@ pillars:
 
       - id: control_mcp_policy
         title: "Control: Attach a contextual MCP policy"
-        outcome: "We can attach a UC SQL service policy that allows read tools and denies write tools, running as the calling user (on-behalf-of)."
+        tier: recommended
+        where: this app
+        outcome: "Attach a contextual UC SQL service policy that allows read tools and denies write tools, running as the calling user (on-behalf-of)."
         concept: |
-          MCP services expose tools to agents. A **service policy** is a UC SQL function that
-          inspects each tool call and returns ALLOW or DENY - allow reads, deny writes.
-          Identity propagates: the tool runs as the calling user, not a shared service account.
+          This is the contextual-policy control. MCP services expose tools to agents. A **service
+          policy** is a UC SQL function that inspects **each tool call in context** and returns
+          ALLOW or DENY: allow reads, deny writes. Identity propagates, so the tool runs as the
+          calling user, not a shared service account.
 
-          Two details that cost debugging time: the function is `to_variant_object(...)` (there
-          is no `to_variant`), and VARIANT paths need casting -
-          `event:context.tool.name::STRING`.
+          - **Try It** creates the policy function.
+          - **Verify** tests a write tool (expect DENY) and a read tool (expect ALLOW).
+
+          Two details that cost debugging time: the function is `to_variant_object(...)` (there is
+          no `to_variant`), and VARIANT paths need casting (`event:context.tool.name::STRING`).
         action:
           label: Create the policy function
           test: create_mcp_policy
@@ -536,38 +197,258 @@ pillars:
           test: test_mcp_policy
 
       - id: control_audit
-        title: "Control: Scan the audit trail for leaks & denials"
-        outcome: "We can query the audit trail for denied and failed calls and scan tool arguments for secret-shaped strings."
+        title: "Control: Scan the audit trail for leaks and denials"
+        tier: recommended
+        where: this app
+        outcome: "Query the audit trail for denied and failed calls and scan tool arguments for secret-shaped strings."
         concept: |
-          `system.access.audit` records who called what and whether a policy fired. This scans
-          recent denied and failed calls, and looks for secret-shaped strings (`sk-`, `AKIA`,
-          `ghp_`) in the arguments. The query is in `queries/audit_scan.sql`.
+          `system.access.audit` records who called what and whether a policy fired.
+
+          **Try It** scans recent denied and failed calls, and looks for secret-shaped strings
+          (`sk-`, `AKIA`, `ghp_`) in the arguments. The query is in `queries/audit_scan.sql`.
         action:
-          label: Query denied calls & scan for secrets
+          label: Query denied calls and scan for secrets
           test: audit_scan
 
-      - id: control_agent_service
-        title: "Control: Register an agent service"
-        outcome: "We can register an agent as a governed Unity Catalog service - owned, versioned, and policy-attachable like a model service."
-        coming_soon: true
+  - id: choice
+    title: Choice
+    tagline: Any model, tool, or agent behind one control plane, addressed as a UC securable.
+    steps:
+      - id: choice_connect
+        title: "Choice: Connect to the workspace"
+        tier: mandatory
+        where: this app
+        outcome: "The app reaches your workspace and SQL warehouse and reads its config."
         concept: |
-          The end state for agent governance: an **agent service** is a Unity Catalog securable,
-          just like a model service - owned, versioned, discoverable, and an attachment point for
-          the same guardrails, rate limits, and service policies. Registering agents this way puts
-          them in one inventory alongside models and MCP, governed by UC grants rather than living
-          as ungoverned endpoints.
+          This app runs as a Databricks App with its own service principal. Every live step needs
+          the workspace and the SQL warehouse.
 
-          **Coming Soon.** Agents-in-Unity-Catalog is still stabilizing, so there is no live Try-It
-          here yet. Today you register agents as MLflow/UC models and govern the serving endpoint
-          directly - the **Agents** accelerator walks through that hands-on. This core step becomes
-          interactive once agent services are GA.
+          - **Try It** confirms the app can reach the warehouse.
+          - **Verify** shows the workspace it is connected to.
+        action:
+          label: Test connection
+          test: connection
+        verify:
+          label: Show workspace context
+          test: workspace_context
+
+      - id: choice_list_endpoints
+        title: "Choice: Inventory endpoints and flag legacy vs model services"
+        tier: mandatory
+        where: this app
+        outcome: "Inventory every serving endpoint and agent, then split traffic into legacy vs Unity Gateway to expose the migration backlog."
+        concept: |
+          Two views of the same surface.
+
+          - **Try It** lists every serving endpoint on the workspace: foundation models, external
+            models, and custom models. This is the inventory you govern.
+          - **Verify** reads `system.ai_gateway.usage` and splits the last 30 days of traffic.
+            A legacy endpoint rides the **v1/v2** path. A model service rides the **Unity Gateway**
+            path (a UC name).
+
+          Any legacy traffic is a **migration backlog**. It breaks when the legacy killswitch
+          flips, so it has to move to a model service first. The query is in
+          `queries/endpoint_inventory_v1_v3.sql`.
+
+          For the migration path off v1/v2, see the
+          [Migration guide: moving to Unity AI Gateway](https://kb.databricks.com/unity-catalog/migration-guide-moving-to-unity-ai-gateway).
+          For the recommended rollout, see the
+          [AI Governance field portal](http://go/aigovernance) (Databricks internal link).
+        action:
+          label: List serving endpoints
+          test: list_endpoints
+        verify:
+          label: Split recent traffic into legacy vs model services
+          test: endpoint_inventory_v1_v3
+
+      - id: choice_model_services
+        title: "Choice: Put a model behind a governed name"
+        tier: mandatory
+        where: this app
+        outcome: "A model is addressed as a Unity Catalog model service (catalog.schema.service) with a stable client contract and UC-grant access."
+        depends_on: [control_model_service]
+        concept: |
+          Controls used to hang off a workspace serving endpoint. They now hang off a **model
+          service**: a Unity Catalog object named `catalog.schema.service`. You created one in the
+          Control tab.
+
+          Two things this buys you:
+
+          - **A stable contract.** Swap the model or split traffic and the app keeps calling the
+            same name. Permissions become UC grants.
+          - **Access you can reason about.** A model service is closed by default. Only an identity
+            granted `EXECUTE` can call it.
+
+          The client change is two things, and they move together:
+
+          - **Base URL** - `/serving-endpoints` becomes `/ai-gateway/mlflow/v1`.
+          - **Model selector** - the endpoint name becomes `catalog.schema.service`.
+
+          **Try It** shows the model services and this client contract.
+        action:
+          label: Show model services and the client contract
+          test: model_services
+
+      - id: choice_default_access
+        title: "Choice: Choose which models teams can access"
+        tier: recommended
+        where: this app
+        outcome: "Each team and the wider org gets model access through Unity Catalog grants, not per-developer API keys."
+        depends_on: [choice_model_services]
+        concept: |
+          A model service is closed by default. Access is a UC `EXECUTE` grant you can reason
+          about. Grant a team the models it should have. Withhold the rest.
+
+          **Try It** reads the effective permissions for the app's own identity and reports which
+          model services it can call. It is read-only. It reports reach. It never changes a grant.
+        action:
+          label: Show which models this identity can access
+          test: default_access
+
+      - id: use_open_weight_model
+        title: "Choice: Run proprietary and open-weight models"
+        tier: recommended
+        where: this app
+        outcome: "Open-weight models (GLM, GPT-OSS, DeepSeek, Llama) and proprietary models (Claude, GPT) run through one governed control plane, with the same grants, policies, and attribution."
+        concept: |
+          Choice is not a single-vendor bet. Proprietary and open-weight models are addressed the
+          same way: a Unity Gateway model service on the `/ai-gateway` path. Both carry the same
+          UC grants, guardrails, rate limits, and request-tag attribution.
+
+          Two things this proves:
+
+          - **No lock-in.** The contract, grants, and telemetry are the same whoever trained the
+            model. You govern access to models, not one lab.
+          - **Data residency option.** An open-weight model served on your own compute keeps the
+            payload in your account.
+
+          **Try It** calls the configured open-weight model service
+          (`gateway.open_weight_model_service` in `config/workshop.yaml`) over the Gateway. Point
+          it at whichever open-weight model service your org uses.
+        action:
+          label: Call an open-weight model service through the Gateway
+          test: use_open_weight_model
+
+  - id: cost
+    title: Cost
+    tagline: See spend, project routing savings, cap spend and throughput, and attribute each request.
+    steps:
+      - id: cost_spend_by_model
+        title: "Cost: Read 30-day spend by model"
+        tier: mandatory
+        where: this app
+        outcome: "Read 30-day AI spend in USD, by model, to see where the money goes and where routing has the most leverage."
+        concept: |
+          AI spend comes from two places. This step reads both.
+
+          - **External providers** - `system.ai_gateway.external_model_spend` reports USD directly.
+          - **Internal Databricks-hosted models** (`system.ai.*`) - these bill in DBUs, priced from
+            `system.billing.usage`. This needs the optional `system.billing` grant. Without it the
+            dollar view reads $0 on an internal-only workspace.
+
+          Broken down by model, this shows which models dominate spend. Dollars are list-price
+          estimates until you apply a negotiated rate. Token counts are real.
+        action:
+          label: Show 30-day spend by model
+          test: gateway_spend_by_model
+
+      - id: cost_routing_compare
+        title: "Cost: Project routing savings"
+        tier: recommended
+        where: this app
+        outcome: "Run prompts across models, measure the tokens each returns, and project the monthly savings from routing each request to the cheapest sufficient model."
+        concept: |
+          Routing sends each request to an appropriately priced model instead of defaulting every
+          request to a frontier model.
+
+          - **Try It** runs the configured prompts against the three models and multiplies
+            per-request cost by the monthly volume in `cost.routing.requests_per_month`
+            (default 10,000). It shows each model's monthly cost and the cost of routing each
+            request to the cheapest sufficient model.
+          - **Verify** shows the model panel and the per-token prices behind the estimate.
+
+          Smart routing (Databricks-managed) is in preview, and is for coding agents. It does not
+          route external provider models (Anthropic, OpenAI) by design. Token counts are measured.
+          Dollars depend on the DBU rate in config.
+        action:
+          label: Compare monthly cost across models
+          test: routing_compare
+        verify:
+          label: Show the models and prices
+          test: routing_panel
+
+      - id: cost_rate_limits
+        title: "Cost: Enforce rate limits (QPM/TPM)"
+        tier: mandatory
+        where: AI Gateway UI
+        outcome: "Enforce QPM/TPM rate limits per service, user, and group, and see HTTP 429 when exceeded."
+        depends_on: [control_model_service]
+        concept: |
+          Two controls, easily confused.
+
+          - **Rate limits** cap throughput. Exceeding one returns HTTP 429 at once. GA.
+          - **Budgets** cap spend. Today they reliably alert. Hard blocking is still rolling out.
+
+          Rate limits are the control that reliably holds a hard ceiling today. They attach to the
+          governed model service you created in the Control tab.
+
+          **Try It** reads the limits set on it (QPM and TPM), per service, user, and group. Set
+          limits in the AI Gateway UI so the workshop never changes throughput on a live service.
+        action:
+          label: Show enforced rate limits
+          test: rate_limits
         manual:
-          label: See the Agents accelerator to register & govern agents today
+          label: Set a rate limit on the model service
+          deep_link: model_service
 
-      # Trimmed from the core for the 3-hour format, and re-addable on request:
-      #   - control_coding_agents  -> lives in the Coding Agents accelerator (deeper treatment).
-      #   - control_traces         -> lives in the Agent Registry accelerator.
-      #   - control_lakewatch      -> Lakewatch is not enabled on most accounts; its telemetry is
-      #                               already proven by cost_usage and control_audit.
-      # The backend tests (coding_agent_usage, telemetry_readiness) still exist and are used by
-      # those accelerators, so re-adding a core step is a config-only change.
+      - id: cost_budgets
+        title: "Cost: Set budgets and alert thresholds"
+        tier: mandatory
+        where: Account console
+        outcome: "Set account budgets with alert thresholds and read the spend they govern, including per-team self-service visibility."
+        concept: |
+          Budgets are scoped to the account and set in the account console. You created a small
+          budget in the prerequisites. Here you set its alert threshold and confirm it fires.
+
+          **Alerts are GA. Hard blocking is rolling out.** Confirm on this account before you tell
+          a FinOps owner that spend is hard-capped. Pair the budget with the rate limit above: the
+          budget tells you when spend drifts, the rate limit is what stops it.
+
+          Self-service: a team lead does not need admin to see their own spend. They run
+          `queries/budget_status.sql` filtered to their model or user. **Try It** runs that same
+          query for the spend the budget governs.
+        action:
+          label: Show 30-day spend the budget governs
+          test: budget_status
+        manual:
+          label: Set an alert threshold on the budget (account console)
+          deep_link: account_budgets
+
+      - id: cost_usage
+        title: "Cost: Attribute usage by team and task"
+        tier: recommended
+        where: this app
+        outcome: "Split AI usage by team tag and by task and model, to attribute spend and see which model does each kind of work most efficiently."
+        concept: |
+          `system.ai_gateway.usage` rolls tokens up by tag. How a request is tagged decides what
+          you can trust:
+
+          - **Request tags** are set per request by the caller. Good for attribution. Caller-
+            controlled, so never a budget boundary.
+          - **Server-side tags** are set by the platform owner on the service. A FinOps owner can
+            trust these as a budget filter.
+
+          - **Try It** splits usage by team tag. Request-tagged calls prove per-caller attribution.
+            Endpoint-tagged calls are the ones safe to budget on.
+          - **Verify** groups by task and model, so the lowest average-tokens row is the cheapest
+            model for that task.
+
+          The table lags real time by minutes. An empty result right after the routing steps means
+          not ingested yet, not broken. Queries: `queries/usage_by_project.sql`,
+          `queries/usage_by_task.sql`.
+        action:
+          label: Query usage by team tag
+          test: usage_by_project
+        verify:
+          label: Show cost/tokens per task, by model
+          test: cost_task_usage

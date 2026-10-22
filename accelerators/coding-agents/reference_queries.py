@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Coding Agents — reference queries
+# MAGIC # Coding Agents - reference queries
 # MAGIC
 # MAGIC Standalone version of the checks the **Coding Agents** accelerator runs inside the AI
 # MAGIC Governance Workshop app, so you can reference and run them without deploying the app.
@@ -33,7 +33,7 @@ ANTHROPIC_MESSAGES_PATH = "/ai-gateway/anthropic/v1/messages"
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1 — Is it actually routed? (`coding_agent_route_check`)
+# MAGIC ## Step 1 - Is it actually routed? (`coding_agent_route_check`)
 # MAGIC The common silent failure: a client "pointed at the gateway" still resolves a legacy
 # MAGIC endpoint, so limits/guardrails on the new **model service** never apply. A call that
 # MAGIC names a model-service FQN records `service_name`; a plain-endpoint call records NULL.
@@ -56,9 +56,9 @@ display(spark.sql("""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2 — Per-developer attribution (`coding_agent_usage`)
+# MAGIC ## Step 2 - Per-developer attribution (`coding_agent_usage`)
 # MAGIC Coding agents identify themselves in `user_agent`, so traffic attributes per developer
-# MAGIC with no tagging required — spend and usage roll up to a real person.
+# MAGIC with no tagging required - spend and usage roll up to a real person.
 
 # COMMAND ----------
 
@@ -79,10 +79,10 @@ display(spark.sql("""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3 — Do the controls fire on the path the agent uses? (`path_coverage_check`)
+# MAGIC ## Step 3 - Do the controls fire on the path the agent uses? (`path_coverage_check`)
 # MAGIC Guardrails/limits are reliably enforced on the OpenAI-compatible chat path. Coding
 # MAGIC agents often call the **provider-native** path (`/ai-gateway/anthropic/v1/messages`).
-# MAGIC Probe the same guardrail-triggering prompt on both and compare — a control that
+# MAGIC Probe the same guardrail-triggering prompt on both and compare - a control that
 # MAGIC silently does not fire on the path a client actually uses is the dangerous gap.
 
 # COMMAND ----------
@@ -113,8 +113,8 @@ if chat_blocked and not anthropic_blocked:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4 — Prove the rate limit bites — HTTP 429 (`rate_limit_429_demo`)
-# MAGIC A rate limit is the hard cost control — an exceeded limit returns 429 immediately. Read
+# MAGIC ## Step 4 - Prove the rate limit bites - HTTP 429 (`rate_limit_429_demo`)
+# MAGIC A rate limit is the hard cost control - an exceeded limit returns 429 immediately. Read
 # MAGIC the configured limits, then send a burst and watch it throttle. Rate-limit changes can
 # MAGIC take ~1–2 hours to take effect, and the limit must apply to the caller's identity (or
 # MAGIC be endpoint-wide) to trip.
@@ -140,10 +140,10 @@ print("Saw a 429:", 429 in statuses)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 5 — Cap the spend with a budget (`budget_status`)
+# MAGIC ## Step 5 - Cap the spend with a budget (`budget_status`)
 # MAGIC Attribution shows who is spending; a budget bounds it. Read the 30-day spend the gateway
 # MAGIC records per model and user. (Set the budget + alert thresholds in the account console;
-# MAGIC alerts are GA, hard caps are rolling out — confirm on the account.)
+# MAGIC alerts are GA, hard caps are rolling out - confirm on the account.)
 
 # COMMAND ----------
 
@@ -159,7 +159,7 @@ display(spark.sql("""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 6 — Code-secret detection (`audit_scan`)
+# MAGIC ## Step 6 - Code-secret detection (`audit_scan`)
 # MAGIC Coding agents can leak API keys/tokens in prompts. Pull recent denied/failed calls from
 # MAGIC the audit log and scan their arguments for secret-shaped strings.
 

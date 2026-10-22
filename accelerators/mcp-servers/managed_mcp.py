@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab — Managed MCP servers
+# MAGIC # Lab - Managed MCP servers
 # MAGIC
 # MAGIC Expose governed Unity Catalog assets to any MCP client, no server to run.
 # MAGIC
@@ -207,7 +207,7 @@ print("result:", result.content[0].text if getattr(result, "content", None) else
 # COMMAND ----------
 
 # MAGIC %md ### The other managed servers
-# MAGIC The same client targets the Vector Search and Genie servers — point `server_url` at the
+# MAGIC The same client targets the Vector Search and Genie servers - point `server_url` at the
 # MAGIC relevant pattern (see README.md). For example:
 # MAGIC
 # MAGIC ```python

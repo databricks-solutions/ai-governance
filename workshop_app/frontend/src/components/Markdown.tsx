@@ -110,7 +110,9 @@ export default function Markdown({
   const flushPara = () => {
     if (!para.length) return;
     out.push(
-      <p key={key++} className={`${body} leading-relaxed text-muted`}>
+      // mt-3 first:mt-0 gives stacked paragraphs real spacing (consecutive <p> used to butt
+      // together with only line-height, which read as cramped/strange on the Walkthrough).
+      <p key={key++} className={`${body} mt-3 first:mt-0 leading-relaxed text-muted`}>
         {H(para.join(" "))}
       </p>,
     );

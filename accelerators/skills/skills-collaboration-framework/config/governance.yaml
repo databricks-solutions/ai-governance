@@ -1,4 +1,4 @@
-# governance.yaml — single people-and-roles directory. The platform team owns this file.
+# governance.yaml - single people-and-roles directory. The platform team owns this file.
 # Owner-eligible = the union of every email listed anywhere below.
 # This is an illustrative reference implementation for a fictional "Greenwood" org.
 platform_team:
@@ -7,10 +7,10 @@ tier2:
   stewards:
     # Four neutral, cross-industry example domains. In a real org each domain names its own
     # steward(s); here a small set keeps the reference readable.
-    #   platform    — platform / infrastructure / cost engineering
-    #   analytics   — BI and data-science analytics
-    #   finance     — financial planning & analysis
-    #   governance  — data governance & catalog stewardship
+    #   platform    - platform / infrastructure / cost engineering
+    #   analytics   - BI and data-science analytics
+    #   finance     - financial planning & analysis
+    #   governance  - data governance & catalog stewardship
     platform:
       - sam.rivera@greenwood.example
     analytics:

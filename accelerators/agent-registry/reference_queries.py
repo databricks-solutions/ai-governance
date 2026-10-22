@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Agent Registry — reference queries
+# MAGIC # Agent Registry - reference queries
 # MAGIC
 # MAGIC Standalone version of the checks the **Agent Registry** accelerator runs inside the AI
 # MAGIC Governance Workshop app, so you can reference and run them without deploying the app.
@@ -29,8 +29,8 @@ _AGENT_HINTS = ("agent", "assistant", "bot", "rag", "chain")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1 — Inventory registered agents & tools (`list_registered_assets`)
-# MAGIC An agent registry makes agents first-class Unity Catalog assets — discoverable,
+# MAGIC ## Step 1 - Inventory registered agents & tools (`list_registered_assets`)
+# MAGIC An agent registry makes agents first-class Unity Catalog assets - discoverable,
 # MAGIC versioned, and owned. List the registered models (agents) and UC functions (tools) in
 # MAGIC the workshop schema.
 
@@ -48,7 +48,7 @@ for f in tools:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2 — Confirm versioning & ownership (`agent_versions`)
+# MAGIC ## Step 2 - Confirm versioning & ownership (`agent_versions`)
 # MAGIC A one-off deploy is not a registered agent. Each should be a UC model with an owner and
 # MAGIC a version history, so it is reproducible and rollback-able.
 
@@ -58,14 +58,14 @@ for m in agents:
     versions = list(w.model_versions.list(full_name=m.full_name))
     print(f"{m.full_name}  owner={m.owner}  versions={len(versions)}")
 if not agents:
-    print("No registered agents yet — register one (MLflow → UC model), then re-run.")
+    print("No registered agents yet - register one (MLflow → UC model), then re-run.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 3 — Confirm traces & telemetry (`telemetry_readiness`)
+# MAGIC ## Step 3 - Confirm traces & telemetry (`telemetry_readiness`)
 # MAGIC A registered agent should emit telemetry. Confirm the AI telemetry tables are present
-# MAGIC and receiving rows. (These `system` schemas require an account-admin grant — see the
+# MAGIC and receiving rows. (These `system` schemas require an account-admin grant - see the
 # MAGIC accelerator README.)
 
 # COMMAND ----------
@@ -85,8 +85,8 @@ display(spark.sql("""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 4 — Govern the agent endpoint itself (`agent_sp_attribution`)
-# MAGIC A custom agent endpoint may lack the controls a model endpoint has — rate limits,
+# MAGIC ## Step 4 - Govern the agent endpoint itself (`agent_sp_attribution`)
+# MAGIC A custom agent endpoint may lack the controls a model endpoint has - rate limits,
 # MAGIC guardrails, usage tracking. Where a control is missing, that agent's traffic is
 # MAGIC ungoverned. Inspect agent-like endpoints and report which controls each carries.
 

@@ -1,15 +1,15 @@
 <!--
 Canonical workspace-level Assistant instructions for the greenwood DEV workspace
-(https://greenwood-dev.cloud.databricks.example) — the Tier 1 sandbox (self-upload) and a Tier 3
+(https://greenwood-dev.cloud.databricks.example) - the Tier 1 sandbox (self-upload) and a Tier 3
 fan-out target.
 
 Governed in Git, reviewed by PR. Applied MANUALLY by an admin to
-/Workspace/.assistant_workspace_instructions.md (auto-push is out of scope — see
+/Workspace/.assistant_workspace_instructions.md (auto-push is out of scope - see
 workspace-instructions/README.md). Only the first 4,000 characters are used by the Assistant;
 keep this concise.
 -->
 
-# Workspace Assistant Instructions — Greenwood (DEV workspace, Tier 1 sandbox + Tier 3 fan-out)
+# Workspace Assistant Instructions - Greenwood (DEV workspace, Tier 1 sandbox + Tier 3 fan-out)
 
 Org-wide context applied to **every** Databricks Assistant / Genie Code interaction in this
 workspace. This is where developers dogfood **Tier-1** sandbox skills before promoting them; it
@@ -19,7 +19,7 @@ also receives the **Tier-3** enterprise fan-out. Audiences span Greenwood's four
 ## Data governance (non-negotiable)
 
 - Query only **Unity Catalog–governed** tables. Never read raw landing/bronze source tables
-  directly — use the curated **gold** marts.
+  directly - use the curated **gold** marts.
 - **Never display restricted identifiers** (name, DOB, address, account number) in results. If a
   question requires access to restricted data, stop and direct the user to an approved,
   access-controlled report.

@@ -143,7 +143,7 @@ write_workspaces() {
 WSEOF
 }
 
-# Test: T2 skill with NO unity_catalog_scopes passes (scopes are optional — footprint
+# Test: T2 skill with NO unity_catalog_scopes passes (scopes are optional - footprint
 # lives in the SKILL.md prose; UC enforces access at runtime regardless)
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/config"
@@ -384,7 +384,7 @@ cp "$REPO_ROOT/tests/fixtures/valid-skill/SKILL.md" "$TMPDIR/tier3/analytics/som
 assert_exit "misplaced SKILL.md (wrong tier depth) exits 1" 1 bash -c "cd '$TMPDIR' && python3 '$SCRIPT'"
 rm -rf "$TMPDIR"
 
-# Test: multi-file skill (supporting .md beside SKILL.md) passes — skills may bundle resources
+# Test: multi-file skill (supporting .md beside SKILL.md) passes - skills may bundle resources
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/config"
 cp "$REPO_ROOT/config/registry.yaml" "$TMPDIR/config/"
@@ -394,7 +394,7 @@ printf '# Supporting patterns\nReference material for the skill.\n' > "$TMPDIR/t
 assert_exit "multi-file skill (supporting .md) passes" 0 bash -c "cd '$TMPDIR' && python3 '$SCRIPT'"
 rm -rf "$TMPDIR"
 
-# Test: T2 skill with pii: true exits 1 (spec §2.2 — PII must be Tier 3)
+# Test: T2 skill with pii: true exits 1 (spec §2.2 - PII must be Tier 3)
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/config"
 mkdir -p "$TMPDIR/tier2/analytics/pii-skill"
@@ -460,7 +460,7 @@ cp "$REPO_ROOT/config/governance.yaml" "$TMPDIR/config/"
 assert_exit "T2 skill with regulated classification exits 1 (must be T3)" 1 bash -c "cd '$TMPDIR' && python3 '$SCRIPT'"
 rm -rf "$TMPDIR"
 
-# Test: T2 skill whose SQL performs a write/mutation exits 1 (spec §2.2 — write skills are T3)
+# Test: T2 skill whose SQL performs a write/mutation exits 1 (spec §2.2 - write skills are T3)
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/config"
 mkdir -p "$TMPDIR/tier2/analytics/write-skill"
@@ -529,7 +529,7 @@ REGEOF
 assert_exit "T2 skill with leftover TODO exits 1" 1 bash -c "cd '$TMPDIR' && python3 '$SCRIPT'"
 rm -rf "$TMPDIR"
 
-# Test: T1 skill with a TODO is ADVISORY only (sandbox scratch — passes, warns)
+# Test: T1 skill with a TODO is ADVISORY only (sandbox scratch - passes, warns)
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/config"
 write_governance "$TMPDIR"
@@ -632,7 +632,7 @@ else
 fi
 rm -rf "$TMPDIR"
 
-# Test: check_domain_mapped — a T2 skill whose domain IS mapped in workspaces.json passes
+# Test: check_domain_mapped - a T2 skill whose domain IS mapped in workspaces.json passes
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/config"
 write_governance "$TMPDIR"
@@ -669,8 +669,8 @@ REGEOF
 assert_exit "T2 skill in a mapped domain passes" 0 bash -c "cd '$TMPDIR' && python3 '$SCRIPT'"
 rm -rf "$TMPDIR"
 
-# Test: check_domain_mapped — a T2 skill whose domain is NOT in workspaces.json exits 1
-# (would merge but reach no workspace at sync time — the gate moves that failure left to the PR)
+# Test: check_domain_mapped - a T2 skill whose domain is NOT in workspaces.json exits 1
+# (would merge but reach no workspace at sync time - the gate moves that failure left to the PR)
 TMPDIR=$(mktemp -d)
 mkdir -p "$TMPDIR/config"
 write_workspaces "$TMPDIR"

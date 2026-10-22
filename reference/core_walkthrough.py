@@ -1,14 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # AI Governance Workshop — core walkthrough (no app)
+# MAGIC # AI Governance Workshop - core walkthrough (no app)
 # MAGIC
 # MAGIC The 14 core steps (Choice · Cost · Control) run by hand, so you can deliver the workshop
-# MAGIC without deploying the app. Everything here targets **your own** workspace and account —
+# MAGIC without deploying the app. Everything here targets **your own** workspace and account -
 # MAGIC the SDK talks to your workspace API, SQL runs on your warehouse, and the SQL comes from
 # MAGIC the same [`workshop_app/queries/*.sql`](../workshop_app/queries) files the app uses.
 # MAGIC
 # MAGIC Read-only unless a cell says otherwise. Guardrails, rate limits, budgets, and attaching an
-# MAGIC MCP policy are set by **you** in the UI — those cells describe the action and verify it.
+# MAGIC MCP policy are set by **you** in the UI - those cells describe the action and verify it.
 
 # COMMAND ----------
 
@@ -44,7 +44,7 @@ def _find_queries_dir() -> Path:
         if cand.is_dir():
             return cand
     raise FileNotFoundError(
-        "Could not find workshop_app/queries — run this notebook from inside the repo checkout."
+        "Could not find workshop_app/queries - run this notebook from inside the repo checkout."
     )
 
 
@@ -74,7 +74,7 @@ def run_sql(sql: str):
 
 # COMMAND ----------
 
-# MAGIC %md ## Choice 1 — Connect
+# MAGIC %md ## Choice 1 - Connect
 
 # COMMAND ----------
 
@@ -84,7 +84,7 @@ print("Warehouse check:", run_sql("SELECT 1 AS ok"))
 
 # COMMAND ----------
 
-# MAGIC %md ## Choice 2 — Inventory endpoints
+# MAGIC %md ## Choice 2 - Inventory endpoints
 
 # COMMAND ----------
 
@@ -96,7 +96,7 @@ for e in eps[:50]:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Choice 2b — v1 (legacy) vs v3 (model service) split
+# MAGIC ## Choice 2b - v1 (legacy) vs v3 (model service) split
 # MAGIC A call naming a legacy endpoint lands with `service_name` NULL (v1); a model-service FQN
 # MAGIC lands with `service_name` set (v3). Any **v1** row is traffic that breaks at the killswitch.
 
@@ -106,12 +106,12 @@ rows = run_sql(load_query("endpoint_inventory_v1_v3", days="30"))
 for r in rows:
     print(r)
 v1 = [r for r in rows if str(r.get("gateway_path", "")).startswith("v1")]
-print(f"\n{len(v1)} target(s) still on the v1 path — migrate these to a model service.")
+print(f"\n{len(v1)} target(s) still on the v1 path - migrate these to a model service.")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Choice 3 — Model services (the governed object)
+# MAGIC ## Choice 3 - Model services (the governed object)
 # MAGIC Client contract moves together: base URL `/serving-endpoints` → `/ai-gateway/mlflow/v1`,
 # MAGIC and model `<endpoint-name>` → `<catalog>.<schema>.<service>`. No in-place rename.
 
@@ -129,7 +129,7 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Cost 5 — Routing compare (the custom-router idea)
+# MAGIC ## Cost 5 - Routing compare (the custom-router idea)
 # MAGIC Send one prompt to each tier and compare tokens. The app adds a classifier that picks the
 # MAGIC cheapest sufficient tier; here we just show the spread. Retarget endpoints to your workspace.
 
@@ -158,7 +158,7 @@ for tier, endpoint in TIERS.items():
 
 # COMMAND ----------
 
-# MAGIC %md ## Cost 6 · 8 · 9 — Spend, budget, and tagged usage (system tables)
+# MAGIC %md ## Cost 6 · 8 · 9 - Spend, budget, and tagged usage (system tables)
 
 # COMMAND ----------
 
@@ -166,7 +166,7 @@ print("Spend by model (30d):")
 for r in run_sql(load_query("spend_by_model")):
     print(" ", r)
 
-print("\nBudget basis — spend by model & user (a non-admin can run this for their own rows):")
+print("\nBudget basis - spend by model & user (a non-admin can run this for their own rows):")
 for r in run_sql(load_query("budget_status")):
     print(" ", r)
 
@@ -177,7 +177,7 @@ for r in run_sql(load_query("usage_by_project", project=f"'{PROJECT}'")):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Cost 7 — Rate limits (manual)
+# MAGIC ## Cost 7 - Rate limits (manual)
 # MAGIC Rate limits are the hard throughput control (HTTP 429). Set them in the AI Gateway UI on
 # MAGIC the endpoint, then read them back:
 
@@ -188,12 +188,12 @@ try:
     ep = w.serving_endpoints.get(GOVERNED)
     print("ai_gateway config:", ep.ai_gateway)
 except Exception as e:
-    print(f"Endpoint '{GOVERNED}' not found yet — create it below, then set limits in the UI. ({str(e)[:120]})")
+    print(f"Endpoint '{GOVERNED}' not found yet - create it below, then set limits in the UI. ({str(e)[:120]})")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Control 10 · 11 — Governed endpoint & who can call it
+# MAGIC ## Control 10 · 11 - Governed endpoint & who can call it
 # MAGIC The app creates the governed endpoint only if you run that step; do it in the UI or with a
 # MAGIC PUT to `/api/2.0/serving-endpoints/<name>/config`. Then read the ACL:
 
@@ -212,9 +212,9 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Control 12 · 13 — Guardrails & MCP policy (mostly manual)
+# MAGIC ## Control 12 · 13 - Guardrails & MCP policy (mostly manual)
 # MAGIC - **Guardrails:** configure PII/safety in the AI Gateway UI; the keyword blocklist is a UC
-# MAGIC   SQL function you attach. Test by sending a prompt that should be blocked — a block is the
+# MAGIC   SQL function you attach. Test by sending a prompt that should be blocked - a block is the
 # MAGIC   pass condition.
 # MAGIC - **MCP policy:** a UC SQL function returning ALLOW/DENY. Note `to_variant_object(...)`
 # MAGIC   (not `to_variant`) and cast VARIANT paths: `event:context.tool.name::STRING`. Attach it
@@ -245,7 +245,7 @@ else:
 
 # COMMAND ----------
 
-# MAGIC %md ## Control 14 — Audit & secret-leak scan
+# MAGIC %md ## Control 14 - Audit & secret-leak scan
 
 # COMMAND ----------
 

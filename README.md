@@ -2,14 +2,14 @@
 
 ```
 A customer-facing, guided workshop for standing up a governed AI control plane on a
-Databricks workspace — and proving it works live. Organized around three pillars —
-Choice · Cost · Control — where every step has a concept, a "Try It" action that
+Databricks workspace - and proving it works live. Organized around three pillars -
+Choice · Cost · Control - where every step has a concept, a "Try It" action that
 exercises a real control against the connected workspace, and a "Verify" step that
-proves it fired. Runs in three hours hands-on, plus about an hour of slides and discussion, with optional ~3-hour accelerators for deeper dives.
+proves it fired. Runs in two hours hands-on, plus a short slide intro, with optional ~2-hour accelerators for deeper dives.
 ```
 
-The workshop puts the **Unity AI Gateway** — a single, governed control plane in front of the
-models, tools, and agents your organization uses — in front of a room of cloud admins, AI
+The workshop puts the **Unity AI Gateway** - a single, governed control plane in front of the
+models, tools, and agents your organization uses - in front of a room of cloud admins, AI
 governance leaders, and principal developers. It ships as a **React + FastAPI Databricks App**
 ([`workshop_app/`](workshop_app)), driven entirely by one config file so it runs on any customer
 workspace, deployed from a single Databricks Asset Bundle.
@@ -42,21 +42,21 @@ workspace, deployed from a single Databricks Asset Bundle.
 audit trail in `system.access`; full request/response payloads in Unity Catalog **inference
 tables** (`<catalog>.<schema>.*`) for audit, eval, and guardrail review.
 
-## The core workshop — Choice · Cost · Control
+## The core workshop - Choice · Cost · Control
 
-Three hours hands-on, plus about an hour of slides and discussion, run top to bottom against the customer's own workspace. Content lives in
+Two hours hands-on, plus a short slide intro, run top to bottom against the customer's own workspace. Content lives in
 [`workshop_app/config/steps.yaml`](workshop_app/config/steps.yaml); the executable checks behind
 each **Try It** button live in
 [`workshop_app/server/tests_registry.py`](workshop_app/server/tests_registry.py).
 
-- **Choice** — place any model, tool, or agent behind one control plane, addressed as a Unity
+- **Choice** - place any model, tool, or agent behind one control plane, addressed as a Unity
   Catalog securable rather than a workspace endpoint name. Connect, discover the model surface,
   and register agents, tools, and MCP servers as first-class UC assets.
-- **Cost** — project the cost of routing between models (a real custom router plugs in here), set
+- **Cost** - project the cost of routing between models (a real custom router plugs in here), set
   budgets and per-user rate limits, tag for cost attribution, and query usage/cost by project.
-- **Control** — create a governed endpoint, apply guardrails on a model service, attach a
+- **Control** - create a governed endpoint, apply guardrails on a model service, attach a
   contextual policy to an MCP service (allow reads, deny writes), govern coding-agent traffic, and
-  get end-to-end observability — scan the audit log for denied calls and leaked secrets, and open
+  get end-to-end observability - scan the audit log for denied calls and leaked secrets, and open
   traces.
 
 Progress is tracked per team in a JSON file on a Unity Catalog volume, so a room can pause and
@@ -64,7 +64,7 @@ resume with no database to provision, and everything you run is included in the 
 
 ## Accelerators
 
-Beyond the core workshop, six optional **~3-hour accelerators** each get their own in-app page —
+Beyond the core workshop, six optional **~2-hour accelerators** each get their own in-app page -
 same **concept → Try It → Verify** flow, same progress store, same outcomes export. Run the one or
 two that match what the customer needs to unblock rather than all six. They are defined for the
 app in [`workshop_app/config/accelerators.yaml`](workshop_app/config/accelerators.yaml) (build plan
@@ -75,7 +75,7 @@ Each accelerator also has a folder under [`accelerators/`](accelerators) with a 
 step, so you can reference them **without deploying the app**), and ported deep-dive notebooks.
 
 ### 🔌 MCP Servers
-Managed vs external MCP, UC permissions, on-behalf-of identity, and service policies — the top
+Managed vs external MCP, UC permissions, on-behalf-of identity, and service policies - the top
 gap being read-only enforcement for coding-agent users while humans keep write. Eleven steps
 distinguish the two kinds of MCP (managed UC-native endpoints vs `MCP_SERVICE` securables), prove
 OBO identity, write and verify a contextual ALLOW/DENY/ASK policy, scan tool metadata for
@@ -83,7 +83,7 @@ poisoning, and show exactly what MCP telemetry does and does not capture.
 → [`accelerators/mcp-servers/`](accelerators/mcp-servers) · [reference queries](accelerators/mcp-servers/reference_queries.py)
 
 ### 🤖 Agent Registry
-Make agents first-class UC assets — registered, versioned, owned, traced, and governed like any
+Make agents first-class UC assets - registered, versioned, owned, traced, and governed like any
 endpoint. Inventory registered agents, register and version a representative one, confirm
 versioning/ownership and traces, and close the identity gap where a custom agent endpoint lacks
 the rate limits, guardrails, or usage tracking a model endpoint has.
@@ -106,7 +106,7 @@ workload as proof.
 → [`accelerators/external-providers/`](accelerators/external-providers) · [reference queries](accelerators/external-providers/reference_queries.py)
 
 ### 🛡️ Policies & Guardrails
-Prove guardrails actually work — not just that they're on. Safety + PII filter on input and
+Prove guardrails actually work - not just that they're on. Safety + PII filter on input and
 output, MASK vs BLOCK, how a block is delivered (4xx vs HTTP 200 + reason, and the coding-agent
 "sticky block" gotcha), path coverage, and effectiveness measured on a labeled set. The
 effectiveness step draws on the in-repo guardrail benchmark.
@@ -120,7 +120,7 @@ across your organization.
 
 ## Getting started
 
-The workshop app deploys from **one Databricks Asset Bundle** — no shell script, two standard
+The workshop app deploys from **one Databricks Asset Bundle** - no shell script, two standard
 commands. Full deploy guide, prerequisites, and the two `system` grants an account admin must run
 are in [`workshop_app/README.md`](workshop_app/README.md).
 
@@ -128,7 +128,7 @@ are in [`workshop_app/README.md`](workshop_app/README.md).
 cd workshop_app
 
 # 1. Deploy: builds the frontend, creates the schema + progress volume, creates the app,
-#    and grants the app's service principal — all in one pass.
+#    and grants the app's service principal - all in one pass.
 databricks bundle deploy -t dev -p <profile> \
   --var="warehouse_id=<id>" --var="catalog=<uc-catalog>"
 
@@ -139,20 +139,20 @@ databricks bundle run ai_governance_workshop_app -t dev -p <profile>
 **Prerequisites:** the Databricks CLI authenticated to the workspace, a running SQL warehouse, an
 existing Unity Catalog catalog, and Node (the bundle builds the frontend on deploy).
 
-**Bundle variables** — passed with `--var="name=value"` on both commands above:
+**Bundle variables** - passed with `--var="name=value"` on both commands above:
 
 | Variable | Required? | What it is / where to get it |
 |---|---|---|
-| `warehouse_id` | **Yes — no default.** The deploy **fails immediately** if it's missing, rather than shipping an app that errors on every step. | The SQL warehouse the app runs its live checks through. List them with `databricks warehouses list -p <profile>` (use the `ID`), or copy it from the warehouse's **Connection details** in the UI. |
-| `catalog` | **Pass your own.** Defaults to `uaigw_fe` — our internal hosted catalog, which won't exist on your workspace. | An existing Unity Catalog catalog; the app creates only its own schema inside it. |
-| `schema` | Optional — default `workshop`. | Schema the app creates for its state and progress volume. |
-| `workshop_group` | Optional — default `users`. | Group granted `CAN_USE` on the deployed app. |
+| `warehouse_id` | **Yes - no default.** The deploy **fails immediately** if it's missing, rather than shipping an app that errors on every step. | The SQL warehouse the app runs its live checks through. List them with `databricks warehouses list -p <profile>` (use the `ID`), or copy it from the warehouse's **Connection details** in the UI. |
+| `catalog` | **Pass your own.** Defaults to `uaigw_fe` - our internal hosted catalog, which won't exist on your workspace. | An existing Unity Catalog catalog; the app creates only its own schema inside it. |
+| `schema` | Optional - default `workshop`. | Schema the app creates for its state and progress volume. |
+| `workshop_group` | Optional - default `users`. | Group granted `CAN_USE` on the deployed app. |
 
 In practice you set `warehouse_id` (required) and `catalog` (so it points at a catalog you actually
 have); the rest can keep their defaults.
 
 Two `system` schema grants (`system.ai_gateway`, `system.access`) need an account admin and unlock
-the telemetry steps — the workshop still runs without them, with those steps reporting "action
+the telemetry steps - the workshop still runs without them, with those steps reporting "action
 needed" rather than failing. See [`workshop_app/README.md`](workshop_app/README.md) for the complete
 instructions.
 
@@ -161,10 +161,10 @@ instructions.
 The Databricks notebooks under [`accelerators/`](accelerators) let you reference and run each
 accelerator's checks **without deploying the app**. Each folder holds a `README.md`, a
 self-contained `reference_queries.py` that reproduces the app's SQL/API checks step by step, and
-one or more ported deep-dive notebooks. They are plain notebooks — clone this repo into Databricks
+one or more ported deep-dive notebooks. They are plain notebooks - clone this repo into Databricks
 (Repos or **Workspace → Import**), open one, set the widgets, and run. No bundle, no deploy.
 
-## 💸 Intelligent AI FinOps — smart model routing (standalone app)
+## 💸 Intelligent AI FinOps - smart model routing (standalone app)
 
 A separate, self-contained Databricks App ([`intelligent-ai-finops/`](intelligent-ai-finops)) that
 makes the **Cost** pillar tangible: the app *is* the gateway. It exposes an OpenAI-compatible
@@ -175,7 +175,7 @@ surface. Five views: **Compare models** side by side (live streaming + LLM-as-ju
 into Small / Medium / Complex size categories, with all-in routed-vs-most-capable economics that net
 the router cost), **Context routing** (the live `finops-auto` proxy: an auto-classifier that routes
 across every deployed model, or a manual mode where an admin picks the model per category and writes
-keyword criteria — plus governance features (guardrails, rate limits, access control, inference
+keyword criteria - plus governance features (guardrails, rate limits, access control, inference
 tables, fallback), semantic cache, output shaping, and the routing receipt; a user persona just asks
 and inherits the admin's persisted settings), **Cost & savings** (real spend from
 `system.ai_gateway.usage` / `system.serving`, the routed-vs-frontier counterfactual, coding-agent
@@ -183,7 +183,7 @@ spend, chargeback, and a projection), **Why Databricks**, and **How it works** (
 
 It **ships in live mode** (real Model Serving calls, real tokens/latency, real system-table cost).
 Set `FINOPS_DEMO_MODE=true` for a **zero-setup, fully offline demo** (synthesised numbers, no
-endpoints required) — useful on venue wifi or a bare workspace. Live mode reads cost through a
+endpoints required) - useful on venue wifi or a bare workspace. Live mode reads cost through a
 serverless SQL warehouse and can optionally persist its cost + semantic cache in an Autoscaling
 Lakebase (pgvector); both degrade gracefully to in-process defaults when not configured.
 
@@ -194,7 +194,7 @@ databricks bundle deploy -t prod --profile <profile>              # create the a
 databricks bundle run intelligent_ai_finops_v2 -t prod --profile <profile>   # start it
 ```
 
-Nothing workspace-specific is hardcoded — fill the `prod` target's variables in `databricks.yml`
+Nothing workspace-specific is hardcoded - fill the `prod` target's variables in `databricks.yml`
 and the target comes from `--profile`. For live mode, the endpoints in `config/models.yaml` must
 exist in the workspace and the app's service principal must have the grants in
 [`intelligent-ai-finops/V2_SETUP.md`](intelligent-ai-finops/V2_SETUP.md) (otherwise deploy with
@@ -206,7 +206,7 @@ exist in the workspace and the app's service principal must have the grants in
 ```
 workshop_app/           The customer-facing workshop app (React + FastAPI Databricks App)
   config/               workshop.yaml (the one file a customer edits) · steps.yaml · accelerators.yaml
-  server/               FastAPI backend — tests_registry.py holds the executable governance tests
+  server/               FastAPI backend - tests_registry.py holds the executable governance tests
   frontend/             React + Vite + Tailwind (Databricks design system)
   databricks.yml        Asset Bundle: app + UC schema + progress volume + grants
   docs/                 APIS_AND_SETUP.md · ACCELERATOR_PLAN.md · PREREQUISITES.md · …
@@ -219,7 +219,7 @@ accelerators/           Reference notebooks, one folder per accelerator:
   policies-and-guardrails/ reference_queries.py + guardrail_benchmark.py + apply_guardrails.py
 
 intelligent-ai-finops/  Standalone smart-routing FinOps app (React + FastAPI Databricks App)
-  backend/                FastAPI — routing, compare lanes, LLM-as-judge, FMAPI invocation
+  backend/                FastAPI - routing, compare lanes, LLM-as-judge, FMAPI invocation
   src/                    React + Vite + TS frontend (Compare · Context routing · Cost · How it works)
   config/                 models.yaml (DBU rate card) · policy.yaml (thresholds + budget)
   databricks.yml          Asset Bundle (bundle deploy)
@@ -230,8 +230,8 @@ intelligent-ai-finops/  Standalone smart-routing FinOps app (React + FastAPI Dat
 Maintained by the Databricks Field Engineering team. For questions or issues, open a GitHub
 issue (below) or reach a maintainer:
 
-- Scott McKean — scott.mckean@databricks.com
-- Tim Lortz — tim.lortz@databricks.com
+- Scott McKean - scott.mckean@databricks.com
+- Tim Lortz - tim.lortz@databricks.com
 
 ## How to get help
 
@@ -252,5 +252,5 @@ All included or referenced third party libraries are subject to their respective
 | requests | HTTP client | Apache 2.0 | https://github.com/psf/requests |
 | polars | DataFrame library | MIT | https://github.com/pola-rs/polars |
 
-A full third-party dependency audit for the workshop app and accelerator notebooks — versions,
-licenses, and purpose — is in [DEPENDENCIES.md](DEPENDENCIES.md).
+A full third-party dependency audit for the workshop app and accelerator notebooks - versions,
+licenses, and purpose - is in [DEPENDENCIES.md](DEPENDENCIES.md).

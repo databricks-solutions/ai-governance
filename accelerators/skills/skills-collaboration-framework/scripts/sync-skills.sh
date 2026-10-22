@@ -8,7 +8,7 @@ source "$HERE/_auth.sh"
 # --this-host-only restricts the sync to the single workspace named by DATABRICKS_HOST, even when
 # the tier resolves to several (e.g. the Tier-3 fan-out). Each per-environment CI job then
 # authenticates with its OWN service principal (from its own variable group) and publishes only to
-# its own workspace — no shared credential, true least-privilege. Strip the flag from anywhere in
+# its own workspace - no shared credential, true least-privilege. Strip the flag from anywhere in
 # the args so the remaining positionals are still <tier> [domain].
 THIS_HOST_ONLY="${THIS_HOST_ONLY:-false}"
 ARGS=()
@@ -37,7 +37,7 @@ fi
 resolve_auth_env   # populates AUTH_ENV (OAuth M2M preferred, PAT fallback) or exits 1
 
 # Skills always land FLAT at skills_path; the tier/domain resolver (_workspaces.py) is the ONE
-# place that maps a tier/domain to its target workspace URLs — shared with prune-deprecated.sh
+# place that maps a tier/domain to its target workspace URLs - shared with prune-deprecated.sh
 # so sync and prune can never disagree about where a skill lives.
 SKILLS_PATH=$(python3 "$HERE/_workspaces.py" skills-path)
 
@@ -48,7 +48,7 @@ TARGET_URLS=$(python3 "$HERE/_workspaces.py" targets "$TIER" "$DOMAIN") || {
 }
 
 # Restrict to this job's own workspace when asked. If DATABRICKS_HOST isn't one of the tier's
-# targets, that's a config error (this job would sync nothing) — fail loudly rather than silently.
+# targets, that's a config error (this job would sync nothing) - fail loudly rather than silently.
 if [[ "$THIS_HOST_ONLY" == "true" ]]; then
   TARGET_URLS=$(TARGETS="$TARGET_URLS" HOST="$DATABRICKS_HOST" python3 -c "
 import os
@@ -63,7 +63,7 @@ print('\n'.join(keep))
 fi
 
 # SOURCE is the tier/domain folder in the repo; its skill subfolders are copied into
-# SKILLS_PATH, so a skill lands at SKILLS_PATH/{skill}/ (flat — no tier/domain nesting).
+# SKILLS_PATH, so a skill lands at SKILLS_PATH/{skill}/ (flat - no tier/domain nesting).
 if [[ "$TIER" == "2" ]]; then
   SOURCE_DIR="tier2/${DOMAIN}"
 else
@@ -71,13 +71,13 @@ else
 fi
 
 if [[ ! -d "$SOURCE_DIR" ]] || [[ -z "$(find "$SOURCE_DIR" -name 'SKILL.md' 2>/dev/null | head -1)" ]]; then
-  echo "WARNING: No SKILL.md files found in ${SOURCE_DIR} — nothing to sync."
+  echo "WARNING: No SKILL.md files found in ${SOURCE_DIR} - nothing to sync."
   exit 0
 fi
 
 # Stage the source into a temp dir and strip repo-only governance artifacts so they never reach
 # the runtime skills folder. TESTS.yaml (per-skill regression tests) lives beside SKILL.md in Git
-# but is NOT a runtime skill resource — Genie Code should only see the skill's own files.
+# but is NOT a runtime skill resource - Genie Code should only see the skill's own files.
 STAGE_DIR=$(mktemp -d)
 trap 'rm -rf "$STAGE_DIR"' EXIT
 cp -R "$SOURCE_DIR/." "$STAGE_DIR/"

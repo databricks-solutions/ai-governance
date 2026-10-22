@@ -10,10 +10,10 @@ Hard checks (exit 1 on failure):
     approvals.security must be listed under tier3 in governance.yaml
   - tier eligibility (spec §2.2): a Tier 2 skill may not declare pii: true or
     data_classification: regulated, and may not run a write/mutation SQL statement
-    (INSERT/UPDATE/DELETE/MERGE/DDL/GRANT/…) — those must be Tier 3
+    (INSERT/UPDATE/DELETE/MERGE/DDL/GRANT/…) - those must be Tier 3
   - NO duplicate skill names or folder names (they would collide in the flat /.assistant/skills)
   - a T2/T3 SKILL.md may NOT contain unfilled 'TODO' placeholders (a scaffold must be authored
-    before it ships; T1 sandbox skills are exempt — advisory only there)
+    before it ships; T1 sandbox skills are exempt - advisory only there)
   - if BASE_REF is set: a changed skill's registry `version` must be bumped vs the base branch
 
 Advisory checks (printed, never fail the build):
@@ -23,7 +23,7 @@ Advisory checks (printed, never fail the build):
   - a very short frontmatter description (weak auto-load signal for Genie Code)
   - unity_catalog_scopes is OPTIONAL (data footprint lives in the SKILL.md prose); when a
     skill declares it, SQL that references a table outside the declared scopes is flagged as
-    a warning only — the forward-compat manifest for future UC Skills grants, not a gate
+    a warning only - the forward-compat manifest for future UC Skills grants, not a gate
 
 Note: judging whether a skill GUIDES an agent well is deliberately a human reviewer's
 job (steward / council / security sign-off), not CI's. CI verifies the skill's
@@ -111,7 +111,7 @@ def load_registry():
 
 
 def load_governance():
-    """Single people-and-roles directory. Returns {} if absent — callers report a
+    """Single people-and-roles directory. Returns {} if absent - callers report a
     precise per-skill error when an approval/owner can't be authorized against it."""
     if not os.path.exists('config/governance.yaml'):
         return {}
@@ -146,7 +146,7 @@ def extract_tables(sql):
     Unions sqlglot (if available) with a regex sweep so detection is robust even
     when one statement fails to parse."""
     tables = set()
-    cte_names = set()   # WITH-clause aliases are NOT real tables — exclude them
+    cte_names = set()   # WITH-clause aliases are NOT real tables - exclude them
     parsed_ok = False
     if _HAVE_SQLGLOT:
         try:
@@ -186,7 +186,7 @@ def table_in_scope(table, scopes):
 
 def check_uc_scopes(skill_files, registry):
     """Advisory: unity_catalog_scopes is optional. It documents a skill's data footprint
-    for review (and is the forward-compat manifest for future UC Skills grants) — it is NOT
+    for review (and is the forward-compat manifest for future UC Skills grants) - it is NOT
     a runtime access control; UC enforces access on the executing principal regardless. When
     a skill DOES declare scopes, we still flag SQL that references a table outside them, but
     only as a warning (the author may have declared a partial footprint on purpose)."""
@@ -200,7 +200,7 @@ def check_uc_scopes(skill_files, registry):
             continue  # missing-entry error already raised in validate_skill
         scopes = registry[name].get('unity_catalog_scopes') or []
         if not scopes:
-            continue  # scopes are optional — nothing to check against
+            continue  # scopes are optional - nothing to check against
         markdown = open(path).read()
         for block in extract_sql_blocks(markdown):
             tables, parsed_ok = extract_tables(block)
@@ -209,7 +209,7 @@ def check_uc_scopes(skill_files, registry):
             for table in sorted(tables):
                 if not table_in_scope(table, scopes):
                     warn(f"{path}: SQL references '{table}' which is outside the declared "
-                         f"unity_catalog_scopes {scopes} for '{name}' — update the footprint "
+                         f"unity_catalog_scopes {scopes} for '{name}' - update the footprint "
                          f"if this table is intended (advisory; not a gate)")
 
 
@@ -236,7 +236,7 @@ def check_write_eligibility(skill_files, registry):
             m = _WRITE_RE.search(block)
             if m:
                 error(f"{path}: SQL uses a write/mutation statement "
-                      f"('{m.group(1).upper()}') but '{name}' is Tier 2 — write/mutation skills "
+                      f"('{m.group(1).upper()}') but '{name}' is Tier 2 - write/mutation skills "
                       f"must be Tier 3 (enterprise, council + security approval). See spec §2.2.")
                 break
 
@@ -290,21 +290,21 @@ def validate_skill(path, registry, gov):
         # unity_catalog_scopes is OPTIONAL: a skill's data footprint is documented in prose in
         # its SKILL.md, and UC enforces access at runtime on the executing principal regardless.
         # When present, the list is treated as a forward-compat manifest (future UC Skills grants)
-        # and cross-checked against the SKILL.md SQL in check_uc_scopes — advisory, never a gate.
+        # and cross-checked against the SKILL.md SQL in check_uc_scopes - advisory, never a gate.
 
         # Tier-eligibility (spec §2.2): a skill that touches PII or regulated data must be Tier 3
-        # (enterprise — council + security approval). A T2 skill can't self-declare pii/regulated.
+        # (enterprise - council + security approval). A T2 skill can't self-declare pii/regulated.
         if tier == 2:
             classification = str(reg_entry.get('data_classification') or '').strip().lower()
             if reg_entry.get('pii') is True:
-                error(f"registry.yaml: '{skill_name}' has pii: true but is Tier 2 — PII skills "
+                error(f"registry.yaml: '{skill_name}' has pii: true but is Tier 2 - PII skills "
                       f"must be Tier 3 (enterprise, council + security approval). See spec §2.2.")
             if classification == 'regulated':
                 error(f"registry.yaml: '{skill_name}' has data_classification: regulated but is "
-                      f"Tier 2 — regulated-data skills must be Tier 3. See spec §2.2.")
+                      f"Tier 2 - regulated-data skills must be Tier 3. See spec §2.2.")
 
         # A skill being retired (deprecated) keeps its orphaned owner / stale approvals on the
-        # way out — don't block its deprecation PR on owner/approval resolution.
+        # way out - don't block its deprecation PR on owner/approval resolution.
         if not reg_entry.get('deprecated'):
             owner = (reg_entry.get('owner') or '').strip().lower()
             people = governance_people(gov)
@@ -356,13 +356,13 @@ def validate_approvals(skill_name, tier, reg_entry, gov):
 def check_domain_mapped(skill_files, registry):
     """Hard gate: every non-deprecated T2 skill's domain must be mapped in workspaces.json, and
     tier3 must have at least one workspace if any T3 skill exists. Without this, a skill in an
-    unmapped domain passes all PR gates and then fails at SYNC time on the merge build — the worst
+    unmapped domain passes all PR gates and then fails at SYNC time on the merge build - the worst
     place to discover it. This moves that failure left to the PR. Skipped only if workspaces.json
     is absent/unreadable (a separate lint-and-scan JSON check covers malformed files)."""
     try:
         cfg = _workspaces.load_config()
     except Exception:
-        return  # no workspaces.json here — nothing to validate against
+        return  # no workspaces.json here - nothing to validate against
     mapped_domains = set(_workspaces.tier2_domains(cfg))
     have_tier3_ws = bool(_workspaces.resolve_targets('3', '', cfg))
     seen_tier3 = False
@@ -381,7 +381,7 @@ def check_domain_mapped(skill_files, registry):
         elif tier == 3:
             seen_tier3 = True
     if seen_tier3 and not have_tier3_ws:
-        error("workspaces.json: tier3.workspaces is empty, but a Tier-3 skill exists — it would "
+        error("workspaces.json: tier3.workspaces is empty, but a Tier-3 skill exists - it would "
               "merge but sync to no workspace. Add the enterprise workspace(s) to tier3.workspaces.")
 
 
@@ -397,11 +397,11 @@ def check_duplicates(skill_files):
     for name, paths in by_name.items():
         if len(paths) > 1:
             error(f"duplicate skill name '{name}' in: {', '.join(sorted(paths))} "
-                  f"(names must be unique — they collide in the flat /.assistant/skills)")
+                  f"(names must be unique - they collide in the flat /.assistant/skills)")
     for folder, paths in by_folder.items():
         if len(paths) > 1:
             error(f"duplicate skill folder '{folder}' in: {', '.join(sorted(paths))} "
-                  f"(folder names must be unique — they collide on flat sync)")
+                  f"(folder names must be unique - they collide on flat sync)")
 
 
 # Best-practice body sections (Databricks Genie Code skill guidance): each skill should
@@ -434,16 +434,16 @@ def check_skill_body(skill_files, registry):
         # Strip the frontmatter block so a 'TODO' in a description isn't matched twice / oddly.
         body = re.sub(r'^---\n.*?\n---\n', '', markdown, count=1, flags=re.DOTALL)
 
-        # (1) TODO placeholders — hard gate for T2/T3, advisory for T1.
+        # (1) TODO placeholders - hard gate for T2/T3, advisory for T1.
         if re.search(r'\bTODO\b', body):
-            msg = (f"{path}: contains unfilled 'TODO' placeholder(s) — a skill must be authored "
+            msg = (f"{path}: contains unfilled 'TODO' placeholder(s) - a skill must be authored "
                    f"before it ships (fill in the template sections)")
             if tier in (2, 3):
                 error(msg)
             else:
                 warn(msg)
 
-        # (2) Recommended section concepts (advisory) — headings only.
+        # (2) Recommended section concepts (advisory) - headings only.
         headings = ' \n '.join(h.lower() for h in re.findall(r'^#{1,6}\s+(.*)$', body, re.MULTILINE))
         missing = [concept for concept, syns in _SECTION_CONCEPTS.items()
                    if not any(s in headings for s in syns)]
@@ -451,12 +451,12 @@ def check_skill_body(skill_files, registry):
             warn(f"{path}: missing recommended section(s): {', '.join(missing)} "
                  f"(Genie Code skills work best with overview + when-to-use + instructions + examples)")
 
-        # (3) Weak description (advisory) — drives auto-load, so it should be substantive.
+        # (3) Weak description (advisory) - drives auto-load, so it should be substantive.
         fm = parse_frontmatter(path)
         desc = (fm or {}).get('description') or ''
         words = str(desc).split()
         if tier in (2, 3) and len(words) < 6:
-            warn(f"{path}: description is very short ({len(words)} words) — a specific, "
+            warn(f"{path}: description is very short ({len(words)} words) - a specific, "
                  f"task-and-trigger description improves Genie Code auto-load accuracy")
 
 
@@ -472,7 +472,7 @@ def check_description_similarity(skill_files):
         for j in range(i + 1, len(descs)):
             ratio = SequenceMatcher(None, descs[i][1], descs[j][1]).ratio()
             if ratio >= SIMILARITY_THRESHOLD:
-                warn(f"descriptions {int(ratio * 100)}% similar — possible duplicate skill: "
+                warn(f"descriptions {int(ratio * 100)}% similar - possible duplicate skill: "
                      f"{descs[i][0]} ~ {descs[j][0]}")
 
 
@@ -502,16 +502,16 @@ def check_version_bumps(registry):
         fm = parse_frontmatter(path)
         name = (fm or {}).get('name')
         if not name or name not in base_reg:
-            continue  # new skill — nothing to bump against
+            continue  # new skill - nothing to bump against
         cur = str((registry.get(name) or {}).get('version', ''))
         old = str(base_reg[name].get('version', ''))
         if cur and old and cur == old:
             error(f"{path}: changed but registry version for '{name}' was not bumped "
-                  f"(still {cur}) — bump it (every skill update needs a new version)")
+                  f"(still {cur}) - bump it (every skill update needs a new version)")
 
 
 def _has_skill_md_ancestor(path):
-    """True if path's own directory — or an ancestor up to the tier root — contains a
+    """True if path's own directory - or an ancestor up to the tier root - contains a
     SKILL.md. That makes `path` a supporting resource of a real skill (Genie Code allows a
     skill folder to bundle extra .md files and scripts beside its required SKILL.md)."""
     d = os.path.dirname(path.replace('\\', '/'))
@@ -525,7 +525,7 @@ def _has_skill_md_ancestor(path):
 def check_skill_file_convention():
     """Genie Code requires each skill to be a FOLDER containing a SKILL.md entry point;
     other files in the folder are supporting resources (docs.databricks.com/.../genie-code/skills).
-    Enforce that, so a loose markdown can't merge as an ungoverned skill — while still
+    Enforce that, so a loose markdown can't merge as an ungoverned skill - while still
     allowing multi-file skills:
       - a SKILL.md must sit at the skill root for its tier (keeps the flat workspace sync correct):
         tier1/<user>/<skill>/SKILL.md, tier2/<domain>/<skill>/SKILL.md, tier3/<skill>/SKILL.md;
@@ -551,7 +551,7 @@ def check_skill_file_convention():
             if len(mid) != expected_mid[tier]:
                 error(f"{path}: SKILL.md is misplaced for Tier {tier}; expected {patterns[tier]}.")
         elif not _has_skill_md_ancestor(norm):
-            error(f"{path}: markdown is not part of any skill — a skill is a folder containing "
+            error(f"{path}: markdown is not part of any skill - a skill is a folder containing "
                   f"SKILL.md, and supporting files must sit beside one (expected {patterns.get(tier)}). "
                   f"A loose .md here would merge ungoverned.")
 
@@ -573,7 +573,7 @@ def main():
     # (If a stray non-SKILL.md was added, check_skill_file_convention recorded an error
     # above, so we must fall through to the error gate rather than exit 0 here.)
     if not skill_files and not ERRORS:
-        print("validate-meta: no SKILL.md files found — nothing to validate.")
+        print("validate-meta: no SKILL.md files found - nothing to validate.")
         sys.exit(0)
 
     for path in skill_files:

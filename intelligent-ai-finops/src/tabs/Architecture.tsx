@@ -18,20 +18,20 @@ const LANDED_NODE: Record<Tier, string> = { 'small-oss': 'small', 'large-oss': '
 const W = 1460, H = 660;
 
 // Gateway box geometry. Wide enough that the longest capability bullet
-// ("AI guardrails — PII, content safety, topics") never runs past the box edge.
+// ("AI guardrails - PII, content safety, topics") never runs past the box edge.
 const GX0 = 380, GX1 = 820, GY0 = 60, GY1 = 600;
 const GCX = (GX0 + GX1) / 2, GCY = (GY0 + GY1) / 2;
 
 // The capabilities the Gateway applies to every request (bulleted in the box).
 const GATEWAY_FEATURES = [
   'Authentication',
-  'Rate limiting — per user · group · SP',
-  'AI guardrails — PII, content safety, topics',
-  'Complexity routing — score → cheapest tier',
-  'Budgets routing — cap the tier as spend rises',
+  'Rate limiting - per user · group · SP',
+  'AI guardrails - PII, content safety, topics',
+  'Complexity routing - score → cheapest tier',
+  'Budgets routing - cap the tier as spend rises',
   'Fallbacks & retries',
   'Traces (MLflow)',
-  'Inference tables — request & response',
+  'Inference tables - request & response',
   'Usage & cost metrics',
 ];
 

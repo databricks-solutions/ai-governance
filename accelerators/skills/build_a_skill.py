@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab — Build, evaluate, and govern an Agent Skill
+# MAGIC # Lab - Build, evaluate, and govern an Agent Skill
 # MAGIC
 # MAGIC Scaffold a sample Agent Skill, place it in `~/.assistant/skills/`, write a registry entry,
 # MAGIC run a minimal eval with golden Q&A + LLM judge, and scan for embedded secrets.
@@ -66,9 +66,9 @@ skill_md_content = f"""# {SKILL_NAME.replace('_', ' ').title()} Skill
 You are an expert assistant specialized in {SKILL_NAME.replace('_', ' ')}. When a user asks about {SKILL_NAME.replace('_', ' ')}, provide clear, actionable guidance.
 
 Always prioritize:
-1. **Clarity** — explain the why, not just the what.
-2. **Examples** — show concrete code or commands.
-3. **Governance** — flag security or compliance considerations when relevant.
+1. **Clarity** - explain the why, not just the what.
+2. **Examples** - show concrete code or commands.
+3. **Governance** - flag security or compliance considerations when relevant.
 
 ## Examples
 
@@ -103,7 +103,7 @@ This demonstrates the core concept. Expand it to fit your needs."
 
 ## Tier
 
-Tier 1 (personal, no review) — read-only, in home directory.
+Tier 1 (personal, no review) - read-only, in home directory.
 
 ## Tags
 
@@ -155,7 +155,7 @@ data_scope:
     - confidential
     - regulated
 tools:
-  allowed: []  # No MCP tools — read-only skill
+  allowed: []  # No MCP tools - read-only skill
 eval_scores:
   accuracy: null  # Not yet evaluated
   data_scope_compliance: null

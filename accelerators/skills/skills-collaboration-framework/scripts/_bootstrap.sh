@@ -1,4 +1,4 @@
-# Shared Python-dependency bootstrap — SOURCE this, don't execute it.
+# Shared Python-dependency bootstrap - SOURCE this, don't execute it.
 #   source "$(dirname "$0")/_bootstrap.sh"
 #   ensure_pydeps yaml            # guarantee PyYAML is importable
 #   ensure_pydeps yaml sqlglot    # ...plus optional extras

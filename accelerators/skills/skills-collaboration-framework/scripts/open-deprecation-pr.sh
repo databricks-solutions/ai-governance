@@ -23,7 +23,7 @@ while IFS=$'\t' read -r NAME REMOVED_AFTER REASON; do
   [[ -z "$NAME" ]] && continue
   BRANCH="auto/deprecate-${NAME}-${RUN_ID}"
   if ! git check-ref-format "refs/heads/${BRANCH}"; then
-    echo "WARNING: skipping '${NAME}' — invalid branch ref '${BRANCH}'" >&2
+    echo "WARNING: skipping '${NAME}' - invalid branch ref '${BRANCH}'" >&2
     continue
   fi
   git checkout -b "$BRANCH" main

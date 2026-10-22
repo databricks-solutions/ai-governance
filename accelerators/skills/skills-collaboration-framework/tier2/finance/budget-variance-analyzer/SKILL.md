@@ -3,7 +3,7 @@ name: budget-variance-analyzer
 description: Analyze Financial Applications budget-vs-actual variance by cost center and account from aggregate financial ledger tables. Ask me where spend is over or under budget, variance trends, or the biggest variance drivers.
 ---
 
-> **Illustrative example** — demonstrates a well-formed `SKILL.md` for this reference
+> **Illustrative example** - demonstrates a well-formed `SKILL.md` for this reference
 > implementation. Adapt the content to your own org; do not deploy verbatim.
 
 # budget-variance-analyzer
@@ -12,8 +12,8 @@ description: Analyze Financial Applications budget-vs-actual variance by cost ce
 
 Turns Financial Applications ledger data into **budget-vs-actual variance** insight: it
 compares actual spend against budget by cost center and account, ranks the largest variances,
-and tracks variance trends over time. It reads aggregate, department-level financial rollups —
-no individual transaction PII — keeping it a Tier-2 (internal) finance skill.
+and tracks variance trends over time. It reads aggregate, department-level financial rollups -
+no individual transaction PII - keeping it a Tier-2 (internal) finance skill.
 
 ## When to use this skill
 
@@ -75,20 +75,20 @@ ORDER BY a.fiscal_period
 
 After presenting results, always include:
 
-1. **Biggest overrun** — the cost center/account with the largest positive variance, with the dollar impact.
-2. **Trend signal** — is the variance widening or closing over the periods shown?
-3. **Quick action** — one corrective observation (e.g. "recurring overrun in account X suggests a budget rebaseline").
+1. **Biggest overrun** - the cost center/account with the largest positive variance, with the dollar impact.
+2. **Trend signal** - is the variance widening or closing over the periods shown?
+3. **Quick action** - one corrective observation (e.g. "recurring overrun in account X suggests a budget rebaseline").
 
 ## Edge cases
 
-- **Unbudgeted actuals** — if an actual row has no matching budget row, report it as
+- **Unbudgeted actuals** - if an actual row has no matching budget row, report it as
   unbudgeted spend rather than treating budget as zero silently.
-- **Sparse periods** — if the requested period has no ledger rows, say so explicitly.
-- **Aggregate only** — this skill works at the cost-center/account level. It does not read
+- **Sparse periods** - if the requested period has no ledger rows, say so explicitly.
+- **Aggregate only** - this skill works at the cost-center/account level. It does not read
   individual transactions, vendor invoices, or payroll detail.
 
 ## Data scope
 
-- `greenwood.finance.actuals` — actual spend rolled up by cost center, account, and fiscal period
-- `greenwood.finance.budgets` — budget amounts on the same keys
-- No PII or transaction-level detail is accessed — figures are aggregate rollups only.
+- `greenwood.finance.actuals` - actual spend rolled up by cost center, account, and fiscal period
+- `greenwood.finance.budgets` - budget amounts on the same keys
+- No PII or transaction-level detail is accessed - figures are aggregate rollups only.

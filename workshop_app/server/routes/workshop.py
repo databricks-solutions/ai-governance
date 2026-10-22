@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel
 
-from .. import config, deep_links, pdf, routing, store
+from .. import config, deep_links, pdf, poc, routing, store
 from ..config import get_accelerators, get_brochure, get_prerequisites, get_steps
 from ..tests_registry import run_test
 
@@ -270,55 +270,14 @@ def export_outcomes():
 
 
 @router.get("/export/report", response_class=PlainTextResponse)
-def export_report():
-    """A human-readable per-step report (complete / incomplete) as Markdown."""
-    o = _build_outcomes()
-    lines = [
-        "# AI Governance Workshop - Outcomes Report",
-        "",
-        f"**Generated:** {o['generated_at']}  ",
-        f"**Progress:** {o['summary']['done']}/{o['summary']['applicable']} applicable steps "
-        f"achieved ({o['summary']['pct']}%)"
-        + (f" · {o['summary']['na']} marked N/A" if o['summary'].get('na') else ""),
-        "",
-    ]
-    def _section(groups, heading=None):
-        if heading and any(g["steps"] for g in groups):
-            lines.append(f"# {heading}")
-            lines.append("")
-        for p in groups:
-            applicable = [s for s in p["steps"] if not s.get("na")]
-            done = sum(1 for s in applicable if s["complete"])
-            lines.append(f"## {p['title']} - {done}/{len(applicable)}")
-            lines.append("")
-            for s in p["steps"]:
-                mark = "x" if s["complete"] else ("-" if s.get("na") else " ")
-                line = f"- [{mark}] {s['title']} - **{s['status']}**"
-                if s.get("poc"):
-                    line += "  ·  _POC_"
-                if s.get("notes"):
-                    line += f"  \n  _notes:_ {s['notes']}"
-                lines.append(line)
-            lines.append("")
+def export_report(customer_name: str | None = None):
+    """The POC DOC as Markdown - the leave-behind that takes the workshop to production.
 
-    _section(o["pillars"])
-    _section(o.get("accelerators", []), heading="Accelerators (optional add-ons)")
-    if o["next_steps"]:
-        lines.append("## Next steps (incomplete items)")
-        lines.append("")
-        for n in o["next_steps"]:
-            lines.append(f"- {n['title']} ({n['pillar_id']}) - {n['status']}")
-        lines.append("")
-    if o.get("poc_items"):
-        lines.append("## Flagged for POC follow-up")
-        lines.append("")
-        for p in o["poc_items"]:
-            line = f"- {p['title']} ({p['pillar_id']}) - {p['status']}"
-            if p.get("notes"):
-                line += f" - _{p['notes']}_"
-            lines.append(line)
-        lines.append("")
-    return "\n".join(lines)
+    Same structure as the field POC DOC template: contacts, scope & success criteria, and a
+    tasks-and-timeline punch list filled from the room's "Add to POC" flags plus any incomplete
+    step. `customer_name` personalises the header (mirrors the prerequisites/brochure exports).
+    """
+    return poc.render_markdown(poc.build_poc_doc(_build_outcomes(), customer_name))
 
 
 def _pdf_response(body: bytes, filename: str) -> Response:
@@ -375,8 +334,9 @@ def export_prerequisites_pdf(customer_name: str | None = None):
 
 
 @router.get("/export/report.pdf")
-def export_report_pdf():
-    """The outcomes report as a PDF - the leave-behind that replaced the POC DOC."""
+def export_report_pdf(customer_name: str | None = None):
+    """The POC DOC as a PDF - the production leave-behind, identical in structure to the Markdown
+    export and the shared Google-Doc template."""
     _require_pdf()
-    o = _build_outcomes()
-    return _pdf_response(pdf.report_pdf(o), "ai-governance-workshop-outcomes.pdf")
+    doc = poc.build_poc_doc(_build_outcomes(), customer_name)
+    return _pdf_response(pdf.report_pdf(doc), "ai-governance-poc-doc.pdf")

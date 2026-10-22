@@ -89,7 +89,8 @@ mcp:
 #
 # The workshop frames three ways to cut token spend:
 #   a) Smart routing - Databricks-managed model selection. Beta; nothing to configure here.
-#   b) Omnigent      - partner routing layer above the agent harnesses.
+#   b) Omnigent      - Databricks' open-source meta-harness above the agent harnesses (Apache 2.0;
+#                      managed Databricks version in Beta). Not a partner service.
 #   c) Custom router - a cheap classifier picks the cheapest sufficient model. This is the
 #                      one the app actually runs, because it is the one you can stand up
 #                      today and measure.

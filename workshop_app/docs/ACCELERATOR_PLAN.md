@@ -9,7 +9,7 @@
 > earlier rebuild, not this trim - see `config/accelerators.yaml` for the current list.
 
 The core workshop proves the control plane across choice / cost / control. The **accelerators**
-are optional ~3-hour deep dives. One of them (**MCP Servers**, 10 steps) is strong; the other
+are optional ~2-hour deep dives. One of them (**MCP Servers**, 10 steps) is strong; the other
 five are thin - mostly `list` / `manual` / `readiness` steps that don't *prove* anything a
 customer couldn't already assume. This plan deepens them.
 

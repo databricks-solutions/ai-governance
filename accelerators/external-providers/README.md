@@ -1,4 +1,4 @@
-# Accelerator — External Providers
+# Accelerator - External Providers
 
 Route Bedrock, OpenAI, and Anthropic through the gateway with credentials in secrets (never
 inline) and access bound to approved workspaces. A ~3-hour deep dive on bringing shadow
@@ -20,7 +20,7 @@ by project tag.
 
 | Notebook | What it is |
 |---|---|
-| [`reference_queries.py`](reference_queries.py) | The app's checks for all five steps — inventory, routing, secret readiness, workspace binding, usage-by-project — runnable without the app. |
+| [`reference_queries.py`](reference_queries.py) | The app's checks for all five steps - inventory, routing, secret readiness, workspace binding, usage-by-project - runnable without the app. |
 | [`traffic_routing.py`](traffic_routing.py) | Deep dive: load balancing + A/B/canary across backends behind one endpoint. |
 | [`fallbacks.py`](fallbacks.py) | Deep dive: automatic failover across served entities. |
 

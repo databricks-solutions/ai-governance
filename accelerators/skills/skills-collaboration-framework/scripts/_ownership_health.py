@@ -46,16 +46,16 @@ def classify(skills, people, last_commit_dates, today, intervals, grace_days):
 
 
 def render_report(result, today):
-    lines = [f"# Ownership Health — {today.isoformat()}", ""]
+    lines = [f"# Ownership Health - {today.isoformat()}", ""]
     if result['ownerless']:
         lines.append("## Ownerless (deprecation proposed)")
         for s in result['ownerless']:
-            lines.append(f"- `{s['name']}` — owner `{s.get('owner')}` not in governance.yaml")
+            lines.append(f"- `{s['name']}` - owner `{s.get('owner')}` not in governance.yaml")
         lines.append("")
     if result['stale']:
-        lines.append("## Stale — owner review requested")
+        lines.append("## Stale - owner review requested")
         for s in result['stale']:
-            lines.append(f"- `{s['name']}` (T{s.get('tier')}) — review and bump the version")
+            lines.append(f"- `{s['name']}` (T{s.get('tier')}) - review and bump the version")
         lines.append("")
     if not result['ownerless'] and not result['stale']:
         lines.append("All T2/T3 skills are owned and within their review interval. ✅")

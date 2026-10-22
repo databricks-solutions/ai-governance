@@ -33,13 +33,13 @@ google_doc_url: https://docs.google.com/document/d/12CnGW0qXCAfrL_lH8r1vPezdQvAz
 # Databricks, so it is rendered app-side only (not read by pdf.py or the Doc generator).
 internal_note: >-
   **Databricks team:** before scheduling, scope the day with the
-  [AI governance maturity assessment](http://go/ug/maturity-assessment) — internal link, it won't
-  resolve outside Databricks.
+  [AI governance maturity assessment](https://github.com/databricks-solutions/ai-governance/blob/main/workshop_app/docs/AI_Governance_Maturity_Assessment.xlsx)
+  - a static copy lives in this repo, so it works for the customer too.
 
 lead_time_note: >-
   These are the prerequisites for your AI Governance Workshop - getting them in place ahead of
-  time is what lets us spend the three hours of hands-on time (plus about an hour of slides and
-  discussion) proving governance on your own workspace instead of waiting on access. Each item
+  time is what lets us spend the two hours of hands-on time (plus a short slide intro) proving
+  governance on your own workspace instead of waiting on access. Each item
   is tagged by persona. The session needs as few as three people:
   an account admin, a business champion, and a technical champion - everyone else is optional.
   The long-lead items need an account admin and can take a few days, so please start those about
@@ -176,6 +176,15 @@ groups:
           app URL it prints and check `GET /api/health` returns `{"status":"ok","config_problems":[]}`.
           If it names a problem, that is exactly what still needs setting.
         who: Technical champion
+      - id: create_budget
+        item: Create a small budget to activate in the session
+        why: >-
+          Only needed if the Cost budget step is in scope. A new budget can take up to 45 minutes
+          to be ready, so create a small one the day before. Then the Cost step just sets the
+          alert threshold and reads spend instead of waiting on budget creation. Create it in the
+          Account Console (Settings, Budgets).
+        who: Account admin
+        optional: true
       - id: sample_prompt_and_rate
         item: Pick a representative prompt and share your negotiated $/DBU rate
         why: >-
@@ -192,7 +201,7 @@ groups:
       - id: accelerator_choice
         item: Decide whether to run an accelerator, and which one
         why: >-
-          There are six optional ~3-hour deep dives (MCP, agent registry, coding agents, external
+          There are six optional ~2-hour deep dives (MCP, agent registry, coding agents, external
           providers, policies & guardrails, and skills). Pick the one matching your top priority -
           we won't run all of them, there isn't time.
         who: Business champion

@@ -58,17 +58,17 @@ SKILLS_PATH=$(python3 "$HERE/_workspaces.py" skills-path)
 while IFS=: read -r tier domain name; do
   [[ -z "$name" ]] && continue
 
-  # Skills are flat under skills_path. Remove the skill from EVERY workspace it was synced to —
+  # Skills are flat under skills_path. Remove the skill from EVERY workspace it was synced to -
   # _workspaces.py is the ONE place that maps tier/domain -> URLs (shared with sync-skills.sh).
   # Unmapped here is skip-with-warning (not fatal): the skill's mapping may have been removed
   # from workspaces.json before its deprecation was pruned.
   if ! TARGET_URLS=$(python3 "$HERE/_workspaces.py" targets "$tier" "$domain" 2>/dev/null); then
-    echo "WARNING: no target workspaces for tier=${tier} domain=${domain} — skipping '${name}'" >&2
+    echo "WARNING: no target workspaces for tier=${tier} domain=${domain} - skipping '${name}'" >&2
     continue
   fi
 
   # Per-env job: keep only this workspace. If DATABRICKS_HOST isn't a target for this skill's
-  # tier/domain, there's nothing to prune here — skip quietly (another env's job handles it).
+  # tier/domain, there's nothing to prune here - skip quietly (another env's job handles it).
   if [[ "$THIS_HOST_ONLY" == "true" ]]; then
     TARGET_URLS=$(TARGETS="$TARGET_URLS" HOST="$DATABRICKS_HOST" python3 -c "
 import os

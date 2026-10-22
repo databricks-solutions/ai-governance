@@ -3,6 +3,7 @@ import PageHeader from "@/components/PageHeader";
 import { Eyebrow, Pill } from "@/components/ui";
 import Markdown, { inline } from "@/components/Markdown";
 import ResetPanel from "@/components/ResetPanel";
+import WorkshopFlow from "@/components/WorkshopFlow";
 import { api, groupCounts, type Pillar, type ProgressMap, type DeployGuide } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
@@ -79,6 +80,17 @@ export default function Intro({
               );
             })}
           </div>
+        </section>
+
+        <section>
+          <Eyebrow>The flow</Eyebrow>
+          <h2 className="mb-3 text-xl font-semibold text-navy">What we do, in order</h2>
+          <p className="mb-5 max-w-2xl text-sm leading-relaxed text-muted">
+            Control first (create the governed model service and attach policies), then Choice
+            (inventory and pick models), then Cost (spend, budgets, attribution). Dots track your
+            live progress.
+          </p>
+          <WorkshopFlow pillars={pillars} progress={progress} />
         </section>
 
         {accelerators && accelerators.length > 0 && (

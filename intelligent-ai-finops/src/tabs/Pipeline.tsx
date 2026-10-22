@@ -112,7 +112,7 @@ function GwToggle({ on, label, onClick, busy = false, disabled = false, title }:
         busy ? 'opacity-50' : '',
       ].join(' ')}
     >
-      <span aria-hidden>{busy ? '…' : on ? '✓' : '—'}</span> {label}
+      <span aria-hidden>{busy ? '…' : on ? '✓' : '-'}</span> {label}
     </button>
   );
 }
@@ -560,7 +560,7 @@ export function Pipeline() {
               <div className={autoClassifier ? 'pointer-events-none opacity-45' : ''}>
                 <div className="mb-2.5 flex items-center gap-2">
                   <span className={EB}>Models to route across</span>
-                  <span className="num text-[11.5px] text-white/50">{autoClassifier ? 'auto — finops-auto picks the cheapest per category' : 'one per category'}</span>
+                  <span className="num text-[11.5px] text-white/50">{autoClassifier ? 'auto - finops-auto picks the cheapest per category' : 'one per category'}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3 max-[640px]:grid-cols-1">
                   {TIER_ORDER.map((t) => {

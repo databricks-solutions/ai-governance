@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 01 — Rate limiting
+# MAGIC # Lab 01 - Rate limiting
 # MAGIC
 # MAGIC Cap traffic to a serving endpoint with the Unity AI Gateway.
 # MAGIC

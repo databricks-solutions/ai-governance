@@ -121,15 +121,15 @@ function Guardrails() {
   const example =
     piiMode === 'block'
       ? 'Request contains US_SSN → BLOCKED at the gateway before any model runs.'
-      : 'Email [EMAIL], SSN [US_SSN] — masked pre-egress, then routed.';
+      : 'Email [EMAIL], SSN [US_SSN] - masked pre-egress, then routed.';
   return (
     <div className="flex flex-col gap-4">
-      <div className="text-[11.5px] text-white/55">Guardrails run on <b className="text-white/80">both the input and the output</b>, at the gateway — the same policy for every model you route to.</div>
+      <div className="text-[11.5px] text-white/55">Guardrails run on <b className="text-white/80">both the input and the output</b>, at the gateway - the same policy for every model you route to.</div>
 
       {/* Safety / content moderation */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <SubHead badge="input & output">Safety — content moderation</SubHead>
+          <SubHead badge="input & output">Safety - content moderation</SubHead>
           <Switch on={safety} onClick={() => setSafety((s) => !s)} />
         </div>
         <div className={`flex flex-wrap gap-2 ${safety ? '' : 'pointer-events-none opacity-40'}`}>

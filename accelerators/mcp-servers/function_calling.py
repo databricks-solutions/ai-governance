@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab — Function calling with Unity Catalog functions
+# MAGIC # Lab - Function calling with Unity Catalog functions
 # MAGIC
 # MAGIC Hand a governed UC function to a model and run a full tool-calling round trip.
 # MAGIC

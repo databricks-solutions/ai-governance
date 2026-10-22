@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Lab 03 — Fallbacks
+# MAGIC # Lab 03 - Fallbacks
 # MAGIC
 # MAGIC Automatically retry failed requests against a fallback served entity.
 # MAGIC
@@ -188,4 +188,4 @@ show_json(get_ai_gateway().get("fallback_config"))
 
 codes = [invoke(f"Say OK ({i}).", max_tokens=5)["status_code"] for i in range(5)]
 print("Status codes:", codes)
-print("All succeeded." if all(c == 200 for c in codes) else "Some non-200s — inspect above.")
+print("All succeeded." if all(c == 200 for c in codes) else "Some non-200s - inspect above.")

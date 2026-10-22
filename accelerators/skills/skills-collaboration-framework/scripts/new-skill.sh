@@ -5,8 +5,8 @@ source "$(dirname "$0")/_bootstrap.sh"; ensure_pydeps yaml
 
 # ---------------------------------------------------------------------------
 # Interactive pickers (pure bash 3.2, no external deps).
-#   pick_one   — ↑/↓ to move, Enter to select one option   → $PICK_RESULT
-#   pick_many  — ↑/↓ to move, Space to toggle, Enter commit → $PICK_RESULTS[@]
+#   pick_one   - ↑/↓ to move, Enter to select one option   → $PICK_RESULT
+#   pick_many  - ↑/↓ to move, Space to toggle, Enter commit → $PICK_RESULTS[@]
 # Both fall back to a numbered prompt when stdin/stdout is not a TTY, so the
 # script stays scriptable and testable (pipe the answers in). All UI is drawn
 # to stderr; results come back in globals so stdout stays clean.
@@ -115,9 +115,9 @@ if [[ ! "$SKILL_NAME" =~ ^[a-z][a-z0-9-]+$ ]]; then
 fi
 
 pick_one "Tier:" \
-  "1 · personal (sandbox — never synced)" \
+  "1 · personal (sandbox - never synced)" \
   "2 · team/domain (synced to the domain workspace)" \
-  "3 · enterprise (org-wide — council + security approval)"
+  "3 · enterprise (org-wide - council + security approval)"
 TIER="${PICK_RESULT%% *}"   # leading digit
 
 USERNAME=""
@@ -139,7 +139,7 @@ else
   SKILL_DIR="tier3/${SKILL_NAME}"
 fi
 
-# Owner — for T2/T3 the value must be listed in governance.yaml, so offer that
+# Owner - for T2/T3 the value must be listed in governance.yaml, so offer that
 # exact set instead of a free-text prompt that would fail validation.
 if [[ "$TIER" == "1" ]]; then
   read -rp "Owner email [${USERNAME:+${USERNAME}@greenwood.example}]: " OWNER
@@ -166,7 +166,7 @@ fi
 
 read -rp "One-line description (used by Genie Code to decide when to load this skill): " DESCRIPTION
 
-# Data classification — 'regulated' is only valid at Tier 3 (validate-meta rejects
+# Data classification - 'regulated' is only valid at Tier 3 (validate-meta rejects
 # regulated/PII at Tier 2), so only offer it there.
 if [[ "$TIER" == "3" ]]; then
   pick_one "Data classification:" "internal" "confidential" "public" "regulated"
@@ -183,7 +183,7 @@ PII="$PICK_RESULT"
 # runtime on the executing principal regardless, so there's no authoring-time scope prompt.
 
 mkdir -p "$SKILL_DIR"
-# Baseline template — aligned with agentskills.io best practices and Databricks Genie Code skill
+# Baseline template - aligned with agentskills.io best practices and Databricks Genie Code skill
 # guidance: focused single task, progressive disclosure (keep SKILL.md concise; link out for depth),
 # explicit step-by-step instructions, concrete examples, edge cases, gotchas, and a prose data-footprint.
 # See https://agentskills.io/skill-creation/best-practices and
@@ -198,7 +198,7 @@ description: ${DESCRIPTION}
 
 ## Overview
 
-TODO: One paragraph — the single task this skill handles and WHEN Genie Code should reach for
+TODO: One paragraph - the single task this skill handles and WHEN Genie Code should reach for
 it. Keep the scope narrow: one skill, one job. Overlapping skills cause the agent to mis-route.
 
 ## When to use this skill
@@ -216,7 +216,7 @@ TODO: Explicit, ordered steps the agent should follow.
 
 ### TODO: short example title
 **Request:** "TODO: a sample question a user would ask"
-**Expected behavior:** TODO: what the skill does — the SQL it runs and/or the shape of the answer.
+**Expected behavior:** TODO: what the skill does - the SQL it runs and/or the shape of the answer.
 
 ## Edge cases
 
@@ -225,14 +225,14 @@ TODO: Common variations or exceptions and how to handle them.
 
 ## Gotchas
 
-TODO: Environment-specific facts the agent would get WRONG without being told — concrete
+TODO: Environment-specific facts the agent would get WRONG without being told - concrete
 corrections, not general advice (e.g. "table X uses soft deletes; filter WHERE deleted_at IS NULL").
 
 ## Data scope
 
 TODO: The skill's data footprint, in prose. Runtime access is governed by Unity Catalog on
-whoever runs the skill — this section documents intent, it is not an access control.
-- \`catalog.schema.table\` — what it is read for
+whoever runs the skill - this section documents intent, it is not an access control.
+- \`catalog.schema.table\` - what it is read for
 - No PII or regulated data is accessed.   <!-- if this is false, the skill must be Tier 3 -->
 
 <!-- Progressive disclosure: for depth, add sibling files (e.g. patterns.md, scripts/foo.py)
@@ -256,7 +256,7 @@ if not reg.get('skills'):
 
 names = [s.get('name') for s in reg['skills']]
 if name in names:
-    print(f"Registry entry already exists for '{name}' — skipping.")
+    print(f"Registry entry already exists for '{name}' - skipping.")
     sys.exit(0)
 
 entry = {

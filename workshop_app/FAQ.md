@@ -17,15 +17,15 @@ Three phases, and the middle one is the only day in a room:
 | Phase | Duration | What happens |
 |---|---|---|
 | **Prerequisites** | ~1 week | Entitlements, grants, previews, pilot users - mostly waiting on admins |
-| **Workshop** | **3 hours hands-on + ~1 hour slides/discussion** | Test and validate live in your own workspace |
+| **Workshop** | **2 hours hands-on + a short slide intro** | Test and validate live in your own workspace |
 | **Follow-up** | 1–2 weeks | Close what didn't land on the day |
 
-Each optional **accelerator** is a ~3-hour add-on on one customer need - run the one that
+Each optional **accelerator** is a ~2-hour add-on on one customer need - run the one that
 matches your priority, not all six.
 
 ## Why isn't <capability> in the workshop?
 
-Four hours is about 19 steps including discussion, so the workshop proves a **governed path
+Two hours is 14 core steps, so the workshop proves a **governed path
 works** rather than covering every Gateway feature. Some things are deliberately left out:
 taking inventory of your current estate (pre-work over your own endpoints and spend), the
 full migration sequence (run in parallel over weeks - there is no in-place rename), network

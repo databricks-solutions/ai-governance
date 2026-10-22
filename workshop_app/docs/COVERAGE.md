@@ -1,6 +1,6 @@
 # Coverage: workshop vs. the POC DOC, Adoption, and Migration guides
 
-**Note:** Workshop timing was retuned from 4 hours / 20 steps to **3 hours hands-on (+ ~1 hour slides/discussion) / ~14 steps**. References below to timing/step counts reflect the current model.
+**Note:** Workshop timing was retuned from 4 hours / 20 steps to **2 hours hands-on (+ a short slide intro) / 14 steps (choice 5 / cost 5 / control 4)**. References below to timing/step counts reflect the current model.
 
 Gap-check of the core workshop steps against three sources of truth:
 
@@ -18,10 +18,10 @@ All three are marked IN PROGRESS (GA launch edition, 2026-08-04).
 | Phase | Duration | What happens |
 |---|---|---|
 | **Prereqs** | ~1 week | Entitlements, grants, previews, pilot users. See `PREREQUISITES.md`. |
-| **Workshop** | **3 hours hands-on + ~1 hour slides** | Test and validate live, in their workspace. Core accelerators plus optional deep dives. |
+| **Workshop** | **2 hours hands-on + a short slide intro** | Test and validate live, in their workspace. Core accelerators plus optional deep dives. |
 | **Follow-up (POC)** | 1–2 weeks | Close what didn't land; the app's exported outcomes drive it. |
 
-Everything below is judged against that budget. **3 hours hands-on fits ~14 core steps at ~12–13 minutes each
+Everything below is judged against that budget. **2 hours hands-on fits 14 core steps
 plus 1 hour of slides and discussion** - there is no room for a feature checklist, so every "not covered" is
 a deliberate call with a stated reason.
 
@@ -213,7 +213,7 @@ except two items that need accumulated traffic (monitoring drift, latency benchm
 of the Adoption Guide's target state is good; the one real gap was the *object model and client
 contract*, now `choice_model_services`.
 
-Fits the delivery shape: **~1 week prereqs → 3 hours hands-on + 1 hour slides → 1–2 weeks follow-up.** ~14 core steps at
+Fits the delivery shape: **~1 week prereqs → 2 hours hands-on + a short slide intro → 1–2 weeks follow-up.** 14 core steps at
 ~12–13 minutes each plus slides/discussion fits the hands-on window - enough to let a
 good question run without losing the last pillar.
 

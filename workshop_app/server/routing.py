@@ -5,7 +5,7 @@ workshop only needs the measurable-ROI story, not the full three-tab demo. Three
 options are framed for the customer (Cost pillar):
 
   a) Smart router  - Databricks-managed routing. Roadmap; nothing to run here yet.
-  b) Omnigent      - partner routing layer in front of the models.
+  b) Omnigent      - Databricks' open-source meta-harness in front of the models (managed version in Beta).
   c) Custom router - a cheap classifier picks the cheapest model that meets the bar.
 
 Only (c) executes: it is the one a customer can stand up today, and it is what produces a

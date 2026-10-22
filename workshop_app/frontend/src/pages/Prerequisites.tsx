@@ -163,7 +163,8 @@ export default function Prerequisites({ onProgressChange }: { onProgressChange: 
       )}
 
       {/* Internal aside for the Databricks account team - rendered app-side only (not in the
-          customer PDF/Doc). The maturity-assessment go-link resolves only inside Databricks. */}
+          customer PDF/Doc). The maturity assessment links to the static copy in this repo; the
+          field portal go-link resolves only inside Databricks. */}
       {data.internal_note && (
         <Md
           text={data.internal_note}

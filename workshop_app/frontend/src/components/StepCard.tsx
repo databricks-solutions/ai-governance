@@ -30,6 +30,22 @@ function Badge({ kind }: { kind: keyof typeof BADGES }) {
   return <span className={cn("rounded px-2 py-0.5 text-[11px] font-semibold", b.cls)}>{b.label}</span>;
 }
 
+// Tier pill (mandatory/recommended/optional) shown in the collapsed header so the room can scan
+// what it must do versus what is nice to have. Matches the debrief ask for clear designations.
+const TIERS = {
+  mandatory: "bg-lava/10 text-lava",
+  recommended: "bg-[#E7F1FC] text-[#0B5FA5]",
+  optional: "bg-navy/5 text-navy-300",
+} as const;
+
+function TierBadge({ tier }: { tier: keyof typeof TIERS }) {
+  return (
+    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", TIERS[tier])}>
+      {tier}
+    </span>
+  );
+}
+
 export default function StepCard({
   index,
   pillarId,
@@ -112,6 +128,7 @@ export default function StepCard({
         >
           <span className="shrink-0 text-xs font-semibold tabular-nums text-navy-300">{index}.</span>
           <span className="truncate text-[13px] font-semibold text-navy">{shortTitle(step.title, groupTitle)}</span>
+          {step.tier && <TierBadge tier={step.tier} />}
           {actionRequired && (
             <span className="shrink-0 rounded bg-[#FDF3E0] px-1.5 py-0.5 text-[10px] font-semibold text-[#B7791F]">
               ACTION NEEDED
@@ -185,6 +202,14 @@ export default function StepCard({
                 is already set up.
               </span>
             </div>
+          )}
+
+          {/* Where to run it - names the surface (this app / AI Gateway UI / Account console) so
+              no one runs a step in the wrong place (e.g. a query in Genie by mistake). */}
+          {step.where && (
+            <p className="mb-2 text-xs text-muted">
+              <span className="font-semibold text-navy">Run in:</span> {step.where}
+            </p>
           )}
 
           {/* Actions row: manual deep-link, Try-It, Verify */}

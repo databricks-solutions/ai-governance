@@ -20,7 +20,7 @@ echo "==> yamllint on config/registry.yaml..."
 yamllint -c .yamllint.yaml config/registry.yaml || ERRORS=$((ERRORS + 1))
 
 echo "==> JSON validation on config/workspaces.json..."
-# workspaces.json is JSON, not YAML — validate as JSON (yamllint mis-flags JSON style).
+# workspaces.json is JSON, not YAML - validate as JSON (yamllint mis-flags JSON style).
 python3 -m json.tool config/workspaces.json >/dev/null || {
   echo "ERROR: config/workspaces.json is not valid JSON." >&2
   ERRORS=$((ERRORS + 1))

@@ -1,9 +1,9 @@
 ---
 name: bi-adoption-analyzer
-description: Analyze Enterprise Analytics & BI adoption from system.query.history — active users, query volumes, warehouse utilization, and slow-query hotspots. Ask me which dashboards/warehouses are busiest or where query performance is degrading.
+description: Analyze Enterprise Analytics & BI adoption from system.query.history - active users, query volumes, warehouse utilization, and slow-query hotspots. Ask me which dashboards/warehouses are busiest or where query performance is degrading.
 ---
 
-> **Illustrative example** — demonstrates a well-formed `SKILL.md` for this reference
+> **Illustrative example** - demonstrates a well-formed `SKILL.md` for this reference
 > implementation. Adapt the content to your own org; do not deploy verbatim.
 
 # bi-adoption-analyzer
@@ -12,8 +12,8 @@ description: Analyze Enterprise Analytics & BI adoption from system.query.histor
 
 Surfaces Enterprise Analytics & BI platform adoption from the live `system.query.history`
 table: it reports active-user and query volumes, warehouse utilization, and slow-query
-hotspots over time. It reads query *metadata* (who ran what, when, how long) — never the
-query results or the underlying business data — so it stays a Tier-2 (internal) skill.
+hotspots over time. It reads query *metadata* (who ran what, when, how long) - never the
+query results or the underlying business data - so it stays a Tier-2 (internal) skill.
 
 ## When to use this skill
 
@@ -30,7 +30,7 @@ When the user asks an adoption, utilization, or performance question:
 
 1. **Identify the window and dimension** (default: last 30 days).
 2. **Query `system.query.history`** for query counts, distinct users, and durations.
-3. **Aggregate by the requested dimension** (warehouse, user, day) — never return raw query text.
+3. **Aggregate by the requested dimension** (warehouse, user, day) - never return raw query text.
 4. **Present results** as a ranked table, then give 2–3 adoption observations
    (see the Recommendations framework).
 
@@ -81,20 +81,20 @@ LIMIT 20
 
 After presenting results, always include:
 
-1. **Top consumer** — the busiest warehouse or heaviest user, named, with its share of volume.
-2. **Trend signal** — is adoption (active users / query volume) rising, flat, or falling?
-3. **Quick action** — one enablement or performance observation (e.g. "one slow query dominates
-   warehouse X — candidate for tuning").
+1. **Top consumer** - the busiest warehouse or heaviest user, named, with its share of volume.
+2. **Trend signal** - is adoption (active users / query volume) rising, flat, or falling?
+3. **Quick action** - one enablement or performance observation (e.g. "one slow query dominates
+   warehouse X - candidate for tuning").
 
 ## Edge cases
 
-- **Sparse windows** — if the requested window has no query rows, say so explicitly.
-- **Null warehouse** — some queries have no `warehouse_id` (non-warehouse compute); report
+- **Sparse windows** - if the requested window has no query rows, say so explicitly.
+- **Null warehouse** - some queries have no `warehouse_id` (non-warehouse compute); report
   those as unattributed rather than dropping them.
-- **Metadata only** — this skill reads query history metadata, never the query *results* or
+- **Metadata only** - this skill reads query history metadata, never the query *results* or
   the business tables those queries touched.
 
 ## Data scope
 
-- `system.query.history` — query execution metadata (user, warehouse, duration, timestamps)
-- No PII or query-result data is accessed — this skill reads execution metadata only.
+- `system.query.history` - query execution metadata (user, warehouse, duration, timestamps)
+- No PII or query-result data is accessed - this skill reads execution metadata only.

@@ -1,22 +1,22 @@
-# Backstop — the platform team reviews anything not claimed by a more specific rule below.
+# Backstop - the platform team reviews anything not claimed by a more specific rule below.
 # Nothing is ever unowned at review time. (Illustrative placeholder handles for a fictional org.)
 *   @greenwood-org/platform-team
 
-# Tier 1 — personal sandboxes, no approval required
+# Tier 1 - personal sandboxes, no approval required
 /tier1/ @greenwood-org/platform-team
 
-# Tier 2 — domain steward approval required
+# Tier 2 - domain steward approval required
 /tier2/platform/   @greenwood-org/platform-stewards
 /tier2/analytics/  @greenwood-org/analytics-stewards
 /tier2/finance/    @greenwood-org/finance-stewards
 /tier2/governance/ @greenwood-org/governance-stewards
 
-# Tier 3 — council + security approval required (recorded in registry.yaml)
+# Tier 3 - council + security approval required (recorded in registry.yaml)
 /tier3/ @greenwood-org/skills-council
 
-# Governance config — changes require council review
+# Governance config - changes require council review
 /config/ @greenwood-org/platform-team
 /CODEOWNERS @greenwood-org/platform-team
 
-# Workspace instructions — always-on, org-wide Assistant context (council review)
+# Workspace instructions - always-on, org-wide Assistant context (council review)
 /workspace-instructions/ @greenwood-org/platform-team

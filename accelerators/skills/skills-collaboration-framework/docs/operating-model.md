@@ -1,4 +1,4 @@
-# Skills Governance — Operating Model
+# Skills Governance - Operating Model
 
 Customer-agnostic charter for who owns the AI-skills framework and how gatekeeping works.
 Names roles, not people; the concrete people live in `governance.yaml`.
@@ -22,9 +22,9 @@ the mapping table in the [README](../README.md#who-maintains-what--mapped-to-the
 | Stage | Responsible | Accountable | Consulted | Informed |
 |-------|-------------|-------------|-----------|----------|
 | Propose | Author | Skill Owner | Steward | Platform Team |
-| Build | Author | Skill Owner | — | — |
+| Build | Author | Skill Owner | - | - |
 | Review | Steward / Council | Platform Team | Security | Author |
-| Operate | Skill Owner | Platform Team | — | Consumers |
+| Operate | Skill Owner | Platform Team | - | Consumers |
 | Retire | Skill Owner / automation | Platform Team | Steward | Consumers |
 
 ## What is automated vs. human-reviewed
@@ -50,14 +50,14 @@ the mapping table in the [README](../README.md#who-maintains-what--mapped-to-the
   It automates most gatekeeping and reviews the rest.
 - Each **Skill Owner** owns one skill; an owner who leaves `governance.yaml` makes their
   skills *ownerless*, which the scheduled health check proposes for deprecation (via PR).
-- Trunk-based: every change to `main` — including automated deprecations — is a feature
+- Trunk-based: every change to `main` - including automated deprecations - is a feature
   branch + PR through the binding gate. CI never writes to `main`.
 
-## Tier-1 sandbox isolation (deliberate choice — recorded)
+## Tier-1 sandbox isolation (deliberate choice - recorded)
 
 `Tier 1` is a **reach** declaration, not a runtime boundary: Unity Catalog grants attach to the
 identity executing a query, not to the tier a skill claims. A Tier-1 skill run under a developer's
-own identity can reach anything that identity can — so "Tier 1 = no production data" must be backed
+own identity can reach anything that identity can - so "Tier 1 = no production data" must be backed
 by a deliberate isolation control, not assumed.
 
 **This deployment's choice: a dev→staging→prod SDLC across dedicated workspaces (the strongest
@@ -66,18 +66,18 @@ dogfooded there; Tier 2 is CI-synced to the **greenwood STAGING workspace** (`gr
 for team integration; Tier 3 (enterprise) fans out to **all three** workspaces (dev + staging +
 `greenwood-prod` prod) so enterprise skills are available everywhere. Because DEV is a distinct
 workspace with its own catalogs and grants, Tier-1 experimentation cannot reach production data
-through a developer's identity — the isolation is topological, not merely policy.
+through a developer's identity - the isolation is topological, not merely policy.
 
 This mapping is the single knob (`workspaces.json`): every T2 domain → STAGING, `tier3.workspaces`
 → [dev, staging, prod]. The CI service principal must be entitled in **all three** workspaces
 (account-level OAuth M2M) with `CAN_MANAGE` on `skills_path`.
 
 > With only three demo workspaces we model reach as an SDLC lifecycle rather than one-workspace-per-domain.
-> In a real Greenwood deployment each domain would map to its own workspace(s); only `workspaces.json` changes —
+> In a real Greenwood deployment each domain would map to its own workspace(s); only `workspaces.json` changes -
 > the scripts and CI do not.
 
 > [!NOTE]
-> **At 1000+ users, Tier 1 becomes local-only** — pushed straight from the developer's CLI to
+> **At 1000+ users, Tier 1 becomes local-only** - pushed straight from the developer's CLI to
 > their dev workspace, like the DABs `dev` stage, and committed to Git only on promotion to Tier 2.
 > The committed `tier1/{user}/` folder is a demo teaching choice, not the scale target. See
 > [ADR-0001](adr/0001-scalability-and-tier-1-as-dabs-sdlc.md) for the full scalability rationale.
@@ -87,20 +87,20 @@ This mapping is the single knob (`workspaces.json`): every T2 domain → STAGING
 Authorization hardens as adoption climbs the ramp (see [`adoption-model.md`](adoption-model.md)),
 but the auditable record never moves:
 
-- **Crawl / Walk — string authorization.** `governance.yaml` lists the actual people (emails) per
+- **Crawl / Walk - string authorization.** `governance.yaml` lists the actual people (emails) per
   role. `validate-meta` checks every owner/approver against it. Simple, readable, and enough to
   start in days.
-- **Run — group authorization.** Wire **Entra / ADO groups** into the branch policy
-  (required-reviewer groups) so membership — not a hand-edited list — decides who can approve.
+- **Run - group authorization.** Wire **Entra / ADO groups** into the branch policy
+  (required-reviewer groups) so membership - not a hand-edited list - decides who can approve.
 - **`governance.yaml` remains the record of intent** at every stage: it documents who *should* hold
   each role and is what CI validates against, even once group membership is the live gate.
 
 ## Protected files (change control)
 
 Some files govern the framework itself: `governance.yaml`, `CODEOWNERS`, `registry.yaml`,
-and `workspace-instructions/` (always-on, org-wide Assistant context — highest blast radius,
+and `workspace-instructions/` (always-on, org-wide Assistant context - highest blast radius,
 so council-reviewed).
-Git cannot prevent anyone from *editing* a file in their own branch — control is over what
+Git cannot prevent anyone from *editing* a file in their own branch - control is over what
 *merges*. These files are protected by **process, not a file lock**:
 
 - **Path-scoped required review.** Any PR touching a protected file must be approved by the
@@ -112,7 +112,7 @@ Git cannot prevent anyone from *editing* a file in their own branch — control 
   author (ADO: "Prohibit the most recent pusher from approving") so an author cannot merge
   their own change to a protected file.
 
-This is the same model as every other change — propose by PR, merge only on authorized review —
+This is the same model as every other change - propose by PR, merge only on authorized review -
 applied with a named, file-specific reviewer for the files that govern the system.
 
 ## Onboarding checklist

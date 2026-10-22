@@ -27,7 +27,7 @@ called out per row rather than glossed.
 | `system.billing.usage` + `list_prices` | **GA** | **Optional** - the *only* source of **internal** DBU-billed FM spend in USD. External spend uses `external_model_spend` (no billing grant); internal spend needs a `system.billing` grant. |
 | MCP payload logging | **Not available** | Do not claim it. |
 | Smart routing (Databricks-managed) | **Beta** | Position as roadmap; the app does not demo it. |
-| Omnigent (managed) | **Beta** (OSS available) | Partner/meta-harness layer; positioned, not demoed. |
+| Omnigent (managed) | **Beta** (OSS available) | Databricks OSS meta-harness (managed in Beta); positioned, not demoed. |
 | Lakewatch | Announced | Not a workshop step - not enabled on most accounts. Confirm status before positioning it. |
 
 ---
@@ -311,7 +311,7 @@ Three options are framed; **only the custom router executes.**
 | Option | What it is | Status | In the app |
 |---|---|---|---|
 | Smart routing | Databricks-managed model selection | **Beta** | Positioned only |
-| Omnigent | Partner meta-harness above agent harnesses | **Beta** (OSS available) | Positioned only |
+| Omnigent | Databricks OSS meta-harness above agent harnesses | **Beta** (OSS available) | Positioned only |
 | Custom router | Cheap classifier → cheapest sufficient model | Available today | **Runs live** |
 
 Implementation: `server/routing.py`. Classifier is the cheapest model, and **its cost counts

@@ -1,11 +1,11 @@
-# Accelerator — Agent Registry
+# Accelerator - Agent Registry
 
-Make agents first-class Unity Catalog assets — registered, versioned, owned, traced, and governed
+Make agents first-class Unity Catalog assets - registered, versioned, owned, traced, and governed
 like any endpoint. A ~3-hour deep dive that turns one-off agent deploys into reproducible,
 rollback-able UC models with owners and telemetry.
 
 A one-off deploy is not a registered agent. Each agent should be a UC model with an owner and a
-version history, emitting MLflow traces, and — where it runs as a serving endpoint — carrying the
+version history, emitting MLflow traces, and - where it runs as a serving endpoint - carrying the
 same rate limits, guardrails, and usage tracking a model endpoint does.
 
 ## What you'll prove
@@ -18,7 +18,7 @@ a custom agent endpoint lacks the controls a model endpoint has.
 
 | Notebook | What it is |
 |---|---|
-| [`reference_queries.py`](reference_queries.py) | The app's checks for the inventory, versioning, telemetry, and endpoint-governance steps — runnable without the app. |
+| [`reference_queries.py`](reference_queries.py) | The app's checks for the inventory, versioning, telemetry, and endpoint-governance steps - runnable without the app. |
 | [`agent_framework.py`](agent_framework.py) | Deep dive: build a Mosaic AI agent on governed endpoints, log it, and register it to Unity Catalog. |
 | [`agent_evaluation.py`](agent_evaluation.py) | Deep dive: evaluate and monitor a governed agent with MLflow judges. |
 

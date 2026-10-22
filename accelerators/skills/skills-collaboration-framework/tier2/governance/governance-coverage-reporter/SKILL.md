@@ -1,9 +1,9 @@
 ---
 name: governance-coverage-reporter
-description: Report Unity Catalog governance coverage — table comments, ownership, tags, and column documentation — from system.information_schema. Ask me which tables lack owners, descriptions, or classification tags across a catalog.
+description: Report Unity Catalog governance coverage - table comments, ownership, tags, and column documentation - from system.information_schema. Ask me which tables lack owners, descriptions, or classification tags across a catalog.
 ---
 
-> **Illustrative example** — demonstrates a well-formed `SKILL.md` for this reference
+> **Illustrative example** - demonstrates a well-formed `SKILL.md` for this reference
 > implementation. Adapt the content to your own org; do not deploy verbatim.
 
 # governance-coverage-reporter
@@ -12,8 +12,8 @@ description: Report Unity Catalog governance coverage — table comments, owners
 
 Measures Unity Catalog **governance hygiene** from the live `system.information_schema`
 metadata views: it reports which tables lack an owner, a description/comment, or classification
-tags, and summarizes documentation coverage across a catalog. This is metadata-only — it reads
-the catalog's *structure and annotations*, never the data inside any table — which keeps it a
+tags, and summarizes documentation coverage across a catalog. This is metadata-only - it reads
+the catalog's *structure and annotations*, never the data inside any table - which keeps it a
 clean Tier-2 (internal) skill.
 
 ## When to use this skill
@@ -22,7 +22,7 @@ Reach for this skill when a data-governance or privacy user asks about catalog h
 
 - "Which tables in the `main` catalog have no description?"
 - "How many tables are missing an owner?"
-- "Show me governance coverage — what share of tables have comments and tags?"
+- "Show me governance coverage - what share of tables have comments and tags?"
 - "Which schemas have the worst documentation coverage?"
 
 ## Instructions
@@ -89,21 +89,21 @@ ORDER BY tagged_tables ASC
 
 After presenting results, always include:
 
-1. **Biggest gap** — the schema with the lowest documentation or tag coverage, named.
-2. **Coverage headline** — the overall share of tables with owners / comments / tags.
-3. **Quick win** — one prioritized action (e.g. "assign owners to the N ownerless tables in schema X first").
+1. **Biggest gap** - the schema with the lowest documentation or tag coverage, named.
+2. **Coverage headline** - the overall share of tables with owners / comments / tags.
+3. **Quick win** - one prioritized action (e.g. "assign owners to the N ownerless tables in schema X first").
 
 ## Edge cases
 
-- **Empty catalog** — if the requested catalog has no tables, say so rather than returning
+- **Empty catalog** - if the requested catalog has no tables, say so rather than returning
   a zero-row summary with no context.
-- **Permission scope** — `information_schema` only surfaces objects the caller can see; note
+- **Permission scope** - `information_schema` only surfaces objects the caller can see; note
   that coverage is relative to visible objects, not necessarily the whole metastore.
-- **Metadata only** — this skill never reads table *contents*. If asked about the data inside
+- **Metadata only** - this skill never reads table *contents*. If asked about the data inside
   a table, redirect: that is a data-query task, not a governance-coverage task.
 
 ## Data scope
 
-- `system.information_schema.tables` — table inventory, owner, and comment metadata
-- `system.information_schema.table_tags` — classification/governance tag assignments
-- No PII or table contents are accessed — this skill reads catalog metadata only.
+- `system.information_schema.tables` - table inventory, owner, and comment metadata
+- `system.information_schema.table_tags` - classification/governance tag assignments
+- No PII or table contents are accessed - this skill reads catalog metadata only.

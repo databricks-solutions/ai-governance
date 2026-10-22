@@ -61,7 +61,7 @@ assert_tier() {
   if [[ $actual -eq $expected ]]; then echo "PASS: $desc"; ((PASS++)); else echo "FAIL: $desc (expected $expected, got $actual)"; ((FAIL++)); fi
 }
 
-# T2 override advisory, T3 override auto-drop, global advisory: T2 passes, T3 blocks — same score.
+# T2 override advisory, T3 override auto-drop, global advisory: T2 passes, T3 blocks - same score.
 assert_tier "per-tier: T2 advisory below-threshold passes"  0 2 EVAL_GATE_MODE=advisory EVAL_GATE_MODE_T2=advisory EVAL_GATE_MODE_T3=auto-drop
 assert_tier "per-tier: T3 auto-drop below-threshold blocks" 1 3 EVAL_GATE_MODE=advisory EVAL_GATE_MODE_T2=advisory EVAL_GATE_MODE_T3=auto-drop
 

@@ -4,7 +4,7 @@ CI_SYSTEM="${CI_SYSTEM:-ado}"   # ado is the live CI here; the github path is ke
 
 if [[ "$CI_SYSTEM" == "ado" ]]; then
   : "${ADO_ORG:?}"; : "${ADO_PROJECT:?}"; : "${ADO_REPO:?}"; : "${ADO_TOKEN:?}"; : "${ADO_BUILD_DEF_ID:?}"
-  # ADO_AUTH: 'bearer' (default — CI OAuth token) or 'pat' (classic PAT, sent as HTTP Basic).
+  # ADO_AUTH: 'bearer' (default - CI OAuth token) or 'pat' (classic PAT, sent as HTTP Basic).
   # Running this by hand you'll typically use a PAT: export ADO_AUTH=pat.
   ADO_AUTH="${ADO_AUTH:-bearer}"
   if [[ "$ADO_AUTH" == "pat" ]]; then
@@ -14,7 +14,7 @@ if [[ "$CI_SYSTEM" == "ado" ]]; then
   fi
   if CI_SYSTEM=ado ADO_ORG="$ADO_ORG" ADO_PROJECT="$ADO_PROJECT" ADO_REPO="$ADO_REPO" \
      ADO_TOKEN="$ADO_TOKEN" ADO_AUTH="$ADO_AUTH" bash scripts/check-branch-protection.sh >/dev/null 2>&1; then
-    echo "==> ADO build-validation policy already present on main — nothing to do."
+    echo "==> ADO build-validation policy already present on main - nothing to do."
     exit 0
   fi
   RID=$(curl -sf -H "$ADO_AUTH_HEADER" \

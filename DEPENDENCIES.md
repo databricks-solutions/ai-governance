@@ -2,11 +2,11 @@
 
 This repository ships three distributables, each with its own dependency set:
 
-- **`workshop_app/`** — the customer-facing AI Governance Workshop app (FastAPI backend +
+- **`workshop_app/`** - the customer-facing AI Governance Workshop app (FastAPI backend +
   React/Vite frontend).
-- **`intelligent-ai-finops/`** — a standalone "smart routing" FinOps Databricks App (FastAPI
+- **`intelligent-ai-finops/`** - a standalone "smart routing" FinOps Databricks App (FastAPI
   backend + React/Vite frontend).
-- **`accelerators/`** — Databricks reference notebooks. Each notebook `%pip install`s its own
+- **`accelerators/`** - Databricks reference notebooks. Each notebook `%pip install`s its own
   dependencies at runtime, so the repo pins no notebook runtime dependencies; the top-level
   `pyproject.toml` only configures `ruff` for local linting.
 
@@ -25,7 +25,7 @@ Security and version updates are tracked automatically by Dependabot
 > inside `workshop_app/frontend/` (and `intelligent-ai-finops/`). Frontend licenses below were
 > confirmed against installed `node_modules/*/package.json`.
 
-## workshop_app — Python backend
+## workshop_app - Python backend
 
 Source of truth: `workshop_app/pyproject.toml` and `workshop_app/requirements.txt`.
 
@@ -39,7 +39,7 @@ Source of truth: `workshop_app/pyproject.toml` and `workshop_app/requirements.tx
 | python-multipart | >=0.0.12 | Apache-2.0 | Multipart form parsing (FastAPI uploads) | https://github.com/Kludex/python-multipart |
 | reportlab | >=4.2 | BSD-3-Clause | Server-side PDF leave-behinds (brochure, prerequisites, outcomes) | https://github.com/MrBitBucket/reportlab-mirror |
 
-## workshop_app — frontend (runtime)
+## workshop_app - frontend (runtime)
 
 Source of truth: `workshop_app/frontend/package.json` (`dependencies`).
 
@@ -51,7 +51,7 @@ Source of truth: `workshop_app/frontend/package.json` (`dependencies`).
 | clsx | 2.1.1 | MIT | Conditional className builder | https://github.com/lukeed/clsx |
 | tailwind-merge | 3.4.0 | MIT | Merge conflicting Tailwind classes | https://github.com/dcastil/tailwind-merge |
 
-## workshop_app — frontend (dev / build only)
+## workshop_app - frontend (dev / build only)
 
 Source of truth: `workshop_app/frontend/package.json` (`devDependencies`). Not shipped in the
 served bundle; used only to build `frontend/dist`.
@@ -66,7 +66,7 @@ served bundle; used only to build `frontend/dist`.
 | @types/react | 19.2.7 | MIT | React type definitions | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | @types/react-dom | 19.2.3 | MIT | React DOM type definitions | https://github.com/DefinitelyTyped/DefinitelyTyped |
 
-## intelligent-ai-finops — Python backend
+## intelligent-ai-finops - Python backend
 
 Source of truth: `intelligent-ai-finops/requirements.txt` (exact `==` pins).
 
@@ -81,7 +81,7 @@ Source of truth: `intelligent-ai-finops/requirements.txt` (exact `==` pins).
 | mlflow-skinny | 3.15.2 | Apache-2.0 | Best-effort LLM-as-judge run logging | https://github.com/mlflow/mlflow |
 | pg8000 | 1.31.5 | BSD-3-Clause | Pure-Python Postgres driver for the durable Lakebase cache (cost cache + pgvector semantic cache). Chosen over psycopg (LGPL) to keep this repo copyleft-free. Transitive deps `scramp` (MIT-0) and `asn1crypto` (MIT). | https://github.com/tlocke/pg8000 |
 
-## intelligent-ai-finops — frontend (runtime)
+## intelligent-ai-finops - frontend (runtime)
 
 Source of truth: `intelligent-ai-finops/package.json` (`dependencies`).
 
@@ -94,11 +94,11 @@ Source of truth: `intelligent-ai-finops/package.json` (`dependencies`).
 | @dnd-kit/sortable | 8.0.0 | MIT | Sortable helpers for dnd-kit | https://github.com/clauderic/dnd-kit |
 | @dnd-kit/utilities | 3.2.2 | MIT | CSS/transform utilities for dnd-kit | https://github.com/clauderic/dnd-kit |
 
-## intelligent-ai-finops — frontend (dev / build only)
+## intelligent-ai-finops - frontend (dev / build only)
 
 Source of truth: `intelligent-ai-finops/package.json` (`devDependencies`). Not shipped in the
 served bundle; used only to build `dist/`. (This app uses Tailwind v3 + PostCSS + Autoprefixer,
-whereas `workshop_app` uses the Tailwind v4 `@tailwindcss/vite` plugin — both MIT.)
+whereas `workshop_app` uses the Tailwind v4 `@tailwindcss/vite` plugin - both MIT.)
 
 | Package | Version | License | Purpose | Source |
 |---|---|---|---|---|
@@ -113,9 +113,9 @@ whereas `workshop_app` uses the Tailwind v4 `@tailwindcss/vite` plugin — both 
 | vitest | 2.1.9 | MIT | Unit test runner | https://github.com/vitest-dev/vitest |
 | @playwright/test | 1.62.1 | Apache-2.0 | Browser test runner (dev/CI only) | https://github.com/microsoft/playwright |
 
-## accelerators — reference notebooks
+## accelerators - reference notebooks
 
-The accelerator notebooks pin no runtime dependencies in the repo — each notebook `%pip
+The accelerator notebooks pin no runtime dependencies in the repo - each notebook `%pip
 install`s what it needs so it runs standalone on Databricks. The libraries they commonly
 install, all permissively licensed:
 
