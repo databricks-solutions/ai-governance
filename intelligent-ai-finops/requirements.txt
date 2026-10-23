@@ -1,10 +1,10 @@
 # Backend dependencies - pinned to audited versions (see DEPENDENCIES.md).
 # All permissive OSS licenses (MIT / BSD-3-Clause / Apache-2.0); no copyleft.
-fastapi==0.141.1            # MIT - web framework (serves ./dist + /api)
+fastapi==0.143.2            # MIT - web framework (serves ./dist + /api)
 uvicorn[standard]==0.54.0   # BSD-3-Clause - ASGI server
-databricks-sdk==0.142.0     # Apache-2.0 - workspace auth + Model Serving access
-pydantic==2.13.5            # MIT - request/response models
+databricks-sdk==0.150.0     # Apache-2.0 - workspace auth + Model Serving access
+pydantic==2.14.1            # MIT - request/response models
 pyyaml==6.0.3               # MIT - reads config/*.yaml
 requests==2.34.2            # Apache-2.0 - HTTP calls to the FMAPI /invocations endpoint
-mlflow-skinny==3.16.1       # Apache-2.0 - best-effort LLM-as-judge run logging
+mlflow-skinny==3.17.1       # Apache-2.0 - best-effort LLM-as-judge run logging
 pg8000==1.31.5              # BSD-3-Clause - pure-Python Postgres driver for the Lakebase durable cache (permissive; no copyleft)
