@@ -429,15 +429,17 @@ def _poc_table(headers, rows, widths, group_rows, C):
     from reportlab.lib.colors import HexColor
     from reportlab.platypus import Paragraph, Table, TableStyle
 
-    # Header text white via inline font colour - a Paragraph's own colour wins over TableStyle.
-    head = [Paragraph(f'<font color="#FFFFFF">{h}</font>', C["cell_head"]) for h in headers]
+    # All cell text runs through _md_inline (which _esc-escapes first), so an & / < / > in a
+    # customer name, step title, note, or objective cannot corrupt reportlab's paragraph parser.
+    # Header text is additionally wrapped white (a Paragraph's own colour wins over TableStyle).
+    head = [Paragraph(f'<font color="#FFFFFF">{_esc(h)}</font>', C["cell_head"]) for h in headers]
     body = [head]
     for ri, r in enumerate(rows):
         if ri in group_rows:
             # One spanned cell carries the group label; pad the rest so the row has ncols cells.
-            body.append([Paragraph(r[0], C["cell_head"])] + [""] * (len(headers) - 1))
+            body.append([Paragraph(_md_inline(r[0]), C["cell_head"])] + [""] * (len(headers) - 1))
         else:
-            body.append([Paragraph(c, C["cell"]) if c else "" for c in r])
+            body.append([Paragraph(_md_inline(c), C["cell"]) if c else "" for c in r])
     t = Table(body, colWidths=widths, repeatRows=1)
     style = [
         ("BACKGROUND", (0, 0), (-1, 0), HexColor(NAVY)),
@@ -537,7 +539,7 @@ def report_pdf(doc_data: dict) -> bytes:
         tgroup.add(len(trows))
         trows.append([g["phase"]])
         for r in g["rows"]:
-            task = r["task"] + ("  ·  <i>Add to POC</i>" if r.get("poc") else "")
+            task = r["task"] + ("  -  **Add to POC**" if r.get("poc") else "")
             trows.append([task, "", "", r.get("comments", ""), "", r.get("status", "")])
     story.append(_poc_table(
         ["Task", f"{doc_data['customer']} owner", "Databricks owner", "Comments", "Due", "Status"],

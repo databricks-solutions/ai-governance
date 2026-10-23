@@ -221,6 +221,9 @@ def _build_outcomes() -> dict:
             row = {
                 "step_id": s["id"],
                 "title": s["title"],
+                # The step-definition "We can…" statement (the real success criterion). Kept
+                # separate from `outcome` below, which is the hand-marked flag (done/na/None).
+                "criterion": s.get("outcome"),
                 "status": disp,
                 "raw_status": raw_status,
                 "outcome": outcome,

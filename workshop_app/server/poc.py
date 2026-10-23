@@ -93,7 +93,7 @@ def build_poc_doc(outcomes: dict, customer: str | None = None) -> dict:
     for g in groups:
         rows, done_titles, carried_titles = [], [], []
         for s in g["steps"]:
-            crit = s.get("outcome") or s.get("title")
+            crit = s.get("criterion") or s.get("title")
             rows.append({
                 "okr": s["title"],
                 "success_criteria": crit,
