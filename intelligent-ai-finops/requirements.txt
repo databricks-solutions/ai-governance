@@ -1,6 +1,6 @@
 # Backend dependencies - pinned to audited versions (see DEPENDENCIES.md).
 # All permissive OSS licenses (MIT / BSD-3-Clause / Apache-2.0); no copyleft.
-fastapi==0.143.2            # MIT - web framework (serves ./dist + /api)
+fastapi==0.161.1            # MIT - web framework (serves ./dist + /api)
 uvicorn[standard]==0.54.0   # BSD-3-Clause - ASGI server
 databricks-sdk==0.154.0     # Apache-2.0 - workspace auth + Model Serving access
 pydantic==2.14.1            # MIT - request/response models
