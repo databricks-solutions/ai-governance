@@ -104,10 +104,12 @@ def _durable_put(prompt: str, emb: list[float], response: dict, meta: dict) -> N
     vec, sal = _vec_literal(emb), _salient_str(prompt)
 
     def _w(cur):
-        # Dedup the exact prompt (refresh, don't accumulate duplicates) + prune the
-        # expired tail, so the table stays bounded to roughly the TTL window of
-        # distinct prompts instead of growing forever.
-        cur.execute("DELETE FROM finops.semcache WHERE prompt = %s", (prompt,))
+        # Dedup the exact prompt per serving endpoint (refresh, don't accumulate
+        # duplicates; keyed on the endpoint too since lookups are model-scoped, so one
+        # model's answer doesn't evict another's) + prune the expired tail, so the table
+        # stays bounded to roughly the TTL window of distinct prompts.
+        cur.execute("DELETE FROM finops.semcache WHERE prompt = %s AND meta->>'servedId' IS NOT DISTINCT FROM %s",
+                    (prompt, meta.get("servedId")))
         cur.execute("DELETE FROM finops.semcache WHERE ts < now() - make_interval(secs => %s)", (_DURABLE_TTL_S,))
         cur.execute(
             "INSERT INTO finops.semcache (prompt, salient, embedding, response, meta) "

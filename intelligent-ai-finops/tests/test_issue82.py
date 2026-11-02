@@ -219,3 +219,12 @@ def test_pg8000_only_uses_scramp_functions_that_exist():
             if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "scramp"}
     assert used, "expected pg8000.core to reference scramp"
     assert not [a for a in used if not hasattr(scramp, a)]
+
+
+def test_durable_put_dedups_per_served_model(monkeypatch):
+    executed = []
+    monkeypatch.setattr(semcache.lakebase, "with_conn",
+                        lambda fn: fn(SimpleNamespace(execute=lambda sql, args=(): executed.append((sql, args)))))
+    semcache._durable_put("q", EMB, {"a": 1}, {"servedId": "endpoint-b"})
+    dedup = next((sql, args) for sql, args in executed if "prompt = %s" in sql)
+    assert "servedId" in dedup[0] and dedup[1] == ("q", "endpoint-b")
