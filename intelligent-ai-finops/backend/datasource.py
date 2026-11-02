@@ -22,10 +22,13 @@ never hard-fails.
 from __future__ import annotations
 
 import os
+import time
 
 from . import models
 
 _DBU_TO_USD_DEFAULT = 0.07
+# Total budget for one statement (the API waits at most 50s per call, then we poll).
+_SQL_TIMEOUT_S = float(os.environ.get("FINOPS_SQL_TIMEOUT_S", "120"))
 
 
 def _tier_for(model_name: str) -> str:
@@ -60,10 +63,29 @@ def _run(warehouse_id: str, sql: str) -> list[dict]:
     """Execute one SQL statement on the warehouse as the app's SP; return rows as dicts."""
     from databricks.sdk import WorkspaceClient
 
+    from databricks.sdk.service.sql import StatementState
+
     w = WorkspaceClient()
+    deadline = time.monotonic() + _SQL_TIMEOUT_S
     resp = w.statement_execution.execute_statement(
         warehouse_id=warehouse_id, statement=sql, wait_timeout="50s",
     )
+    # A cold/slow warehouse returns PENDING/RUNNING with no result after the 50s wait.
+    # Treating that as "no rows" would cache real spend as $0, so poll to a terminal
+    # state and raise on timeout/failure (every caller falls back to demo on raise).
+    while resp.status and resp.status.state in (StatementState.PENDING, StatementState.RUNNING):
+        if time.monotonic() >= deadline:
+            try:
+                w.statement_execution.cancel_execution(resp.statement_id)
+            except Exception:  # noqa: BLE001 - best-effort cancel; the timeout is the error
+                pass
+            raise TimeoutError(f"SQL statement did not finish within {_SQL_TIMEOUT_S:.0f}s")
+        time.sleep(2)
+        resp = w.statement_execution.get_statement(resp.statement_id)
+    state = resp.status.state if resp.status else None
+    if state != StatementState.SUCCEEDED:
+        err = resp.status.error.message if resp.status and resp.status.error else ""
+        raise RuntimeError(f"SQL statement {state.value if state else 'UNKNOWN'}: {err}"[:300])
     result = resp.result
     if result is None or not result.data_array:
         return []

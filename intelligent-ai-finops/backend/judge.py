@@ -66,8 +66,9 @@ def _extract_score_reason(text: str) -> tuple[float | None, str]:
     the `"score":` key even when the closing brace (and the reason) are cut off -
     which is exactly the case that used to fall through to a bogus neutral 5.0 on
     every lane. Layered: (1) clean JSON, (2) score-key regex on unclosed JSON,
-    (3) an explicit "Score: N" / "N/10" phrasing. A bare number anywhere is NOT
-    accepted (it wrongly matched digits like "112%" inside the reason)."""
+    (3) an explicit "Score: N" phrasing, or a reply that is ONLY "N/10". A bare number
+    or ratio anywhere else is NOT accepted (it wrongly matched digits like "112%" or
+    "covers 3/10 steps" inside the reason)."""
     t = (text or "").strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     # 1) Clean JSON object.
     try:
@@ -84,8 +85,8 @@ def _extract_score_reason(text: str) -> tuple[float | None, str]:
     if ms:
         mr = re.search(r'"reason"\s*:\s*"([^"]*)', t)
         return float(ms.group(1)), (mr.group(1).strip() if mr else "")
-    # 3) Free-text phrasing like "Score: 8" or "8/10".
-    mp = re.search(r'(?:score\D{0,8}|rating\D{0,8})([0-9]{1,2}(?:\.[0-9])?)|\b([0-9]{1,2}(?:\.[0-9])?)\s*/\s*10', t, re.I)
+    # 3) Free-text phrasing like "Score: 8" / "Rating: 8/10", or a bare "8/10" reply.
+    mp = re.search(r'(?:score\D{0,8}|rating\D{0,8})([0-9]{1,2}(?:\.[0-9])?)|^([0-9]{1,2}(?:\.[0-9])?)\s*/\s*10\W*$', t, re.I)
     if mp:
         return float(mp.group(1) or mp.group(2)), ""
     return None, ""

@@ -198,7 +198,11 @@ def serve(messages: list[dict], requested_model: str | None = None, options: dic
     if sc_on:
         t0 = time.monotonic()
         sc_emb = _sem.embed(prompt)
-        hit = _sem.lookup(prompt, sc_cfg.get("threshold"), embedding=sc_emb) if sc_emb else None
+        # Only reuse an answer one of THIS request's candidates served: the pinned
+        # endpoint for passthrough, the policy's model set for finops-auto.
+        allowed = [m.id for m in candidates]
+        hit = (_sem.lookup(prompt, sc_cfg.get("threshold"), embedding=sc_emb, served_ids=allowed)
+               if sc_emb else None)
         if hit:
             meta = hit["meta"]
             saved = float(meta.get("costUsd") or 0.0)

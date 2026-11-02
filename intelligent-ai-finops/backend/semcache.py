@@ -104,10 +104,12 @@ def _durable_put(prompt: str, emb: list[float], response: dict, meta: dict) -> N
     vec, sal = _vec_literal(emb), _salient_str(prompt)
 
     def _w(cur):
-        # Dedup the exact prompt (refresh, don't accumulate duplicates) + prune the
-        # expired tail, so the table stays bounded to roughly the TTL window of
-        # distinct prompts instead of growing forever.
-        cur.execute("DELETE FROM finops.semcache WHERE prompt = %s", (prompt,))
+        # Dedup the exact prompt per serving endpoint (refresh, don't accumulate
+        # duplicates; keyed on the endpoint too since lookups are model-scoped, so one
+        # model's answer doesn't evict another's) + prune the expired tail, so the table
+        # stays bounded to roughly the TTL window of distinct prompts.
+        cur.execute("DELETE FROM finops.semcache WHERE prompt = %s AND meta->>'servedId' IS NOT DISTINCT FROM %s",
+                    (prompt, meta.get("servedId")))
         cur.execute("DELETE FROM finops.semcache WHERE ts < now() - make_interval(secs => %s)", (_DURABLE_TTL_S,))
         cur.execute(
             "INSERT INTO finops.semcache (prompt, salient, embedding, response, meta) "
@@ -117,19 +119,24 @@ def _durable_put(prompt: str, emb: list[float], response: dict, meta: dict) -> N
     lakebase.with_conn(_w)
 
 
-def _durable_lookup(prompt: str, emb: list[float], th: float) -> dict | None:
+def _durable_lookup(prompt: str, emb: list[float], th: float,
+                    served_ids: list[str] | None = None) -> dict | None:
     """Nearest neighbour in the durable table with the SAME salient set (the
     numbers/dates guard) AND within the durable TTL, scored by cosine similarity
     (1 - pgvector `<=>`). The TTL filter mirrors L1's freshness so L2 never serves a
-    stale answer as fresh."""
+    stale answer as fresh. `served_ids` (when set) restricts hits to answers served
+    by one of those endpoints."""
     vec, sal = _vec_literal(emb), _salient_str(prompt)
 
     def _q(cur):
+        model_sql, model_args = "", ()
+        if served_ids is not None:
+            model_sql, model_args = " AND meta->>'servedId' = ANY(%s::text[])", (list(served_ids),)
         cur.execute(
             "SELECT prompt, response, meta, 1 - (embedding <=> %s::vector) AS sim "
-            "FROM finops.semcache WHERE salient = %s AND ts > now() - make_interval(secs => %s) "
-            "ORDER BY embedding <=> %s::vector LIMIT 1",
-            (vec, sal, _DURABLE_TTL_S, vec))
+            "FROM finops.semcache WHERE salient = %s AND ts > now() - make_interval(secs => %s)"
+            + model_sql + " ORDER BY embedding <=> %s::vector LIMIT 1",
+            (vec, sal, _DURABLE_TTL_S, *model_args, vec))
         return cur.fetchone()
     row = lakebase.with_conn(_q)
     if row and row[3] is not None and float(row[3]) >= th:
@@ -149,10 +156,13 @@ def _put_local(prompt: str, emb: list[float], response: dict, meta: dict) -> Non
 
 
 def lookup(prompt: str, threshold: float | None = None,
-           embedding: list[float] | None = None) -> dict | None:
+           embedding: list[float] | None = None,
+           served_ids: list[str] | None = None) -> dict | None:
     """Find the nearest cached prompt by cosine similarity. Returns the stored hit
     (response + meta + similarity) when the best match clears the threshold, else
-    None. Reuses a precomputed `embedding` if the caller already has one."""
+    None. Reuses a precomputed `embedding` if the caller already has one.
+    `served_ids` (when set) only accepts answers served by one of those endpoints, so
+    a pinned passthrough request never gets another model's answer."""
     th = threshold if threshold is not None else _DEFAULT_THRESHOLD
     emb = embedding if embedding is not None else embed(prompt)
     if not emb:
@@ -172,6 +182,8 @@ def lookup(prompt: str, threshold: float | None = None,
             # the query - "Q4 2026" and "Q3 2026" embed at ~0.99 but are different asks.
             if e.get("salient") != q_sal:
                 continue
+            if served_ids is not None and e["meta"].get("servedId") not in served_ids:
+                continue
             sim = _cosine(emb, qn, e["emb"], e["norm"])
             if sim > best_sim:
                 best_sim, best = sim, e
@@ -180,7 +192,7 @@ def lookup(prompt: str, threshold: float | None = None,
                 "similarity": round(best_sim, 4), "prompt": best["prompt"]}
     # L1 miss → try the durable L2 (survives restarts/replicas). Hydrate L1 on a hit
     # so the next same-process lookup is instant.
-    d = _durable_lookup(prompt, emb, th)
+    d = _durable_lookup(prompt, emb, th, served_ids)
     if d is not None:
         _put_local(prompt, emb, d["response"], d["meta"])
         return d
@@ -226,7 +238,9 @@ def stats() -> dict:
 
 
 def clear() -> None:
-    """Reset the cache and stats (used by the demo's 'clear cache' control)."""
+    """Reset the cache and stats (used by the demo's 'clear cache' control). Clears
+    the durable L2 too, otherwise the next lookup would re-hydrate L1 from it."""
     with _lock:
         _store.clear()
         _stats.update({"hits": 0, "misses": 0, "savedUsd": 0.0})
+    lakebase.with_conn(lambda cur: cur.execute("DELETE FROM finops.semcache"))
