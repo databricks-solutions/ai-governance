@@ -200,3 +200,22 @@ def test_compression_stats_consistent(text):
 ])
 def test_judge_score_extraction(text, expected):
     assert judge._extract_score_reason(text)[0] == expected
+
+
+# ---- Lakebase driver: pg8000 must match the installed scramp ----------------------
+
+def test_pg8000_only_uses_scramp_functions_that_exist():
+    # scramp 1.5.0 removed make_channel_binding; pg8000 1.31.5 still called it on every
+    # connect, so Lakebase silently degraded to in-process (with_conn swallows errors).
+    # This catches that class of break offline, without a database.
+    import ast
+    import inspect
+
+    import pg8000.core
+    import scramp
+
+    tree = ast.parse(inspect.getsource(pg8000.core))
+    used = {n.attr for n in ast.walk(tree)
+            if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "scramp"}
+    assert used, "expected pg8000.core to reference scramp"
+    assert not [a for a in used if not hasattr(scramp, a)]
