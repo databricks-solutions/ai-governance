@@ -93,7 +93,7 @@ export function stepOutcome(saved: ProgressMap[string] | null | undefined) {
 }
 
 /** A step's unmet dependencies: the `depends_on` ids that are not yet achieved. A dependency
- *  counts as met only when it is `done` (its Try-It passed or it was hand-marked done) - an
+ *  counts as met only when it is `done` (hand-marked; a passing Try-It alone does not count) - an
  *  `action_required` prerequisite (e.g. the endpoint still needs creating) is deliberately still
  *  unmet, since that is exactly the setup this step needs. Returns [{id, title}] for the banner. */
 export function unmetDependencies(

@@ -66,7 +66,7 @@ export default function Outcomes({
       <PageHeader
         eyebrow="Track & follow up"
         title="Outcomes"
-        lead="Every core and accelerator step in one checklist. Tick Done as you run each activity - you don't have to use the interactive Try-It buttons. Running a step's Try-It marks it Done here automatically, and these ticks sync with the step cards on each page and feed the exported outcomes."
+        lead="Every core and accelerator step in one checklist. Tick Done as you run each activity - you don't have to use the interactive Try-It buttons. A passing Try-It shows a green result but does not mark the step Done, so tick it yourself once the outcome is proven. These ticks sync with the step cards on each page and feed the exported outcomes."
       />
       <div className="mx-auto max-w-4xl px-8 py-12 lg:px-14">
         {/* Overall summary */}
@@ -76,7 +76,7 @@ export default function Outcomes({
               {done} of {applicable} applicable steps achieved ({pct}%)
             </div>
             <div className="mt-0.5 text-xs text-muted">
-              A step is achieved when its Try-It test passed or you marked it Done. N/A steps are
+              A step is achieved when you mark it Done. N/A steps are
               excluded from the count.
             </div>
           </div>

@@ -73,7 +73,7 @@ export default function StepCard({
   // is working on to reveal the concept, Try-It/Verify, and results.
   const [open, setOpen] = useState(false);
   const status = saved?.status ?? "not_started";
-  // Achieved = Try-It passed OR hand-marked done; `na` = marked not-applicable.
+  // Achieved = hand-marked done (a passing Try-It never auto-marks it); `na` = marked not-applicable.
   const { done: achieved, na } = stepOutcome(saved);
 
   async function run(kind: "action" | "verify", test: string) {
