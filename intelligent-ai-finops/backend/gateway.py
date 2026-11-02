@@ -12,6 +12,7 @@ predictable in front of a customer.
 from __future__ import annotations
 
 import re
+import threading
 import time
 
 from . import compare, compress, judge, models, routing, smartrouting
@@ -19,20 +20,30 @@ from . import guardrails as _guard
 
 # In-process per-user sliding-window rate limiter (app-enforced, Idea 2). One process
 # per app replica - fine for the demo; a shared store (Lakebase) would make it global.
+# Users idle for a full window are swept out (at most once a minute) so the map stays
+# bounded by recently-active users instead of growing for the life of the replica.
 _RL: dict[str, list[float]] = {}
+_RL_LOCK = threading.Lock()
+_RL_LAST_SWEEP = 0.0
 
 
 def _rate_check(user: str, per_min: int) -> tuple[bool, int]:
     """Record a request for `user` and report (allowed, count_in_last_minute). Refuses
     (allowed=False) once the last-60s count would exceed per_min."""
+    global _RL_LAST_SWEEP
     now = time.time()
-    win = [t for t in _RL.get(user, []) if t >= now - 60]
-    if len(win) >= per_min:
+    with _RL_LOCK:
+        if now - _RL_LAST_SWEEP >= 60:
+            for u in [u for u, ts in _RL.items() if not ts or ts[-1] < now - 60]:
+                del _RL[u]
+            _RL_LAST_SWEEP = now
+        win = [t for t in _RL.get(user, []) if t >= now - 60]
+        if len(win) >= per_min:
+            _RL[user] = win
+            return False, len(win)
+        win.append(now)
         _RL[user] = win
-        return False, len(win)
-    win.append(now)
-    _RL[user] = win
-    return True, len(win)
+        return True, len(win)
 
 # Governance features shown as ticks in the box. `feature` maps to the config
 # panel; `label` is display text; `category` colours the tick.

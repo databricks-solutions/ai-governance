@@ -43,12 +43,13 @@ def compress_prompt(text: str | None) -> dict:
     c = re.sub(r"[ \t]{2,}", " ", c).strip()
     before, after = _tok(original), _tok(c)
     win = after < before
+    sent = after if win else before  # the original is sent when compression doesn't help
     return {
         "compressed": c if win else original,
         "tokensBefore": before,
-        "tokensAfter": after if win else before,
-        "savedTokens": max(0, before - after),
-        "savedPct": round((1 - after / before) * 100) if before else 0,
+        "tokensAfter": sent,
+        "savedTokens": before - sent,
+        "savedPct": round((before - sent) / before * 100) if before else 0,
     }
 
 
